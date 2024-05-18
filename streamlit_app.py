@@ -1,13 +1,19 @@
 import streamlit as st
+from fluids.units import *
+from thermo.units import Stream
+
 
 # Título de la aplicación
 st.title("Suma de dos números")
 
 # Entradas para los dos números
-num1 = st.number_input("Ingrese el primer número", value=0)
-num2 = st.number_input("Ingrese el segundo número", value=0)
+T = st.number_input("Ingrese la temperatura [°C]", value=0)
+P = st.number_input("Ingrese la presión [bar(a)]", value=0)
+
+T = T * u.degC
+P = P * u.bar
 
 # Botón para realizar la suma
 if st.button("Sumar"):
-    suma = num1 + num2
-    st.write(f"La suma de {num1} y {num2} es {suma}")
+    steam = Stream('water', T = T, P = P, m = 40000 * u.kg / u.hr)
+    st.write(f"La entalpía a {T} y {P} es {steam.h}")
