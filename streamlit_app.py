@@ -15,4 +15,4 @@ p = st.number_input("Ingrese la presión [bar(a)]", value=0.0, step=0.01, format
 # Botón para calcular la entalpía
 if st.button("Calcular"):
     h = cp.PropsSI('H', 'P', p * 1e5, 'T', t + 273.15, 'Water') / 1000  # Entalpía en [kJ/kg]
-    st.write(f"La entalpía a {t:.2f} °C y {p:.2f} bar(a) es {h:.2f} kJ/kg.")g.")
+    st.write(f"La entalpía a {t:.2f} °C y {p:.2f} bar(a) es {h:.2f} kJ/kg.")
