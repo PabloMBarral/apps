@@ -99,8 +99,10 @@ option = st.sidebar.radio("", ("Temperatura y Presión",
                                 ))
 
 # Texto adicional
-st.sidebar.write("Desarrollado por Pablo M. Barral para **Tecnología del Calor**. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp.")
-st.sidebar.write("Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp.")
+st.sidebar.write("Desarrollado por Pablo M. Barral para **Tecnología del Calor**.")
+st.sidebar.write("Versión: 0.01.")
+st.sidebar.write("Contacto: pbarral@fi.uba.ar.")
+st.sidebar.write("Powered by CoolProp.")
 st.sidebar.markdown("[Readme.md](https://github.com/PabloMBarral/apps/blob/850f68ccf322553bd7eedfdf585b52ca7c1260de/README.md)")
 
 # Separador
