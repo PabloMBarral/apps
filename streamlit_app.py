@@ -89,13 +89,13 @@ def calcular_propiedades(desde, **kwargs):
 
 # Formulario para seleccionar la opción
 st.sidebar.title("Seleccioná una opción:")
-option = st.sidebar.radio("", ("Temperatura y Presión", 
-                                "Presión y Entalpía",
-                                "Entalpía y Entropía",
-                                "Presión y Título",
-                                "Temperatura y Título",
-                                "Presión y Entropía",
-                                "Temperatura y Entropía"
+option = st.sidebar.radio("", ("ty y p", 
+                                "p y h",
+                                "h y s",
+                                "p y t",
+                                "t y x",
+                                "p y s",
+                                "t y s"
                                 ))
 
 # Texto adicional
