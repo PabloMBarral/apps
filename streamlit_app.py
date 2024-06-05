@@ -65,15 +65,6 @@ def calcular_propiedades(desde, **kwargs):
             h = cp.PropsSI('H', 'P', p_pascal, 'S', s_joules, 'Water') / 1000
             x = cp.PropsSI('Q', 'P', p_pascal, 'S', s_joules, 'Water')
             t = t_kelvin - 273.15
-        elif desde == 'TH':
-            t_kelvin = kwargs['t'] + 273.15
-            h_joules = kwargs['h'] * 1000
-            t = kwargs['t']
-            h = kwargs['h']
-            p_pascal = cp.PropsSI('P', 'T', t_kelvin, 'H', h_joules, 'Water')
-            s = cp.PropsSI('S', 'T', t_kelvin, 'H', h_joules, 'Water') / 1000
-            x = cp.PropsSI('Q', 'T', t_kelvin, 'H', h_joules, 'Water')
-            p = p_pascal / 1e5
         elif desde == 'TS':
             t_kelvin = kwargs['t'] + 273.15
             s_joules = kwargs['s'] * 1000
@@ -193,23 +184,6 @@ if ps_submit_button:
         st.write(f"Resultados a {p:.2f} bar(a) y {s:.4f} kJ/(kg·K):")
         st.write(f"Temperatura: {t:.2f} °C")
         st.write(f"Entalpía: {h:.2f} kJ/kg")
-        st.write(f"Título: {x:.2f}")
-
-# Separador
-st.markdown("---")
-
-# Formulario para Temperatura y Entalpía
-with st.form(key='th_form'):
-    t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
-    h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f")
-    th_submit_button = st.form_submit_button(label='Calcular desde Temperatura y Entalpía')
-
-if th_submit_button:
-    t, p, h, s, x = calcular_propiedades('TH', t=t, h=h)
-    if t is not None:
-        st.write(f"Resultados a {t:.2f} °C y {h:.2f} kJ/kg:")
-        st.write(f"Presión: {p:.2f} bar(a)")
-        st.write(f"Entropía: {s:.4f} kJ/(kg·K)")
         st.write(f"Título: {x:.2f}")
 
 # Separador
