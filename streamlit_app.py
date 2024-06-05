@@ -88,14 +88,22 @@ def calcular_propiedades(desde, **kwargs):
 
 
 # Formulario para seleccionar la opción
-option = st.radio("Seleccioná una opción:", ("t y p", 
-                                             "p y h",
-                                             "h y s",
-                                             "p y x",
-                                             "t y x",
-                                             "p y s",
-                                             "t y s"
-                                             ))
+st.sidebar.title("Selecciona una opción:")
+option = st.sidebar.radio("", ("Temperatura y Presión", 
+                                "Presión y Entalpía",
+                                "Entalpía y Entropía",
+                                "Presión y Título",
+                                "Temperatura y Título",
+                                "Presión y Entropía",
+                                "Temperatura y Entropía"
+                                ))
+
+# Texto adicional
+st.sidebar.write("Desarrollado por Pablo M. Barral para **Tecnología del Calor**. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp.")
+st.sidebar.markdown("[Readme.md](https://github.com/PabloMBarral/apps/blob/850f68ccf322553bd7eedfdf585b52ca7c1260de/README.md)")
+
+# Separador
+st.sidebar.markdown("---")
 
 if option == 't y p':
 
@@ -240,6 +248,6 @@ elif option == 't y s':
 
 
 # Separador
-st.markdown("---")
+#st.markdown("---")
 # Texto adicional
-st.write("Desarrollado por Pablo M. Barral para **Tecnología del Calor**. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp. Ver [Readme.md](https://github.com/PabloMBarral/apps/blob/850f68ccf322553bd7eedfdf585b52ca7c1260de/README.md) en Github.")
+#st.write("Desarrollado por Pablo M. Barral para **Tecnología del Calor**. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp. Ver [Readme.md](https://github.com/PabloMBarral/apps/blob/850f68ccf322553bd7eedfdf585b52ca7c1260de/README.md) en Github.")
