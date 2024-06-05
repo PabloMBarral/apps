@@ -86,7 +86,7 @@ def calcular_propiedades(desde, **kwargs):
 
 
 # Formulario para seleccionar la opción
-option = st.radio("Seleccione una opción:", ("t y p", 
+option = st.radio("Seleccioná una opción:", ("t y p", 
                                              "p y h",
                                              "h y s",
                                              "p y x",
@@ -117,9 +117,6 @@ if option == 't y p':
             st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
 
 
-# Separador
-# st.markdown("---")
-
 elif option == 'p y h':
 
 
@@ -140,108 +137,105 @@ elif option == 'p y h':
         else:
             st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
 
-# Separador
-#st.markdown("---")
 
-# Formulario para Entalpía y Entropía
-st.write("### Entalpía y Entropía")
-with st.form(key='hs_form'):
-    h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f")
-    s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
-    hs_submit_button = st.form_submit_button(label='Calcular desde Entalpía y Entropía')
+elif option == 'h y s':
 
-if hs_submit_button:
-    t, p, h, s, x = calcular_propiedades('HS', h=h, s=s)
-    if t is not None:
-        st.write(f"Resultados a {h:.2f} kJ/kg y {s:.4f} kJ/(kg·K):")
-        st.write(f"Temperatura: {t:.2f} °C")
-        st.write(f"Presión: {p:.2f} bar(a)")
-        st.write(f"Título: {x:.2f}")
-    else:
-        st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
+    # Formulario para Entalpía y Entropía
+    st.write("### Entalpía y Entropía")
+    with st.form(key='hs_form'):
+        h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f")
+        s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
+        hs_submit_button = st.form_submit_button(label='Calcular desde Entalpía y Entropía')
 
-# Separador
-#st.markdown("---")
+    if hs_submit_button:
+        t, p, h, s, x = calcular_propiedades('HS', h=h, s=s)
+        if t is not None:
+            st.write(f"Resultados a {h:.2f} kJ/kg y {s:.4f} kJ/(kg·K):")
+            st.write(f"Temperatura: {t:.2f} °C")
+            st.write(f"Presión: {p:.2f} bar(a)")
+            st.write(f"Título: {x:.2f}")
+        else:
+            st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
 
-# Formulario para Presión y Título
-st.write("### Presión y Título")
-with st.form(key='px_form'):
-    p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
-    x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f")
-    px_submit_button = st.form_submit_button(label='Calcular desde Presión y Título')
+elif option == 'p y x':
 
-if px_submit_button:
-    t, p, h, s, x = calcular_propiedades('PX', p=p, x=x)
-    if t is not None:
-        st.write(f"Resultados a {p:.2f} bar(a) y {x:.2f}:")
-        st.write(f"Temperatura: {t:.2f} °C")
-        st.write(f"Entalpía: {h:.2f} kJ/kg")
-        st.write(f"Entropía: {s:.4f} kJ/(kg·K)")
-    else:
-        st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
+    # Formulario para Presión y Título
+    st.write("### Presión y Título")
+    with st.form(key='px_form'):
+        p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
+        x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f")
+        px_submit_button = st.form_submit_button(label='Calcular desde Presión y Título')
 
-# Separador
-#st.markdown("---")
+    if px_submit_button:
+        t, p, h, s, x = calcular_propiedades('PX', p=p, x=x)
+        if t is not None:
+            st.write(f"Resultados a {p:.2f} bar(a) y {x:.2f}:")
+            st.write(f"Temperatura: {t:.2f} °C")
+            st.write(f"Entalpía: {h:.2f} kJ/kg")
+            st.write(f"Entropía: {s:.4f} kJ/(kg·K)")
+        else:
+            st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
 
-# Formulario para Temperatura y Título
-st.write("### Temperatura y Título")
-with st.form(key='tx_form'):
-    t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
-    x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f")
-    tx_submit_button = st.form_submit_button(label='Calcular desde Temperatura y Título')
 
-if tx_submit_button:
-    t, p, h, s, x = calcular_propiedades('TX', t=t, x=x)
-    if t is not None:
-        st.write(f"Resultados a {t:.2f} °C y {x:.2f}:")
-        st.write(f"Presión: {p:.2f} bar(a)")
-        st.write(f"Entalpía: {h:.2f} kJ/kg")
-        st.write(f"Entropía: {s:.4f} kJ/(kg·K)")
-    else:
-        st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
+elif option == 't y x':
 
-# Separador
-#st.markdown("---")
+    # Formulario para Temperatura y Título
+    st.write("### Temperatura y Título")
+    with st.form(key='tx_form'):
+        t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
+        x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f")
+        tx_submit_button = st.form_submit_button(label='Calcular desde Temperatura y Título')
 
-# Formulario para Presión y Entropía
-st.write("### Presión y Entropía")
-with st.form(key='ps_form'):
-    p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
-    s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
-    ps_submit_button = st.form_submit_button(label='Calcular desde Presión y Entropía')
+    if tx_submit_button:
+        t, p, h, s, x = calcular_propiedades('TX', t=t, x=x)
+        if t is not None:
+            st.write(f"Resultados a {t:.2f} °C y {x:.2f}:")
+            st.write(f"Presión: {p:.2f} bar(a)")
+            st.write(f"Entalpía: {h:.2f} kJ/kg")
+            st.write(f"Entropía: {s:.4f} kJ/(kg·K)")
+        else:
+            st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
 
-if ps_submit_button:
-    t, p, h, s, x = calcular_propiedades('PS', p=p, s=s)
-    if t is not None:
-        st.write(f"Resultados a {p:.2f} bar(a) y {s:.4f} kJ/(kg·K):")
-        st.write(f"Temperatura: {t:.2f} °C")
-        st.write(f"Entalpía: {h:.2f} kJ/kg")
-        st.write(f"Título: {x:.2f}")
-    else:
-        st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
 
-# Separador
-#st.markdown("---")
+elif option == 'p y s':
 
-# Formulario para Temperatura y Entropía
-st.write("### Temperatura y Entropía")
-with st.form(key='ts_form'):
-    t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
-    s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
-    ts_submit_button = st.form_submit_button(label='Calcular desde Temperatura y Entropía')
+    # Formulario para Presión y Entropía
+    st.write("### Presión y Entropía")
+    with st.form(key='ps_form'):
+        p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
+        s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
+        ps_submit_button = st.form_submit_button(label='Calcular desde Presión y Entropía')
 
-if ts_submit_button:
-    t, p, h, s, x = calcular_propiedades('TS', t=t, s=s)
-    if t is not None:
-        st.write(f"Resultados a {t:.2f} °C y {s:.4f} kJ/(kg·K):")
-        st.write(f"Presión: {p:.2f} bar(a)")
-        st.write(f"Entalpía: {h:.2f} kJ/kg")
-        st.write(f"Título: {x:.2f}")
-    else:
-        st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
+    if ps_submit_button:
+        t, p, h, s, x = calcular_propiedades('PS', p=p, s=s)
+        if t is not None:
+            st.write(f"Resultados a {p:.2f} bar(a) y {s:.4f} kJ/(kg·K):")
+            st.write(f"Temperatura: {t:.2f} °C")
+            st.write(f"Entalpía: {h:.2f} kJ/kg")
+            st.write(f"Título: {x:.2f}")
+        else:
+            st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
 
-# Separador
-#st.markdown("---")
+elif option == 't y s':
+
+    # Formulario para Temperatura y Entropía
+    st.write("### Temperatura y Entropía")
+    with st.form(key='ts_form'):
+        t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
+        s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
+        ts_submit_button = st.form_submit_button(label='Calcular desde Temperatura y Entropía')
+
+    if ts_submit_button:
+        t, p, h, s, x = calcular_propiedades('TS', t=t, s=s)
+        if t is not None:
+            st.write(f"Resultados a {t:.2f} °C y {s:.4f} kJ/(kg·K):")
+            st.write(f"Presión: {p:.2f} bar(a)")
+            st.write(f"Entalpía: {h:.2f} kJ/kg")
+            st.write(f"Título: {x:.2f}")
+        else:
+            st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
+
+
 
 # Texto adicional
 st.write("Desarrollado por Pablo M. Barral. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp.")
