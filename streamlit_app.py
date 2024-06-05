@@ -89,7 +89,7 @@ def calcular_propiedades(desde, **kwargs):
 
 # Formulario para seleccionar la opción
 st.sidebar.title("Seleccioná una opción:")
-option = st.sidebar.radio("", ("ty y p", 
+option = st.sidebar.radio("", ("t y p", 
                                 "p y h",
                                 "h y s",
                                 "p y t",
