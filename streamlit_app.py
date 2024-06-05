@@ -13,6 +13,8 @@ def calcular_propiedades(desde, **kwargs):
     x = None
     
     try:
+        print("Debug: Desde:", desde)
+        print("Debug: kwargs:", kwargs)
         if desde == 'TP':
             t_kelvin = kwargs['t'] + 273.15
             p_pascal = kwargs['p'] * 1e5
@@ -267,5 +269,5 @@ if ts_submit_button:
 st.markdown("---")
 
 # Texto adicional
-st.write("Desarrollado por Pablo M. Barral. Contacto: pbarral@fi.uba.ar. Powered by CoolProp.")
+st.write("Desarrollado por Pablo M. Barral. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp.")
 """
