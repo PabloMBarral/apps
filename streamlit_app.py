@@ -16,6 +16,8 @@ def calcular_propiedades(desde, **kwargs):
         if desde == 'TP':
             t_kelvin = kwargs['t'] + 273.15
             p_pascal = kwargs['p'] * 1e5
+            t = kwargs['t']
+            p = kwargs['p']
             h = cp.PropsSI('H', 'P', p_pascal, 'T', t_kelvin, 'Water') / 1000
             s = cp.PropsSI('S', 'P', p_pascal, 'T', t_kelvin, 'Water') / 1000
             x = cp.PropsSI('Q', 'P', p_pascal, 'T', t_kelvin, 'Water')
@@ -111,7 +113,7 @@ if tp_submit_button:
         st.write(f"Entropía: {s:.4f} kJ/(kg·K)")
         st.write(f"Título: {x:.2f}")
     else:
-        st.write(f"algo paso")
+        st.write(f"Algo pasó.")
 """
 # Separador
 st.markdown("---")
