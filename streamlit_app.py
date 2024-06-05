@@ -110,6 +110,8 @@ if tp_submit_button:
         st.write(f"Entalpía: {h:.2f} kJ/kg")
         st.write(f"Entropía: {s:.4f} kJ/(kg·K)")
         st.write(f"Título: {x:.2f}")
+    else
+        st.write(f"algo paso")
 """
 # Separador
 st.markdown("---")
