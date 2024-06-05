@@ -94,7 +94,7 @@ def calcular_propiedades(desde, **kwargs):
         return None, None, None, None, None
 
 # Sección para diferentes combinaciones de propiedades
-st.header("Calcular propiedades del agua")
+#st.header("Calcular propiedades del agua")
 
 # Formulario para Temperatura y Presión
 with st.form(key='tp_form'):
