@@ -13,8 +13,6 @@ def calcular_propiedades(desde, **kwargs):
     x = None
     
     try:
-        print("Debug: Desde:", desde)
-        print("Debug: kwargs:", kwargs)
         if desde == 'TP':
             t_kelvin = kwargs['t'] + 273.15
             p_pascal = kwargs['p'] * 1e5
@@ -106,8 +104,7 @@ with st.form(key='tp_form'):
 
 if tp_submit_button:
     t, p, h, s, x = calcular_propiedades('TP', t=t, p=p_t)
-    print("Debug: t =", t)
-    print("Debug: p_t =", p_t)
+
     if t is not None:
         st.write(f"Resultados a {t:.2f} °C y {p:.2f} bar(a):")
         st.write(f"Entalpía: {h:.2f} kJ/kg")
