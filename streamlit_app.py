@@ -101,8 +101,9 @@ if option == 't y p':
     st.write("### Temperatura y Presión")
 
     with st.form(key='tp_form'):
-        t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
-        p_t = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
+        t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f", min_value=0.0)
+        p_t = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f", min_value=0.0)
+
         tp_submit_button = st.form_submit_button(label='Calcular desde Temperatura y Presión')
 
     if tp_submit_button:
@@ -123,8 +124,8 @@ elif option == 'p y h':
     # Formulario para Presión y Entalpía
     st.write("### Presión y Entalpía")
     with st.form(key='ph_form'):
-        h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f")
-        p_h = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
+        h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f", min_value=0.0)
+        p_h = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f", min_value=0.0)
         ph_submit_button = st.form_submit_button(label='Calcular desde Presión y Entalpía')
 
     if ph_submit_button:
@@ -143,8 +144,8 @@ elif option == 'h y s':
     # Formulario para Entalpía y Entropía
     st.write("### Entalpía y Entropía")
     with st.form(key='hs_form'):
-        h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f")
-        s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
+        h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f", min_value=0.0)
+        s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f", min_value=0.0)
         hs_submit_button = st.form_submit_button(label='Calcular desde Entalpía y Entropía')
 
     if hs_submit_button:
@@ -162,8 +163,8 @@ elif option == 'p y x':
     # Formulario para Presión y Título
     st.write("### Presión y Título")
     with st.form(key='px_form'):
-        p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
-        x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f")
+        p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f", min_value=0.0)
+        x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f", min_value=0.0, max_value=1.0)
         px_submit_button = st.form_submit_button(label='Calcular desde Presión y Título')
 
     if px_submit_button:
@@ -182,8 +183,8 @@ elif option == 't y x':
     # Formulario para Temperatura y Título
     st.write("### Temperatura y Título")
     with st.form(key='tx_form'):
-        t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
-        x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f")
+        t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f", min_value=0.0)
+        x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f", min_value=0.0, max_value=1.0)
         tx_submit_button = st.form_submit_button(label='Calcular desde Temperatura y Título')
 
     if tx_submit_button:
@@ -202,8 +203,8 @@ elif option == 'p y s':
     # Formulario para Presión y Entropía
     st.write("### Presión y Entropía")
     with st.form(key='ps_form'):
-        p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
-        s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
+        p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f", min_value=0.0)
+        s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f", min_value=0.0)
         ps_submit_button = st.form_submit_button(label='Calcular desde Presión y Entropía')
 
     if ps_submit_button:
@@ -221,8 +222,8 @@ elif option == 't y s':
     # Formulario para Temperatura y Entropía
     st.write("### Temperatura y Entropía")
     with st.form(key='ts_form'):
-        t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
-        s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
+        t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f", min_value=0.0)
+        s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f", min_value=0.0)
         ts_submit_button = st.form_submit_button(label='Calcular desde Temperatura y Entropía')
 
     if ts_submit_button:
