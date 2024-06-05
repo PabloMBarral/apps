@@ -121,7 +121,7 @@ elif option == 'p y h':
 
 
     # Formulario para Presión y Entalpía
-    st.write("## Presión y Entalpía")
+    st.write("### Presión y Entalpía")
     with st.form(key='ph_form'):
         h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f")
         p_h = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
@@ -236,6 +236,7 @@ elif option == 't y s':
             st.write(f"Revisá que sean coherentes los valores ingresados, y volvé a intentarlo.")
 
 
-
+# Separador
+st.markdown("---")
 # Texto adicional
-st.write("Desarrollado por Pablo M. Barral. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp.")
+st.write("Desarrollado por Pablo M. Barral. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp. Ver Readme.md en Github.")
