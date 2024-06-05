@@ -88,7 +88,7 @@ def calcular_propiedades(desde, **kwargs):
 
 
 # Formulario para seleccionar la opción
-st.sidebar.title("Selecciona una opción:")
+st.sidebar.title("Seleccioná una opción:")
 option = st.sidebar.radio("", ("Temperatura y Presión", 
                                 "Presión y Entalpía",
                                 "Entalpía y Entropía",
@@ -100,10 +100,11 @@ option = st.sidebar.radio("", ("Temperatura y Presión",
 
 # Texto adicional
 st.sidebar.write("Desarrollado por Pablo M. Barral para **Tecnología del Calor**. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp.")
+st.sidebar.write("Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp.")
 st.sidebar.markdown("[Readme.md](https://github.com/PabloMBarral/apps/blob/850f68ccf322553bd7eedfdf585b52ca7c1260de/README.md)")
 
 # Separador
-st.sidebar.markdown("---")
+#st.sidebar.markdown("---")
 
 if option == 't y p':
 
