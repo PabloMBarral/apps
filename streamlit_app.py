@@ -40,15 +40,6 @@ def calcular_propiedades(desde, **kwargs):
             x = cp.PropsSI('Q', 'H', h_joules, 'S', s_joules, 'Water')
             t = t_kelvin - 273.15
             p = p_pascal / 1e5
-        elif desde == 'HX':
-            h_joules = kwargs['h'] * 1000
-            x = kwargs['x']
-            h = kwargs['h']
-            t_kelvin = cp.PropsSI('T', 'H', h_joules, 'Q', x, 'Water')
-            p_pascal = cp.PropsSI('P', 'H', h_joules, 'Q', x, 'Water')
-            s = cp.PropsSI('S', 'H', h_joules, 'Q', x, 'Water') / 1000
-            t = t_kelvin - 273.15
-            p = p_pascal / 1e5
         elif desde == 'PX':
             p_pascal = kwargs['p'] * 1e5
             x = kwargs['x']
@@ -64,15 +55,6 @@ def calcular_propiedades(desde, **kwargs):
             p_pascal = cp.PropsSI('P', 'T', t_kelvin, 'Q', x, 'Water')
             h = cp.PropsSI('H', 'T', t_kelvin, 'Q', x, 'Water') / 1000
             s = cp.PropsSI('S', 'T', t_kelvin, 'Q', x, 'Water') / 1000
-            p = p_pascal / 1e5
-        elif desde == 'SX':
-            s_joules = kwargs['s'] * 1000
-            x = kwargs['x']
-            s = kwargs['s']
-            t_kelvin = cp.PropsSI('T', 'S', s_joules, 'Q', x, 'Water')
-            p_pascal = cp.PropsSI('P', 'S', s_joules, 'Q', x, 'Water')
-            h = cp.PropsSI('H', 'S', s_joules, 'Q', x, 'Water') / 1000
-            t = t_kelvin - 273.15
             p = p_pascal / 1e5
         elif desde == 'PS':
             p_pascal = kwargs['p'] * 1e5
@@ -165,23 +147,6 @@ if hs_submit_button:
 # Separador
 st.markdown("---")
 
-# Formulario para Entalpía y Título
-with st.form(key='hx_form'):
-    h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f")
-    x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f")
-    hx_submit_button = st.form_submit_button(label='Calcular desde Entalpía y Título')
-
-if hx_submit_button:
-    t, p, h, s, x = calcular_propiedades('HX', h=h, x=x)
-    if t is not None:
-        st.write(f"Resultados a {h:.2f} kJ/kg y {x:.2f}:")
-        st.write(f"Temperatura: {t:.2f} °C")
-        st.write(f"Presión: {p:.2f} bar(a)")
-        st.write(f"Entropía: {s:.4f} kJ/(kg·K)")
-
-# Separador
-st.markdown("---")
-
 # Formulario para Presión y Título
 with st.form(key='px_form'):
     p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
@@ -212,23 +177,6 @@ if tx_submit_button:
         st.write(f"Presión: {p:.2f} bar(a)")
         st.write(f"Entalpía: {h:.2f} kJ/kg")
         st.write(f"Entropía: {s:.4f} kJ/(kg·K)")
-
-# Separador
-st.markdown("---")
-
-# Formulario para Entropía y Título
-with st.form(key='sx_form'):
-    s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
-    x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f")
-    sx_submit_button = st.form_submit_button(label='Calcular desde Entropía y Título')
-
-if sx_submit_button:
-    t, p, h, s, x = calcular_propiedades('SX', s=s, x=x)
-    if t is not None:
-        st.write(f"Resultados a {s:.4f} kJ/(kg·K) y {x:.2f}:")
-        st.write(f"Temperatura: {t:.2f} °C")
-        st.write(f"Presión: {p:.2f} bar(a)")
-        st.write(f"Entalpía: {h:.2f} kJ/kg")
 
 # Separador
 st.markdown("---")
