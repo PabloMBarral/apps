@@ -92,7 +92,7 @@ st.sidebar.title("Seleccioná una opción:")
 option = st.sidebar.radio("", ("t y p", 
                                 "p y h",
                                 "h y s",
-                                "p y t",
+                                "p y x",
                                 "t y x",
                                 "p y s",
                                 "t y s"
