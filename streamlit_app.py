@@ -87,7 +87,7 @@ def calcular_propiedades(desde, **kwargs):
 #st.header("Calcular propiedades del agua")
 
 # Formulario para Temperatura y Presión
-st.write("## Temperatura y Presión")
+st.write("### Temperatura y Presión")
 
 with st.form(key='tp_form'):
     t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
@@ -130,7 +130,7 @@ if ph_submit_button:
 st.markdown("---")
 
 # Formulario para Entalpía y Entropía
-st.write("## Entalpía y Entropía")
+st.write("### Entalpía y Entropía")
 with st.form(key='hs_form'):
     h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f")
     s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
@@ -150,7 +150,7 @@ if hs_submit_button:
 st.markdown("---")
 
 # Formulario para Presión y Título
-st.write("## Presión y Título")
+st.write("### Presión y Título")
 with st.form(key='px_form'):
     p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
     x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f")
@@ -170,7 +170,7 @@ if px_submit_button:
 st.markdown("---")
 
 # Formulario para Temperatura y Título
-st.write("## Temperatura y Título")
+st.write("### Temperatura y Título")
 with st.form(key='tx_form'):
     t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
     x = st.number_input("Ingrese el título (calidad del vapor) [0-1]", value=0.0, step=0.01, format="%.2f")
@@ -190,7 +190,7 @@ if tx_submit_button:
 st.markdown("---")
 
 # Formulario para Presión y Entropía
-st.write("## Presión y Entropía")
+st.write("### Presión y Entropía")
 with st.form(key='ps_form'):
     p = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
     s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
@@ -210,7 +210,7 @@ if ps_submit_button:
 st.markdown("---")
 
 # Formulario para Temperatura y Entropía
-st.write("## Temperatura y Entropía")
+st.write("### Temperatura y Entropía")
 with st.form(key='ts_form'):
     t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
     s = st.number_input("Ingrese la entropía [kJ/(kg·K)]", value=0.0, step=0.01, format="%.4f")
