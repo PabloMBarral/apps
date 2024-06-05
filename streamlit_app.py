@@ -3,7 +3,7 @@ import CoolProp.CoolProp as cp
 
 # Título de la aplicación
 st.subheader("Tecnología del Calor")
-st.title("Calculador de propiedades del agua")
+st.title("💧 Calculador de propiedades del agua")
 # Separador
 st.markdown("---")
 
@@ -105,8 +105,6 @@ st.sidebar.write("Contacto: pbarral@fi.uba.ar.")
 st.sidebar.write("Powered by CoolProp.")
 st.sidebar.markdown("[Readme.md](https://github.com/PabloMBarral/apps/blob/850f68ccf322553bd7eedfdf585b52ca7c1260de/README.md)")
 
-# Separador
-#st.sidebar.markdown("---")
 
 if option == 't y p':
 
