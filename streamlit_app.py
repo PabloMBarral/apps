@@ -239,4 +239,4 @@ elif option == 't y s':
 # Separador
 st.markdown("---")
 # Texto adicional
-st.write("Desarrollado por Pablo M. Barral. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp. Ver Readme.md en Github.")
+st.write("Desarrollado por Pablo M. Barral para **Tecnología del Calor**. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp. Ver [Readme.md](https://github.com/PabloMBarral/apps/blob/850f68ccf322553bd7eedfdf585b52ca7c1260de/README.md) en Github.")
