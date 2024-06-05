@@ -24,6 +24,8 @@ def calcular_propiedades(desde, **kwargs):
         elif desde == 'PH':
             h_joules = kwargs['h'] * 1000
             p_pascal = kwargs['p'] * 1e5
+            h = kwargs['h']
+            p = kwargs['p']
             t_kelvin = cp.PropsSI('T', 'P', p_pascal, 'H', h_joules, 'Water')
             s = cp.PropsSI('S', 'P', p_pascal, 'H', h_joules, 'Water') / 1000
             x = cp.PropsSI('Q', 'P', p_pascal, 'H', h_joules, 'Water')
@@ -31,6 +33,8 @@ def calcular_propiedades(desde, **kwargs):
         elif desde == 'HS':
             h_joules = kwargs['h'] * 1000
             s_joules = kwargs['s'] * 1000
+            h = kwargs['h']
+            s = kwargs['s']
             t_kelvin = cp.PropsSI('T', 'H', h_joules, 'S', s_joules, 'Water')
             p_pascal = cp.PropsSI('P', 'H', h_joules, 'S', s_joules, 'Water')
             x = cp.PropsSI('Q', 'H', h_joules, 'S', s_joules, 'Water')
@@ -39,6 +43,7 @@ def calcular_propiedades(desde, **kwargs):
         elif desde == 'HX':
             h_joules = kwargs['h'] * 1000
             x = kwargs['x']
+            h = kwargs['h']
             t_kelvin = cp.PropsSI('T', 'H', h_joules, 'Q', x, 'Water')
             p_pascal = cp.PropsSI('P', 'H', h_joules, 'Q', x, 'Water')
             s = cp.PropsSI('S', 'H', h_joules, 'Q', x, 'Water') / 1000
@@ -47,6 +52,7 @@ def calcular_propiedades(desde, **kwargs):
         elif desde == 'PX':
             p_pascal = kwargs['p'] * 1e5
             x = kwargs['x']
+            p = kwargs['p']
             t_kelvin = cp.PropsSI('T', 'P', p_pascal, 'Q', x, 'Water')
             h = cp.PropsSI('H', 'P', p_pascal, 'Q', x, 'Water') / 1000
             s = cp.PropsSI('S', 'P', p_pascal, 'Q', x, 'Water') / 1000
@@ -54,6 +60,7 @@ def calcular_propiedades(desde, **kwargs):
         elif desde == 'TX':
             t_kelvin = kwargs['t'] + 273.15
             x = kwargs['x']
+            t = kwargs['t']
             p_pascal = cp.PropsSI('P', 'T', t_kelvin, 'Q', x, 'Water')
             h = cp.PropsSI('H', 'T', t_kelvin, 'Q', x, 'Water') / 1000
             s = cp.PropsSI('S', 'T', t_kelvin, 'Q', x, 'Water') / 1000
@@ -61,6 +68,7 @@ def calcular_propiedades(desde, **kwargs):
         elif desde == 'SX':
             s_joules = kwargs['s'] * 1000
             x = kwargs['x']
+            s = kwargs['s']
             t_kelvin = cp.PropsSI('T', 'S', s_joules, 'Q', x, 'Water')
             p_pascal = cp.PropsSI('P', 'S', s_joules, 'Q', x, 'Water')
             h = cp.PropsSI('H', 'S', s_joules, 'Q', x, 'Water') / 1000
@@ -69,6 +77,8 @@ def calcular_propiedades(desde, **kwargs):
         elif desde == 'PS':
             p_pascal = kwargs['p'] * 1e5
             s_joules = kwargs['s'] * 1000
+            p = kwargs['p']
+            s = kwargs['s']
             t_kelvin = cp.PropsSI('T', 'P', p_pascal, 'S', s_joules, 'Water')
             h = cp.PropsSI('H', 'P', p_pascal, 'S', s_joules, 'Water') / 1000
             x = cp.PropsSI('Q', 'P', p_pascal, 'S', s_joules, 'Water')
@@ -76,6 +86,8 @@ def calcular_propiedades(desde, **kwargs):
         elif desde == 'TH':
             t_kelvin = kwargs['t'] + 273.15
             h_joules = kwargs['h'] * 1000
+            t = kwargs['t']
+            h = kwargs['h']
             p_pascal = cp.PropsSI('P', 'T', t_kelvin, 'H', h_joules, 'Water')
             s = cp.PropsSI('S', 'T', t_kelvin, 'H', h_joules, 'Water') / 1000
             x = cp.PropsSI('Q', 'T', t_kelvin, 'H', h_joules, 'Water')
@@ -83,6 +95,8 @@ def calcular_propiedades(desde, **kwargs):
         elif desde == 'TS':
             t_kelvin = kwargs['t'] + 273.15
             s_joules = kwargs['s'] * 1000
+            t = kwargs['t']
+            s = kwargs['s']
             p_pascal = cp.PropsSI('P', 'T', t_kelvin, 'S', s_joules, 'Water')
             h = cp.PropsSI('H', 'T', t_kelvin, 'S', s_joules, 'Water') / 1000
             x = cp.PropsSI('Q', 'T', t_kelvin, 'S', s_joules, 'Water')
@@ -112,9 +126,8 @@ if tp_submit_button:
         st.write(f"Entalpía: {h:.2f} kJ/kg")
         st.write(f"Entropía: {s:.4f} kJ/(kg·K)")
         st.write(f"Título: {x:.2f}")
-    else:
-        st.write(f"Algo pasó.")
-"""
+
+
 # Separador
 st.markdown("---")
 
@@ -273,4 +286,3 @@ st.markdown("---")
 
 # Texto adicional
 st.write("Desarrollado por Pablo M. Barral. Versión: 0.01. Contacto: pbarral@fi.uba.ar. Powered by CoolProp.")
-"""
