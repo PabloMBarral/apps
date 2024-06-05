@@ -6,6 +6,12 @@ st.title("Calculador de propiedades del agua")
 
 # Definir funciones para cálculos específicos
 def calcular_propiedades(desde, **kwargs):
+    t = None
+    p = None
+    h = None
+    s = None
+    x = None
+    
     try:
         if desde == 'TP':
             t_kelvin = kwargs['t'] + 273.15
