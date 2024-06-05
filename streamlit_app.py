@@ -6,11 +6,12 @@ st.title("Calculador de propiedades del agua")
 
 # Sección para el ingreso de temperatura y presión
 st.header("Calcular desde Temperatura y Presión")
-t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
-p_t = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
+with st.form(key='tp_form'):
+    t = st.number_input("Ingrese la temperatura [°C]", value=0.0, step=0.01, format="%.2f")
+    p_t = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
+    tp_submit_button = st.form_submit_button(label='Calcular desde Temperatura y Presión')
 
-# Botón para calcular las propiedades desde temperatura y presión
-if st.button("Calcular desde Temperatura y Presión"):
+if tp_submit_button:
     # Convertir las unidades
     t_kelvin = t + 273.15
     p_pascal_t = p_t * 1e5
@@ -38,11 +39,12 @@ st.markdown("---")
 
 # Sección para el ingreso de presión y entalpía
 st.header("Calcular desde Presión y Entalpía")
-h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f")
-p_h = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
+with st.form(key='ph_form'):
+    h = st.number_input("Ingrese la entalpía [kJ/kg]", value=0.0, step=0.01, format="%.2f")
+    p_h = st.number_input("Ingrese la presión [bar(a)]", value=1.0, step=0.01, format="%.2f")
+    ph_submit_button = st.form_submit_button(label='Calcular desde Presión y Entalpía')
 
-# Botón para calcular las propiedades desde presión y entalpía
-if st.button("Calcular desde Presión y Entalpía"):
+if ph_submit_button:
     # Convertir las unidades
     h_joules = h * 1000
     p_pascal_h = p_h * 1e5
