@@ -2,8 +2,10 @@ import streamlit as st
 import CoolProp.CoolProp as cp
 
 # Título de la aplicación
-st.title("Calculador de propiedades del agua")
 st.subheader("Tecnología del Calor")
+st.title("Calculador de propiedades del agua")
+# Separador
+st.markdown("---")
 
 # Definir funciones para cálculos específicos
 def calcular_propiedades(desde, **kwargs):
