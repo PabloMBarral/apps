@@ -103,7 +103,7 @@ st.sidebar.write("Desarrollado por Pablo M. Barral para **Tecnología del Calor*
 st.sidebar.write("Versión: 0.01.")
 st.sidebar.write("Contacto: pbarral@fi.uba.ar.")
 st.sidebar.write("Powered by CoolProp.")
-st.sidebar.markdown("[Readme.md](https://github.com/PabloMBarral/apps/blob/850f68ccf322553bd7eedfdf585b52ca7c1260de/README.md)")
+st.sidebar.markdown("[Readme.md](https://github.com/PabloMBarral/apps/blob/afc6a6ee783080c5d6adcff382cdea83cf95ff6e/README.md)")
 
 
 if option == 't y p':
