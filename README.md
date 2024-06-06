@@ -1,5 +1,12 @@
 # README
 
+Versión 0.01.
+log: versión inicial.
+
+Realizó: Pablo M. Barral, para Tecnología del Calor. 
+Fecha: 2024-06-06
+Contacto: pbarral@fi.uba.ar.
+
 Esta es una versión beta. Work in progress.
 
 La exactitud de los resultados está supeditada a lo que genera CoolProp. Usar bajo la propia responsabilidad.
