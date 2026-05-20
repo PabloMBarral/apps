@@ -19,14 +19,16 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
 ## Módulos
 
 ### Estables
-- **Propiedades del agua/vapor** a partir de cualquier par de variables independientes
-  (T-p, p-h, h-s, p-x, T-x, p-s, T-s).
+- ✅ **Propiedades del agua/vapor** a partir de cualquier par de variables
+  independientes (T-p, p-h, h-s, p-x, T-x, p-s, T-s).
+- ✅ **Interpolación lineal y doble entrada** sobre tablas, con procedimiento
+  paso a paso (LaTeX + explicación en español) y comparación contra el valor
+  exacto de CoolProp cuando la tabla es reconocida como saturación o vapor
+  sobrecalentado.
 
 ### En desarrollo (roadmap)
 - **Multifluido**: refrigerantes (R134a, R410A, R1234yf, NH₃, CO₂), aire,
   combustibles puros y mezclas.
-- **Interpolación lineal y doble entrada** sobre tablas, con procedimiento
-  paso a paso y comparación contra el valor exacto de CoolProp.
 - **Rendimientos isoentrópicos** de turbinas, compresores y bombas
   (cálculo directo e inverso, rendimiento politrópico para compresores
   multietapa).

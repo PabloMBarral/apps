@@ -73,7 +73,7 @@ option = st.sidebar.radio(
 )
 
 st.sidebar.write("Desarrollado por Pablo M. Barral para **Tecnología del Calor**.")
-st.sidebar.write("Versión: 0.2.0 — Fase 0.")
+st.sidebar.write("Versión: 0.3.0 — Fase 1.1.")
 st.sidebar.write("Contacto: pbarral@fi.uba.ar.")
 st.sidebar.write("Powered by CoolProp.")
 st.sidebar.markdown("[Readme.md](https://github.com/PabloMBarral/apps/blob/main/README.md)")

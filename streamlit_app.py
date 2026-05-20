@@ -29,12 +29,15 @@ st.markdown(
 
     - **1 · Propiedades** — agua/vapor a partir de cualquier par de variables
       independientes (T-p, p-h, h-s, p-x, T-x, p-s, T-s).
+    - **2 · Interpolación** — lineal simple y doble entrada (bilineal) sobre
+      tablas, con procedimiento didáctico paso a paso y comparación contra
+      CoolProp.
 
     ### En desarrollo
 
-    Interpolación, isoentrópicos, diagramas, ciclos Rankine /
-    refrigeración / Brayton / combinado, psicrometría, combustión,
-    poder calorífico, ISO 6976, exergía. Ver el
+    Isoentrópicos, diagramas, ciclos Rankine / refrigeración / Brayton /
+    combinado, psicrometría, combustión, poder calorífico, ISO 6976,
+    exergía. Ver el
     [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para el
     roadmap completo.
     """
@@ -44,5 +47,5 @@ st.sidebar.markdown("### Acerca")
 st.sidebar.write("Desarrollado por **Pablo M. Barral** para Tecnología del Calor — FIUBA.")
 st.sidebar.write("Contacto: pbarral@fi.uba.ar")
 st.sidebar.write("ORCID 0000-0003-1125-4199")
-st.sidebar.write("Versión: 0.2.0 — Fase 0")
+st.sidebar.write("Versión: 0.3.0 — Fase 1.1")
 st.sidebar.markdown("[Repo en GitHub](https://github.com/PabloMBarral/apps)")

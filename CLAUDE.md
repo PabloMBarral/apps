@@ -40,7 +40,7 @@ apps/
 ├── streamlit_app.py           # Home / landing
 ├── pages/                     # Una página por módulo (numeradas)
 │   ├── 1_Propiedades.py
-│   ├── 2_Interpolacion.py
+│   ├── 2_Interpolacion.py     # ✅ Fase 1.1
 │   ├── 3_Isoentropicos.py
 │   ├── 4_Diagramas.py
 │   ├── 5_Rankine.py
@@ -55,7 +55,7 @@ apps/
 │   ├── __init__.py
 │   ├── units.py               # Selector global de unidades
 │   ├── fluids.py              # Wrappers cacheados sobre CoolProp
-│   ├── interpolation.py       # Interpolación lineal y doble entrada
+│   ├── interpolation.py       # ✅ Fase 1.1 — Interpolación lineal y doble entrada
 │   ├── isentropic.py          # Turbina / compresor / bomba; politrópico
 │   ├── exergy.py              # Exergía física y química
 │   ├── combustion/
