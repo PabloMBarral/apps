@@ -19,7 +19,9 @@ import streamlit as st
 
 from core.fluids import state_from_pair
 from core.units import bar_to_pa, c_to_k, j_to_kj, k_to_c, kj_to_j, pa_to_bar
+from ui.branding import SUBJECT, sidebar_credits
 
+PAGE_VERSION = "0.4.0"
 FLUID = "Water"
 
 
@@ -54,13 +56,13 @@ def _compute_in_didactic_units(
     return k_to_c(T_K), pa_to_bar(P_Pa), j_to_kj(h_J), j_to_kj(s_J), x
 
 
-st.subheader("Tecnología del Calor")
+st.subheader(SUBJECT)
 st.title("💧 Calculador de propiedades del agua")
 st.markdown("---")
 
 st.sidebar.title("Seleccioná una opción:")
 option = st.sidebar.radio(
-    "",
+    "Modo de cálculo",
     (
         "t y p",
         "p y h",
@@ -70,13 +72,10 @@ option = st.sidebar.radio(
         "p y s",
         "t y s",
     ),
+    label_visibility="collapsed",
 )
 
-st.sidebar.write("Desarrollado por Pablo M. Barral para **Tecnología del Calor**.")
-st.sidebar.write("Versión: 0.3.0 — Fase 1.1.")
-st.sidebar.write("Contacto: pbarral@fi.uba.ar.")
-st.sidebar.write("Powered by CoolProp.")
-st.sidebar.markdown("[Readme.md](https://github.com/PabloMBarral/apps/blob/main/README.md)")
+sidebar_credits(version=PAGE_VERSION, page_name="Propiedades")
 
 
 _NO_COHERENT = "Revisá que sean coherentes los valores ingresados, y volvé a intentarlo."

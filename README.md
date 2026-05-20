@@ -1,4 +1,4 @@
-# Tecnología del Calor — Apps
+# TA216 — Tecnología de Calor Avanzada — Apps
 
 [![Streamlit](https://img.shields.io/badge/Streamlit-app-red?logo=streamlit)](https://streamlit.io)
 [![Python](https://img.shields.io/badge/python-3.11+-blue?logo=python)](https://www.python.org)
@@ -8,7 +8,7 @@
 [![DOI](https://img.shields.io/badge/cite-CITATION.cff-orange)](CITATION.cff)
 
 Suite de herramientas didácticas en Python/Streamlit para la materia
-**Tecnología del Calor** (Facultad de Ingeniería, Universidad de Buenos Aires).
+**TA216 — Tecnología de Calor Avanzada** (Facultad de Ingeniería, Universidad de Buenos Aires).
 
 > 📖 Las **fórmulas teóricas** que sustentan estos cálculos están en el repo
 > hermano [vademecum-termo](https://github.com/PabloMBarral/vademecum-termo).
@@ -24,7 +24,10 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
 - ✅ **Interpolación lineal y doble entrada** sobre tablas, con procedimiento
   paso a paso (LaTeX + explicación en español) y comparación contra el valor
   exacto de CoolProp cuando la tabla es reconocida como saturación o vapor
-  sobrecalentado.
+  sobrecalentado. Tabla editable in-place (`st.data_editor`), comparación
+  CoolProp como opt-in con selector de fluido (Water, R134a, R410A, R1234yf,
+  NH₃, CO₂, Air), normalizador de unidades tolerante a notación variada
+  (`kJ/(kg·K)`, `kJ/kg-K`, `kJ kg^-1 K^-1`, etc.). _Fase 1.2 cerrada._
 
 ### En desarrollo (roadmap)
 - **Multifluido**: refrigerantes (R134a, R410A, R1234yf, NH₃, CO₂), aire,
@@ -104,7 +107,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *Tecnología del Calor — Apps* (Versión 0.2.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.2.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -179,7 +182,7 @@ respectivas licencias (todas compatibles, mayormente MIT y Apache 2.0).
 
 ## Autoría y contacto
 
-**Pablo M. Barral** — Profesor, Tecnología del Calor, FIUBA.
+**Pablo M. Barral** — Profesor, TA216 — Tecnología de Calor Avanzada, FIUBA.
 [ORCID 0000-0003-1125-4199](https://orcid.org/0000-0003-1125-4199)
 · [Google Scholar](https://scholar.google.com/citations?user=nxvRCoUAAAAJ)
 · pbarral@fi.uba.ar

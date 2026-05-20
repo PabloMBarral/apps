@@ -7,7 +7,7 @@
 ## Proyecto
 
 Suite de herramientas didácticas de ingeniería térmica para la materia
-**Tecnología del Calor** (FIUBA). Streamlit + CoolProp + TESPy + fluprodia.
+**TA216 — Tecnología de Calor Avanzada** (FIUBA). Streamlit + CoolProp + TESPy + fluprodia.
 
 Repo hermano de fórmulas teóricas:
 [PabloMBarral/vademecum-termo](https://github.com/PabloMBarral/vademecum-termo).

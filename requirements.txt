@@ -1,5 +1,5 @@
 # =============================================================================
-# Tecnología del Calor — Apps
+# TA216 — Tecnología de Calor Avanzada — Apps
 # Dependencias del proyecto. Verificadas contra PyPI a mayo 2026.
 # Instalar dentro de un venv:  pip install -r requirements.txt
 # =============================================================================
