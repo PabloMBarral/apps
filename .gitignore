@@ -1,0 +1,24 @@
+# Python bytecode y caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Caches de herramientas
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Config local de Claude Code
+.claude/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+.DS_Store

@@ -97,7 +97,9 @@ apps/
 - **Type hints obligatorios** en todo `core/`.
 - Funciones puras, sin estado global. Resultados como `dataclass`
   cuando hay varios valores (`StatePoint`, `CycleResult`, etc.).
-- Cache de CoolProp con `@st.cache_data` en los wrappers de `fluids.py`.
+- Cache de CoolProp con `@st.cache_data` en los wrappers de Streamlit
+  (`pages/`) que envuelven funciones de `core.fluids`. `core/` no
+  importa Streamlit.
 - Idioma de la UI: **español rioplatense**. Los identificadores de
   código en inglés, comentarios y docstrings en español.
 - Cada función académicamente relevante incluye en su docstring una

@@ -1,0 +1,15 @@
+# Configuración mínima del proyecto. Por ahora solo ruff (lint + format).
+# Las dependencias siguen en requirements.txt; la metadata académica y la
+# cita formal viven en CITATION.cff.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", ".git", "build", "dist", ".devcontainer"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
