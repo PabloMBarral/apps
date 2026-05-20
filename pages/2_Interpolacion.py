@@ -28,7 +28,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from core.fluids import state_from_pair
+from core.fluids import SUPPORTED_FLUIDS, state_from_pair
 from core.interpolation import (
     InterpolationResult,
     bilinear_from_table,
@@ -42,17 +42,7 @@ from core.units import (
 )
 from ui.branding import SUBJECT, sidebar_credits
 
-PAGE_VERSION = "0.4.0"
-
-SUPPORTED_FLUIDS = [
-    "Water",
-    "R134a",
-    "R410A",
-    "R1234yf",
-    "Ammonia",
-    "CarbonDioxide",
-    "Air",
-]
+PAGE_VERSION = "0.5.0"
 
 EXAMPLE_LINEAR_CSV = """T [°C],h_f [kJ/kg]
 100,419.06

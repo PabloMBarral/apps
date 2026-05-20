@@ -28,13 +28,18 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   CoolProp como opt-in con selector de fluido (Water, R134a, R410A, R1234yf,
   NH₃, CO₂, Air), normalizador de unidades tolerante a notación variada
   (`kJ/(kg·K)`, `kJ/kg-K`, `kJ kg^-1 K^-1`, etc.). _Fase 1.2 cerrada._
+- ✅ **Rendimientos isoentrópicos** de turbinas, compresores y bombas:
+  modo directo (calcular el estado real dado η_s) e inverso (recuperar η_s
+  a partir de los dos estados). Compresor multietapa con η_s por etapa,
+  intercooler opcional entre etapas, y benchmark built-in contra una sola
+  etapa equivalente. Validación de fase líquida del inlet de bomba vía
+  `CoolProp.PhaseSI`. Procedimiento paso a paso con LaTeX y narrativa en
+  español. Comparación opt-in en bomba contra el modelo de líquido
+  incompresible `w_p ≈ v_1·Δp/η_s`. _Fase 1.3 cerrada._
 
 ### En desarrollo (roadmap)
 - **Multifluido**: refrigerantes (R134a, R410A, R1234yf, NH₃, CO₂), aire,
   combustibles puros y mezclas.
-- **Rendimientos isoentrópicos** de turbinas, compresores y bombas
-  (cálculo directo e inverso, rendimiento politrópico para compresores
-  multietapa).
 - **Diagramas de propiedades** (log p-h, T-s, h-s, p-v) con
   [fluprodia](https://github.com/fwitte/fluprodia), con superposición de
   puntos y procesos calculados.

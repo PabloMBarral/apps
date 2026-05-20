@@ -21,7 +21,7 @@ from core.fluids import state_from_pair
 from core.units import bar_to_pa, c_to_k, j_to_kj, k_to_c, kj_to_j, pa_to_bar
 from ui.branding import SUBJECT, sidebar_credits
 
-PAGE_VERSION = "0.4.0"
+PAGE_VERSION = "0.5.0"
 FLUID = "Water"
 
 

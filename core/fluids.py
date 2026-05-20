@@ -22,6 +22,19 @@ import CoolProp.CoolProp as cp
 
 PairCode = Literal["TP", "PH", "HS", "PX", "TX", "PS", "TS"]
 
+# Fluidos puros/pseudo-puros aceptados por CoolProp que se ofrecen como
+# default en las UIs. Mantenerla acá centraliza el set para todas las
+# páginas (propiedades, interpolación, isoentrópicos, ciclos, ...).
+SUPPORTED_FLUIDS: list[str] = [
+    "Water",
+    "R134a",
+    "R410A",
+    "R1234yf",
+    "Ammonia",
+    "CarbonDioxide",
+    "Air",
+]
+
 # (kwarg en la API, símbolo CoolProp)
 _PAIR_KEYS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
     "TP": (("t", "T"), ("p", "P")),

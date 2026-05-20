@@ -41,7 +41,7 @@ apps/
 ├── pages/                     # Una página por módulo (numeradas)
 │   ├── 1_Propiedades.py
 │   ├── 2_Interpolacion.py     # ✅ Fase 1.1
-│   ├── 3_Isoentropicos.py
+│   ├── 3_Isoentropicos.py     # ✅ Fase 1.3
 │   ├── 4_Diagramas.py
 │   ├── 5_Rankine.py
 │   ├── 6_Refrigeracion.py
@@ -56,7 +56,7 @@ apps/
 │   ├── units.py               # Selector global de unidades
 │   ├── fluids.py              # Wrappers cacheados sobre CoolProp
 │   ├── interpolation.py       # ✅ Fase 1.1 — Interpolación lineal y doble entrada
-│   ├── isentropic.py          # Turbina / compresor / bomba; politrópico
+│   ├── isentropic.py          # ✅ Fase 1.3 — Turbina / compresor / bomba; multietapa
 │   ├── exergy.py              # Exergía física y química
 │   ├── combustion/
 │   │   ├── __init__.py

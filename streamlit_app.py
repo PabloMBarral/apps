@@ -11,7 +11,7 @@ import streamlit as st
 
 from ui.branding import SUBJECT, sidebar_credits
 
-PAGE_VERSION = "0.4.0"
+PAGE_VERSION = "0.5.0"
 
 
 def _home_page() -> None:
@@ -46,12 +46,16 @@ def _home_page() -> None:
         - 📐 **Interpolación** — lineal simple y doble entrada (bilineal)
           sobre tablas, con procedimiento didáctico paso a paso y
           comparación opcional contra CoolProp.
+        - ⚙️ **Isoentrópicos** — turbina, compresor, bomba y compresor
+          multietapa con intercooler, en modo directo (calcular el
+          estado real dado η_s) o inverso (calcular η_s dados los dos
+          estados).
 
         ### En desarrollo
 
-        Isoentrópicos, diagramas, ciclos Rankine / refrigeración /
-        Brayton / combinado, psicrometría, combustión, poder calorífico,
-        ISO 6976, exergía. Ver el
+        Diagramas, ciclos Rankine / refrigeración / Brayton / combinado,
+        psicrometría, combustión, poder calorífico, ISO 6976, exergía.
+        Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
         """
@@ -64,6 +68,7 @@ pages = [
     st.Page(_home_page, title="Home", icon="🏠", default=True),
     st.Page("pages/1_Propiedades.py", title="Propiedades", icon="💧"),
     st.Page("pages/2_Interpolacion.py", title="Interpolación", icon="📐"),
+    st.Page("pages/3_Isoentropicos.py", title="Isoentrópicos", icon="⚙️"),
 ]
 pg = st.navigation(pages)
 pg.run()
