@@ -1,0 +1,101 @@
+cff-version: 1.2.0
+title: "Tecnología del Calor — Apps"
+message: >-
+  Si usás este software en investigación, docencia o publicaciones,
+  por favor citalo como se indica abajo, y citá también las librerías
+  open source en las que se apoya (ver "references").
+type: software
+authors:
+  - family-names: "Barral"
+    given-names: "Pablo M."
+    affiliation: "Universidad de Buenos Aires, Facultad de Ingeniería"
+    orcid: "https://orcid.org/0000-0003-1125-4199"
+    email: "pbarral@fi.uba.ar"
+repository-code: "https://github.com/PabloMBarral/apps"
+url: "https://github.com/PabloMBarral/apps"
+abstract: >-
+  Suite de herramientas didácticas en Python/Streamlit para la enseñanza
+  de ingeniería térmica en la materia Tecnología del Calor (FIUBA):
+  propiedades termofísicas, interpolación lineal y doble, rendimientos
+  isoentrópicos, ciclos termodinámicos, estequiometría y combustión,
+  poder calorífico por composición última/próxima y por ISO 6976,
+  exergía, psicrometría y diagramas de fluidos.
+keywords:
+  - thermal-engineering
+  - thermodynamics
+  - combustion
+  - exergy
+  - education
+  - streamlit
+  - coolprop
+  - tespy
+  - fluprodia
+  - iso-6976
+license: MIT
+version: "0.2.0"
+date-released: "2026-05-15"
+references:
+  - type: article
+    scope: "Motor de propiedades termofísicas (CoolProp)"
+    authors:
+      - family-names: "Bell"
+        given-names: "Ian H."
+      - family-names: "Wronski"
+        given-names: "Jorrit"
+      - family-names: "Quoilin"
+        given-names: "Sylvain"
+      - family-names: "Lemort"
+        given-names: "Vincent"
+    title: >-
+      Pure and Pseudo-pure Fluid Thermophysical Property Evaluation and
+      the Open-Source Thermophysical Property Library CoolProp
+    journal: "Industrial & Engineering Chemistry Research"
+    year: 2014
+    volume: 53
+    issue: 6
+    start: 2498
+    end: 2508
+    doi: "10.1021/ie4033999"
+  - type: article
+    scope: "Simulación de ciclos termodinámicos (TESPy)"
+    authors:
+      - family-names: "Witte"
+        given-names: "Francesco"
+      - family-names: "Tuschy"
+        given-names: "Ilja"
+    title: "TESPy: Thermal Engineering Systems in Python"
+    journal: "Journal of Open Source Software"
+    year: 2020
+    volume: 5
+    issue: 49
+    start: 2178
+    doi: "10.21105/joss.02178"
+  - type: software
+    scope: "Diagramas de propiedades de fluidos (fluprodia)"
+    authors:
+      - family-names: "Witte"
+        given-names: "Francesco"
+    title: "fluprodia: Fluid Property Diagrams"
+    repository-code: "https://github.com/fwitte/fluprodia"
+  - type: software
+    scope: "Framework de interfaz web (Streamlit)"
+    authors:
+      - name: "Streamlit Inc."
+    title: "Streamlit"
+    url: "https://streamlit.io"
+  - type: standard
+    scope: "Cálculo de poder calorífico de gas natural"
+    title: >-
+      Natural gas — Calculation of calorific values, density, relative
+      density and Wobbe indices from composition
+    institution:
+      name: "International Organization for Standardization"
+    number: "ISO 6976:2016"
+    year: 2016
+  - type: software
+    scope: "Repositorio hermano: hoja de fórmulas teóricas"
+    authors:
+      - family-names: "Barral"
+        given-names: "Pablo M."
+    title: "vademecum-termo"
+    repository-code: "https://github.com/PabloMBarral/vademecum-termo"

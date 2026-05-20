@@ -1,1 +1,31 @@
-CoolProp
+# =============================================================================
+# Tecnología del Calor — Apps
+# Dependencias del proyecto. Verificadas contra PyPI a mayo 2026.
+# Instalar dentro de un venv:  pip install -r requirements.txt
+# =============================================================================
+
+# --- Interfaz web ---
+streamlit>=1.40
+
+# --- Propiedades termofísicas ---
+# CoolProp: motor de propiedades de fluidos puros y pseudo-puros
+CoolProp>=6.6
+
+# --- Simulación de ciclos termodinámicos ---
+# TESPy: modela ciclos completos (Rankine, refrigeración, Brayton, etc.)
+tespy>=0.9.14
+
+# --- Diagramas de fluidos ---
+# fluprodia: log p-h, T-s, h-s, p-v con isolineas
+fluprodia>=4.0
+
+# --- Stack científico ---
+numpy>=1.26
+scipy>=1.11
+pandas>=2.1
+matplotlib>=3.8
+
+# --- Desarrollo (tests y calidad) ---
+pytest>=8.0
+pytest-cov>=5.0
+ruff>=0.4
