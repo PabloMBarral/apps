@@ -1,0 +1,153 @@
+{
+  "_meta": {
+    "source": "ISO 6976:2016 Annex D — Example calculations",
+    "purpose": "Test fixtures for core/combustion/iso6976.py implementation",
+    "notes": [
+      "All compositions are normalized to sum=1.000000.",
+      "Composition uncertainties u(x_i) are absolute (same units as x_i).",
+      "Reference conditions follow the standard: T in celsius, P in kPa.",
+      "Examples 1 and 2 use identity matrix for mole fraction correlations (no inter-component correlations).",
+      "Example 3 includes both identity-matrix and normalization-matrix results.",
+      "Tolerances suggested are conservative; implementation should match to the last reported decimal."
+    ]
+  },
+
+  "example_1": {
+    "description": "D.2 — A simple mixture of five components",
+    "reference_section": "ISO 6976:2016 D.2",
+    "inputs": {
+      "composition_mol_fraction": [
+        {"name": "methane",        "x": 0.933212, "u_x": 0.000346},
+        {"name": "ethane",         "x": 0.025656, "u_x": 0.000243},
+        {"name": "propane",        "x": 0.015368, "u_x": 0.000148},
+        {"name": "nitrogen",       "x": 0.010350, "u_x": 0.000195},
+        {"name": "carbon dioxide", "x": 0.015414, "u_x": 0.000111}
+      ],
+      "combustion_reference": {"T_celsius": 15,    "P_kPa": 101.325},
+      "metering_reference":   {"T_celsius": 15,    "P_kPa": 101.325},
+      "correlation_matrix": "identity"
+    },
+    "expected_intermediate": {
+      "molar_mass_kg_per_kmol":     {"value": 17.388430,    "tol_abs": 1.0e-5},
+      "summation_factor":           {"value": 0.047305,     "tol_abs": 1.0e-5},
+      "compression_factor":         {"value": 0.99776224,   "tol_abs": 1.0e-7},
+      "molar_volume_m3_per_mol":    {"value": 0.023591917,  "tol_abs": 1.0e-8}
+    },
+    "expected_final": {
+      "Hc_G_molar_kJ_per_mol": {"value": 906.179959, "u": 0.615609872, "U_k2": 1.2,   "tol_abs": 1.0e-5},
+      "Hm_G_mass_MJ_per_kg":   {"value": 52.113961,  "u": 0.024301,    "U_k2": 0.049, "tol_abs": 1.0e-5},
+      "Hv_G_volume_MJ_per_m3": {"value": 38.410611,  "u": 0.026267,    "U_k2": 0.053, "tol_abs": 1.0e-5}
+    }
+  },
+
+  "example_2": {
+    "description": "D.3 — A simple mixture containing water vapour. Note 15.55 °C ref instead of 15 °C.",
+    "reference_section": "ISO 6976:2016 D.3",
+    "inputs": {
+      "composition_mol_fraction": [
+        {"name": "methane",        "x": 0.931819, "u_x": 0.000350},
+        {"name": "ethane",         "x": 0.025618, "u_x": 0.000243},
+        {"name": "nitrogen",       "x": 0.010335, "u_x": 0.000195},
+        {"name": "carbon dioxide", "x": 0.015391, "u_x": 0.000111},
+        {"name": "water",          "x": 0.016837, "u_x": 0.000162}
+      ],
+      "combustion_reference": {"T_celsius": 15.55, "P_kPa": 101.325},
+      "metering_reference":   {"T_celsius": 15.55, "P_kPa": 101.325},
+      "correlation_matrix": "identity"
+    },
+    "expected_intermediate": {
+      "molar_mass_kg_per_kmol":     {"value": 16.989170,    "tol_abs": 1.0e-5},
+      "summation_factor":           {"value": 0.049306,     "tol_abs": 1.0e-5},
+      "compression_factor":         {"value": 0.997570,     "tol_abs": 1.0e-6},
+      "molar_volume_m3_per_mol":    {"value": 0.023632824,  "tol_abs": 1.0e-8}
+    },
+    "expected_final": {
+      "Hc_G_molar_kJ_per_mol": {"value": 871.443916, "u": 0.522493911, "U_k2": 1.0,   "tol_abs": 1.0e-5},
+      "Hm_G_mass_MJ_per_kg":   {"value": 51.294085,  "U_k2": 0.052,                    "tol_abs": 1.0e-5},
+      "Hv_G_volume_MJ_per_m3": {"value": 36.874304,  "U_k2": 0.045,                    "tol_abs": 1.0e-5}
+    },
+    "validation_notes": [
+      "j=42 (water vapor) in Tabla 3 has Hc = L0(water) from Annex A.5. So water in fuel contributes 44.408 kJ/mol at 15.55 °C, ie its latent heat."
+    ]
+  },
+
+  "example_3": {
+    "description": "D.4 — A more complex mixture of 11 components. Tested under two sets of reference conditions and two correlation matrices.",
+    "reference_section": "ISO 6976:2016 D.4",
+    "inputs": {
+      "composition_mol_fraction": [
+        {"name": "methane",             "x": 0.922393, "u_x": 0.000348},
+        {"name": "ethane",              "x": 0.025358, "u_x": 0.000247},
+        {"name": "propane",             "x": 0.015190, "u_x": 0.000149},
+        {"name": "n-butane",            "x": 0.000523, "u_x": 0.000018},
+        {"name": "2-methylpropane",     "x": 0.001512, "u_x": 0.000027},
+        {"name": "n-pentane",           "x": 0.002846, "u_x": 0.000007},
+        {"name": "2-methylbutane",      "x": 0.002832, "u_x": 0.000009},
+        {"name": "2,2-dimethylpropane", "x": 0.001015, "u_x": 0.000004},
+        {"name": "n-hexane",            "x": 0.002865, "u_x": 0.000008},
+        {"name": "nitrogen",            "x": 0.010230, "u_x": 0.000195},
+        {"name": "carbon dioxide",      "x": 0.015236, "u_x": 0.000112}
+      ]
+    },
+    "cases": {
+      "case_a_iso_standard_identity": {
+        "description": "D.4.3.1 — ISO standard ref (15/15 °C, 101.325 kPa), identity matrix",
+        "combustion_reference": {"T_celsius": 15, "P_kPa": 101.325},
+        "metering_reference":   {"T_celsius": 15, "P_kPa": 101.325},
+        "correlation_matrix": "identity",
+        "expected_final": {
+          "Hv_G_volume_MJ_per_m3":     {"value": 39.73351, "u": 0.026917, "U_k2": 0.053833, "tol_abs": 1.0e-4},
+          "Hv_N_volume_net_MJ_per_m3": {"value": 35.86811, "u": 0.024757, "U_k2": 0.049515, "tol_abs": 1.0e-4},
+          "density_kg_per_m3":         {"value": 0.76462,  "u": 0.000586, "U_k2": 0.001172, "tol_abs": 1.0e-5},
+          "relative_density":          {"value": 0.62391,  "u": 0.000478, "U_k2": 0.000956, "tol_abs": 1.0e-5},
+          "Wobbe_gross_MJ_per_m3":     {"value": 50.30318, "u": 0.021588, "U_k2": 0.043177, "tol_abs": 1.0e-4},
+          "Wobbe_net_MJ_per_m3":       {"value": 45.40954, "u": 0.020151, "U_k2": 0.040302, "tol_abs": 1.0e-4}
+        }
+      },
+      "case_b_iso_standard_normalization": {
+        "description": "D.4.3.2 — ISO standard ref (15/15 °C, 101.325 kPa), normalization matrix",
+        "combustion_reference": {"T_celsius": 15, "P_kPa": 101.325},
+        "metering_reference":   {"T_celsius": 15, "P_kPa": 101.325},
+        "correlation_matrix": "normalization",
+        "note": "Y values identical to case_a; only u and U change with the correlation matrix.",
+        "expected_final": {
+          "Hv_G_volume_MJ_per_m3":     {"value": 39.73351, "u": 0.016316, "U_k2": 0.032631, "tol_abs": 1.0e-4},
+          "Hv_N_volume_net_MJ_per_m3": {"value": 35.86811, "u": 0.015305, "U_k2": 0.030609, "tol_abs": 1.0e-4},
+          "density_kg_per_m3":         {"value": 0.76462,  "u": 0.000277, "U_k2": 0.000554, "tol_abs": 1.0e-5},
+          "relative_density":          {"value": 0.62391,  "u": 0.000226, "U_k2": 0.000453, "tol_abs": 1.0e-5},
+          "Wobbe_gross_MJ_per_m3":     {"value": 50.30318, "u": 0.019823, "U_k2": 0.039646, "tol_abs": 1.0e-4},
+          "Wobbe_net_MJ_per_m3":       {"value": 45.40954, "u": 0.018498, "U_k2": 0.036996, "tol_abs": 1.0e-4}
+        }
+      },
+      "case_c_25c_0c_identity": {
+        "description": "D.4.4.1 — Combustion 25 °C, metering 0 °C, 101.325 kPa, identity matrix",
+        "combustion_reference": {"T_celsius": 25, "P_kPa": 101.325},
+        "metering_reference":   {"T_celsius": 0,  "P_kPa": 101.325},
+        "correlation_matrix": "identity",
+        "expected_final": {
+          "Hv_G_volume_MJ_per_m3":     {"value": 41.89360, "u": 0.028425, "U_k2": 0.056850, "tol_abs": 1.0e-4},
+          "Hv_N_volume_net_MJ_per_m3": {"value": 37.85228, "u": 0.026164, "U_k2": 0.052327, "tol_abs": 1.0e-4},
+          "density_kg_per_m3":         {"value": 0.80701,  "u": 0.000619, "U_k2": 0.001238, "tol_abs": 1.0e-5},
+          "relative_density":          {"value": 0.62411,  "u": 0.000479, "U_k2": 0.000958, "tol_abs": 1.0e-5},
+          "Wobbe_gross_MJ_per_m3":     {"value": 53.02930, "u": 0.022783, "U_k2": 0.045566, "tol_abs": 1.0e-4},
+          "Wobbe_net_MJ_per_m3":       {"value": 47.91376, "u": 0.021278, "U_k2": 0.042557, "tol_abs": 1.0e-4}
+        }
+      },
+      "case_d_25c_0c_normalization": {
+        "description": "D.4.4.2 — Combustion 25 °C, metering 0 °C, 101.325 kPa, normalization matrix",
+        "combustion_reference": {"T_celsius": 25, "P_kPa": 101.325},
+        "metering_reference":   {"T_celsius": 0,  "P_kPa": 101.325},
+        "correlation_matrix": "normalization",
+        "note": "Y values identical to case_c; only u and U change.",
+        "expected_final": {
+          "Hv_G_volume_MJ_per_m3":     {"value": 41.89360, "u": 0.017241, "U_k2": 0.034483, "tol_abs": 1.0e-4},
+          "Hv_N_volume_net_MJ_per_m3": {"value": 37.85228, "u": 0.016181, "U_k2": 0.032361, "tol_abs": 1.0e-4},
+          "density_kg_per_m3":         {"value": 0.80701,  "u": 0.000293, "U_k2": 0.000586, "tol_abs": 1.0e-5},
+          "relative_density":          {"value": 0.62411,  "u": 0.000227, "U_k2": 0.000454, "tol_abs": 1.0e-5},
+          "Wobbe_gross_MJ_per_m3":     {"value": 53.02930, "u": 0.020914, "U_k2": 0.041828, "tol_abs": 1.0e-4},
+          "Wobbe_net_MJ_per_m3":       {"value": 47.91376, "u": 0.019528, "U_k2": 0.039057, "tol_abs": 1.0e-4}
+        }
+      }
+    }
+  }
+}
