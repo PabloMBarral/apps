@@ -9,8 +9,16 @@ solo en modo directo y trae built-in la comparación contra single-stage.
 Solo la bomba ofrece comparación opt-in contra el modelo simplificado
 de líquido incompresible (``w_p ≈ v_in · Δp / η_s``).
 
+Unidades: la tabla de estados y los KPIs se muestran en el sistema
+seleccionado en el sidebar (SI / Técnico / Inglés). Los pasos didácticos
+del expansor "🔬 Procedimiento" se mantienen en sistema Técnico
+(kJ/kg, °C, bar) — generados en ``core/isentropic.py`` para mantener la
+consistencia con la bibliografía clásica (Cengel). La conversión de los
+pasos al sistema actual queda pendiente para Fase 1.5.
+
 TODO (próximas fases, ver CLAUDE.md §"Páginas Streamlit"):
 - Diagrama T-s / h-s del proceso con fluprodia (Fase 1.5).
+- Conversión de los pasos didácticos al sistema activo (Fase 1.5).
 - Expansor `📖 Fórmulas teóricas` con link a vademecum-termo.
 - Botón de exportar resultados (CSV / JSON).
 """
@@ -34,10 +42,17 @@ from core.isentropic import (
     turbine_direct,
     turbine_inverse,
 )
-from core.units import bar_to_pa, c_to_k, j_to_kj, k_to_c, kj_to_j, pa_to_bar
+from core.units_system import convert_from_si
 from ui.branding import SUBJECT, sidebar_credits
+from ui.units_ui import (
+    current_unit_label,
+    get_current_system,
+    number_input_si,
+    quantity_label,
+    render_units_selector,
+)
 
-PAGE_VERSION = "0.6.0"
+PAGE_VERSION = "0.7.0"
 
 # Códigos de par independiente reconocidos por core.fluids.state_from_pair,
 # ordenados por uso didáctico.
@@ -51,6 +66,15 @@ _PAIR_LABELS_TO_CODE: dict[str, str] = {
     "h y s": "HS",
 }
 
+# Símbolo → (kwarg en state_from_pair, kind para el sistema de unidades, default en SI).
+_SYMBOL_SPEC: dict[str, tuple[str, str, float]] = {
+    "T": ("t", "temperature", 298.15),  # 25 °C
+    "P": ("p", "pressure", 1.0e5),  # 1 bar
+    "H": ("h", "specific_enthalpy", 2.5e6),  # 2500 kJ/kg
+    "S": ("s", "specific_entropy", 5000.0),  # 5 kJ/(kg·K)
+    "X": ("x", "dimensionless", 0.0),
+}
+
 
 # ---------------------------------------------------------------------
 # Helpers
@@ -61,65 +85,53 @@ def _render_var_input(
     symbol: str,
     *,
     key: str,
-    default: float,
+    default_si: float,
 ) -> tuple[str, float]:
-    """Renderiza un input numérico para una propiedad y devuelve
-    ``(kwarg_si_name, value_si)``. ``default`` viene en unidades
-    didácticas (°C / bar / kJ por kg / -)."""
-    if symbol == "T":
-        val_c = st.number_input(
-            "Temperatura T [°C]",
-            value=float(default),
-            format="%.4f",
-            key=key,
-        )
-        return "t", c_to_k(float(val_c))
-    if symbol == "P":
-        val_bar = st.number_input(
-            "Presión P [bar(a)]",
-            value=float(default),
-            min_value=1.0e-6,
-            format="%.4f",
-            key=key,
-        )
-        return "p", bar_to_pa(float(val_bar))
-    if symbol == "H":
-        val_kj = st.number_input(
-            "Entalpía h [kJ/kg]",
-            value=float(default),
-            format="%.4f",
-            key=key,
-        )
-        return "h", kj_to_j(float(val_kj))
-    if symbol == "S":
-        val_kj = st.number_input(
-            "Entropía s [kJ/(kg·K)]",
-            value=float(default),
-            format="%.4f",
-            key=key,
-        )
-        return "s", kj_to_j(float(val_kj))
+    """Renderiza un input para una propiedad y devuelve ``(kwarg_si_name, value_si)``.
+
+    Para magnitudes con sistema (T/P/H/S) usa el sistema actual. Para X
+    (calidad), el widget es plano sin conversión.
+    """
     if symbol == "X":
         val_x = st.number_input(
             "Título x (calidad) [-]",
-            value=float(default),
+            value=float(default_si),
             min_value=0.0,
             max_value=1.0,
             format="%.4f",
             key=key,
         )
         return "x", float(val_x)
-    raise ValueError(f"Símbolo no soportado: {symbol!r}")
+
+    kw_name, kind, _ = _SYMBOL_SPEC[symbol]
+    label_map = {
+        "T": "Temperatura T",
+        "P": "Presión P",
+        "H": "Entalpía h",
+        "S": "Entropía s",
+    }
+    value_si = number_input_si(
+        label=label_map[symbol],
+        kind=kind,  # type: ignore[arg-type]
+        default_si=default_si,
+        key=key,
+        format="%.4f",
+    )
+    return kw_name, value_si
 
 
 def _build_state_input(
     *,
     key_prefix: str,
     header: str,
-    defaults: dict[str, float],
+    defaults_si: dict[str, float],
     default_pair_label: str,
 ) -> tuple[str, dict[str, float]]:
-    """Renderiza el form para definir un estado y devuelve ``(pair_code, kwargs_si)``."""
+    """Renderiza el form para definir un estado y devuelve ``(pair_code, kwargs_si)``.
+
+    ``defaults_si`` mapea símbolo → valor en SI. Para los símbolos faltantes
+    se usa :data:`_SYMBOL_SPEC` como fallback.
+    """
     st.markdown(f"**{header}**")
     pair_options = list(_PAIR_LABELS_TO_CODE.keys())
     pair_label = st.selectbox(
@@ -135,19 +147,15 @@ def _build_state_input(
         kw1, val1 = _render_var_input(
             char1,
             key=f"{key_prefix}_v1",
-            default=defaults.get(char1, _default_for_symbol(char1)),
+            default_si=defaults_si.get(char1, _SYMBOL_SPEC[char1][2]),
         )
     with c2:
         kw2, val2 = _render_var_input(
             char2,
             key=f"{key_prefix}_v2",
-            default=defaults.get(char2, _default_for_symbol(char2)),
+            default_si=defaults_si.get(char2, _SYMBOL_SPEC[char2][2]),
         )
     return pair_code, {kw1: val1, kw2: val2}
-
-
-def _default_for_symbol(symbol: str) -> float:
-    return {"T": 25.0, "P": 1.0, "H": 2500.0, "S": 5.0, "X": 0.0}[symbol]
 
 
 def _resolve_state(fluid: str, pair_code: str, kwargs_si: dict[str, float]) -> StatePoint:
@@ -155,12 +163,18 @@ def _resolve_state(fluid: str, pair_code: str, kwargs_si: dict[str, float]) -> S
 
 
 def _state_to_row(label: str, state: StatePoint) -> dict[str, Any]:
+    """Una fila de la tabla de estados en el sistema actual."""
+    sys = get_current_system()
+    T_col = f"T [{current_unit_label('temperature')}]"
+    P_col = f"P [{current_unit_label('pressure')}]"
+    h_col = f"h [{current_unit_label('specific_enthalpy')}]"
+    s_col = f"s [{current_unit_label('specific_entropy')}]"
     return {
         "estado": label,
-        "T [°C]": k_to_c(state.T_K),
-        "P [bar]": pa_to_bar(state.P_Pa),
-        "h [kJ/kg]": j_to_kj(state.h_J_per_kg),
-        "s [kJ/(kg·K)]": j_to_kj(state.s_J_per_kg_K),
+        T_col: convert_from_si(state.T_K, "temperature", sys),
+        P_col: convert_from_si(state.P_Pa, "pressure", sys),
+        h_col: convert_from_si(state.h_J_per_kg, "specific_enthalpy", sys),
+        s_col: convert_from_si(state.s_J_per_kg_K, "specific_entropy", sys),
         "x [-]": state.x,
     }
 
@@ -172,6 +186,12 @@ def _render_states_table(rows: list[dict[str, Any]]) -> None:
 
 def _render_procedure(steps: Any) -> None:
     with st.expander("🔬 Procedimiento", expanded=True):
+        st.caption(
+            "ℹ️ Los pasos se muestran siempre en sistema **Técnico** "
+            "(°C, bar, kJ/kg, kJ/(kg·K)) para consistencia con la "
+            "bibliografía clásica (Cengel). La conversión al sistema "
+            "activo de la tabla de estados queda pendiente para Fase 1.5."
+        )
         st.markdown("**Fórmula aplicada:**")
         st.latex(steps.formula_latex)
         st.markdown("**Con los valores ingresados:**")
@@ -186,8 +206,9 @@ def _clear_state_for(prefix: str) -> None:
             del st.session_state[k]
 
 
-def _format_kj_per_kg(value_si: float) -> str:
-    return f"{value_si / 1.0e3:.4g} kJ/kg"
+def _format_specific_work(value_si: float) -> str:
+    """Trabajo específico en unidades del sistema actual."""
+    return quantity_label(value_si, "specific_enthalpy", precision=4)
 
 
 # ---------------------------------------------------------------------
@@ -206,6 +227,7 @@ st.markdown(
 st.markdown("---")
 
 sidebar_credits(version=PAGE_VERSION, page_name="Isoentrópicos")
+render_units_selector()
 
 fluid = st.selectbox(
     "Fluido (CoolProp)",
@@ -232,11 +254,11 @@ with tab_turbine:
     )
     is_direct = mode.startswith("Directo")
 
-    # Inputs de estado de entrada (defaults: vapor sobrecalentado 30 bar, 400 °C).
+    # Defaults: vapor sobrecalentado 30 bar, 400 °C.
     pair_in, kwargs_in = _build_state_input(
         key_prefix="turb_in",
         header="Estado 1 (entrada)",
-        defaults={"T": 400.0, "P": 30.0},
+        defaults_si={"T": 673.15, "P": 3.0e6},  # 400 °C, 30 bar
         default_pair_label="T y P",
     )
 
@@ -244,12 +266,12 @@ with tab_turbine:
         st.markdown("**Parámetros del proceso**")
         c1, c2 = st.columns(2)
         with c1:
-            p_out_bar = st.number_input(
-                "Presión de salida P₂ [bar(a)]",
-                value=0.5,
-                min_value=1.0e-6,
-                format="%.4f",
+            p_out_Pa = number_input_si(
+                label="Presión de salida P₂",
+                kind="pressure",
+                default_si=5.0e4,  # 0.5 bar
                 key="turb_p_out",
+                format="%.4f",
             )
         with c2:
             eta_s = st.number_input(
@@ -265,7 +287,7 @@ with tab_turbine:
         pair_out, kwargs_out = _build_state_input(
             key_prefix="turb_out",
             header="Estado 2 (salida real)",
-            defaults={"T": 100.0, "P": 0.5},
+            defaults_si={"T": 373.15, "P": 5.0e4},  # 100 °C, 0.5 bar
             default_pair_label="T y P",
         )
 
@@ -276,7 +298,7 @@ with tab_turbine:
                 result = turbine_direct(
                     fluid=fluid,
                     state_in=state_in,
-                    p_out_Pa=bar_to_pa(float(p_out_bar)),
+                    p_out_Pa=p_out_Pa,
                     eta_s=float(eta_s),
                 )
             else:
@@ -298,7 +320,7 @@ with tab_turbine:
         w_t = -result.delta_h_real_J_per_kg
         c1, c2 = st.columns(2)
         c1.metric("η_s", f"{result.eta_s:.4f}")
-        c2.metric("Trabajo específico w_t", _format_kj_per_kg(w_t))
+        c2.metric("Trabajo específico w_t", _format_specific_work(w_t))
         _render_states_table(
             [
                 _state_to_row("1 (entrada)", result.state_in),
@@ -325,7 +347,7 @@ with tab_compressor:
     pair_in, kwargs_in = _build_state_input(
         key_prefix="comp_in",
         header="Estado 1 (entrada)",
-        defaults={"T": 25.0, "P": 1.0},
+        defaults_si={"T": 298.15, "P": 1.0e5},  # 25 °C, 1 bar
         default_pair_label="T y P",
     )
 
@@ -333,12 +355,12 @@ with tab_compressor:
         st.markdown("**Parámetros del proceso**")
         c1, c2 = st.columns(2)
         with c1:
-            p_out_bar = st.number_input(
-                "Presión de salida P₂ [bar(a)]",
-                value=8.0,
-                min_value=1.0e-6,
-                format="%.4f",
+            p_out_Pa = number_input_si(
+                label="Presión de salida P₂",
+                kind="pressure",
+                default_si=8.0e5,  # 8 bar
                 key="comp_p_out",
+                format="%.4f",
             )
         with c2:
             eta_s = st.number_input(
@@ -354,7 +376,7 @@ with tab_compressor:
         pair_out, kwargs_out = _build_state_input(
             key_prefix="comp_out",
             header="Estado 2 (salida real)",
-            defaults={"T": 300.0, "P": 8.0},
+            defaults_si={"T": 573.15, "P": 8.0e5},  # 300 °C, 8 bar
             default_pair_label="T y P",
         )
 
@@ -365,7 +387,7 @@ with tab_compressor:
                 result = compressor_direct(
                     fluid=fluid,
                     state_in=state_in,
-                    p_out_Pa=bar_to_pa(float(p_out_bar)),
+                    p_out_Pa=p_out_Pa,
                     eta_s=float(eta_s),
                 )
             else:
@@ -387,7 +409,7 @@ with tab_compressor:
         w_c = result.delta_h_real_J_per_kg
         c1, c2 = st.columns(2)
         c1.metric("η_s", f"{result.eta_s:.4f}")
-        c2.metric("Trabajo específico w_c", _format_kj_per_kg(w_c))
+        c2.metric("Trabajo específico w_c", _format_specific_work(w_c))
         _render_states_table(
             [
                 _state_to_row("1 (entrada)", result.state_in),
@@ -414,7 +436,7 @@ with tab_pump:
     pair_in, kwargs_in = _build_state_input(
         key_prefix="pump_in",
         header="Estado 1 (entrada, líquido)",
-        defaults={"P": 0.10, "X": 0.0, "T": 45.81},
+        defaults_si={"P": 1.0e4, "X": 0.0, "T": 318.96},  # 0.1 bar, x=0
         default_pair_label="P y x (saturado)",
     )
 
@@ -422,12 +444,12 @@ with tab_pump:
         st.markdown("**Parámetros del proceso**")
         c1, c2 = st.columns(2)
         with c1:
-            p_out_bar = st.number_input(
-                "Presión de salida P₂ [bar(a)]",
-                value=150.0,
-                min_value=1.0e-6,
-                format="%.4f",
+            p_out_Pa = number_input_si(
+                label="Presión de salida P₂",
+                kind="pressure",
+                default_si=1.5e7,  # 150 bar
                 key="pump_p_out",
+                format="%.4f",
             )
         with c2:
             eta_s = st.number_input(
@@ -443,7 +465,7 @@ with tab_pump:
         pair_out, kwargs_out = _build_state_input(
             key_prefix="pump_out",
             header="Estado 2 (salida real)",
-            defaults={"P": 150.0, "T": 46.0},
+            defaults_si={"P": 1.5e7, "T": 319.15},  # 150 bar, 46 °C
             default_pair_label="T y P",
         )
 
@@ -454,7 +476,7 @@ with tab_pump:
                 result = pump_direct(
                     fluid=fluid,
                     state_in=state_in,
-                    p_out_Pa=bar_to_pa(float(p_out_bar)),
+                    p_out_Pa=p_out_Pa,
                     eta_s=float(eta_s),
                 )
             else:
@@ -476,7 +498,7 @@ with tab_pump:
         w_p = result.delta_h_real_J_per_kg
         c1, c2 = st.columns(2)
         c1.metric("η_s", f"{result.eta_s:.4f}")
-        c2.metric("Trabajo específico w_p", _format_kj_per_kg(w_p))
+        c2.metric("Trabajo específico w_p", _format_specific_work(w_p))
         _render_states_table(
             [
                 _state_to_row("1 (entrada)", result.state_in),
@@ -498,7 +520,7 @@ with tab_pump:
                 "Compará contra la EOS de CoolProp para ver cuánto se aleja."
             )
             try:
-                # v_1 = 1 / rho_1 a partir de CoolProp (densidad del estado in).
+                # v_1 = 1 / rho_1 a partir de CoolProp.
                 import CoolProp.CoolProp as cp
 
                 rho_in = cp.PropsSI("D", "P", result.state_in.P_Pa, "T", result.state_in.T_K, fluid)
@@ -512,8 +534,8 @@ with tab_pump:
                     else float("nan")
                 )
                 c1, c2, c3 = st.columns(3)
-                c1.metric("w_p (EOS CoolProp)", _format_kj_per_kg(w_p_real))
-                c2.metric("w_p (modelo simple)", _format_kj_per_kg(w_p_simple))
+                c1.metric("w_p (EOS CoolProp)", _format_specific_work(w_p_real))
+                c2.metric("w_p (modelo simple)", _format_specific_work(w_p_simple))
                 c3.metric("Error relativo", f"{err_pct:.3f} %")
                 st.caption(
                     "Para agua subenfriada / saturada líquida y compresiones "
@@ -538,19 +560,19 @@ with tab_polytropic:
     pair_in, kwargs_in = _build_state_input(
         key_prefix="poly_in",
         header="Estado 1 (entrada al primer etapa)",
-        defaults={"T": 25.0, "P": 1.0},
+        defaults_si={"T": 298.15, "P": 1.0e5},  # 25 °C, 1 bar
         default_pair_label="T y P",
     )
 
     st.markdown("**Parámetros del proceso**")
     c1, c2 = st.columns(2)
     with c1:
-        p_out_bar = st.number_input(
-            "Presión final P_out [bar(a)]",
-            value=27.0,
-            min_value=1.0e-6,
-            format="%.4f",
+        p_out_Pa = number_input_si(
+            label="Presión final P_out",
+            kind="pressure",
+            default_si=2.7e6,  # 27 bar
             key="poly_p_out",
+            format="%.4f",
         )
         n_stages = st.number_input(
             "Número de etapas n",
@@ -577,15 +599,17 @@ with tab_polytropic:
         )
 
     if intercool:
-        t_intercool_c = st.number_input(
-            "Temperatura del intercooler T_ic [°C]",
-            value=25.0,
-            format="%.4f",
+        t_intercool_K = number_input_si(
+            label="Temperatura del intercooler T_ic",
+            kind="temperature",
+            default_si=298.15,  # 25 °C
             key="poly_tic",
-            help="Default = temperatura de entrada (full cooling).",
+            format="%.4f",
+            help="Default = temperatura ambiente (25 °C). En la práctica se usa "
+            "la temperatura de entrada al compresor para 'full cooling'.",
         )
     else:
-        t_intercool_c = None
+        t_intercool_K = None
 
     if st.button("Calcular", key="poly_btn", type="primary"):
         try:
@@ -593,11 +617,11 @@ with tab_polytropic:
             result = compressor_multistage(
                 fluid=fluid,
                 state_in=state_in,
-                p_out_Pa=bar_to_pa(float(p_out_bar)),
+                p_out_Pa=p_out_Pa,
                 n_stages=int(n_stages),
                 eta_s_per_stage=float(eta_s_stage),
                 intercool=bool(intercool),
-                t_intercool_K=(c_to_k(float(t_intercool_c)) if t_intercool_c is not None else None),
+                t_intercool_K=t_intercool_K,
             )
         except ValueError as exc:
             st.error(f"Error: {exc}")
@@ -611,11 +635,11 @@ with tab_polytropic:
         c1, c2, c3 = st.columns(3)
         c1.metric(
             "Δh total (multietapa)",
-            _format_kj_per_kg(result.total_delta_h_real_J_per_kg),
+            _format_specific_work(result.total_delta_h_real_J_per_kg),
         )
         c2.metric(
             "Δh 1 etapa equivalente",
-            _format_kj_per_kg(result.delta_h_single_stage_real_J_per_kg),
+            _format_specific_work(result.delta_h_single_stage_real_J_per_kg),
         )
         single = result.delta_h_single_stage_real_J_per_kg
         if single != 0.0:

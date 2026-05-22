@@ -42,7 +42,6 @@ apps/
 │   ├── 1_Propiedades.py
 │   ├── 2_Interpolacion.py     # ✅ Fase 1.1
 │   ├── 3_Isoentropicos.py     # ✅ Fase 1.3
-│   ├── 4_Diagramas.py
 │   ├── 5_Rankine.py
 │   ├── 6_Refrigeracion.py
 │   ├── 7_Psicrometria.py
@@ -53,7 +52,11 @@ apps/
 │   └── 99_Acerca.py           # Créditos, licencias, citas
 ├── core/                      # Lógica pura, sin dependencia de Streamlit
 │   ├── __init__.py
-│   ├── units.py               # Selector global de unidades
+│   ├── units.py               # Conversiones simples + normalizador de
+│   │                          # headers (Fase 1.2). NO importa Streamlit.
+│   ├── units_system.py        # ✅ Fase 1.4 — Sistema global SI/Técnico/Inglés.
+│   │                          # Tabla (kind, system) → (factor, offset, label),
+│   │                          # API format_quantity / convert_*_si / unit_label.
 │   ├── fluids.py              # Wrappers cacheados sobre CoolProp
 │   ├── interpolation.py       # ✅ Fase 1.1 — Interpolación lineal y doble entrada
 │   ├── isentropic.py          # ✅ Fase 1.3 — Turbina / compresor / bomba; multietapa

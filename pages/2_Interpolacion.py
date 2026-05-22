@@ -41,8 +41,9 @@ from core.units import (
     temperature_to_kelvin,
 )
 from ui.branding import SUBJECT, sidebar_credits
+from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.6.0"
+PAGE_VERSION = "0.7.0"
 
 EXAMPLE_LINEAR_CSV = """T [°C],h_f [kJ/kg]
 100,419.06
@@ -436,6 +437,14 @@ st.markdown(
 st.markdown("---")
 
 sidebar_credits(version=PAGE_VERSION, page_name="Interpolación")
+render_units_selector()
+
+st.info(
+    "ℹ️ Esta página opera en las unidades del CSV que pegues. El selector "
+    "global de unidades **no aplica** al cálculo de interpolación — los "
+    "resultados se muestran en las unidades originales del header. Para "
+    "convertir resultados a otro sistema, usá la página de Propiedades."
+)
 
 with st.expander("📋 Cómo formatear tu tabla", expanded=False):
     st.markdown(

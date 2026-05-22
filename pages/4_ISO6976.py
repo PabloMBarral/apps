@@ -36,8 +36,9 @@ from core.combustion.iso6976 import (
     load_tables,
 )
 from ui.branding import SUBJECT, sidebar_credits
+from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.6.0"
+PAGE_VERSION = "0.7.0"
 
 _FIXTURE_PATH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "iso6976_annex_d.json"
 
@@ -169,6 +170,15 @@ st.markdown(
 st.markdown("---")
 
 sidebar_credits(version=PAGE_VERSION, page_name="ISO 6976")
+render_units_selector()
+
+st.info(
+    "ℹ️ Esta página usa las unidades de la norma ISO 6976:2016 "
+    "(kJ/mol, MJ/kg, MJ/m³, kg/m³) independientemente del sistema global "
+    "de unidades seleccionado en el sidebar. La conversión a sistema "
+    "inglés (Btu/lb·mol, etc.) según Annex C de la norma queda pendiente "
+    "para fase futura."
+)
 
 # Cargo las tablas y el fixture de ejemplos.
 tables = _load_tables_cached()

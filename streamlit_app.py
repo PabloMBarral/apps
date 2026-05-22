@@ -10,8 +10,9 @@ from __future__ import annotations
 import streamlit as st
 
 from ui.branding import SUBJECT, sidebar_credits
+from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.6.0"
+PAGE_VERSION = "0.7.0"
 
 
 def _home_page() -> None:
@@ -41,7 +42,8 @@ def _home_page() -> None:
 
         ### Módulos disponibles
 
-        - 💧 **Propiedades** — agua/vapor a partir de cualquier par de
+        - 💧 **Propiedades** — agua y otros fluidos puros (R134a, R410A,
+          R1234yf, amoníaco, CO₂, aire) a partir de cualquier par de
           variables independientes (T-p, p-h, h-s, p-x, T-x, p-s, T-s).
         - 📐 **Interpolación** — lineal simple y doble entrada (bilineal)
           sobre tablas, con procedimiento didáctico paso a paso y
@@ -63,10 +65,22 @@ def _home_page() -> None:
         psicrometría, combustión, exergía. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
+
+        ---
+
+        ### Sistema de unidades
+
+        En el sidebar (después de los créditos) podés elegir entre **SI**
+        (K, Pa, J/kg, J/(kg·K)), **Técnico** (°C, bar, kJ/kg, kJ/(kg·K))
+        — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
+        Btu/(lb·°R)). La selección persiste entre páginas y aplica a
+        Propiedades e Isoentrópicos. Interpolación respeta las unidades
+        del CSV original; ISO 6976 usa las unidades de la norma.
         """
     )
 
     sidebar_credits(version=PAGE_VERSION, page_name="Home")
+    render_units_selector()
 
 
 pages = [

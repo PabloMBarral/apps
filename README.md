@@ -36,6 +36,17 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   `CoolProp.PhaseSI`. Procedimiento paso a paso con LaTeX y narrativa en
   español. Comparación opt-in en bomba contra el modelo de líquido
   incompresible `w_p ≈ v_1·Δp/η_s`. _Fase 1.3 cerrada._
+- ✅ **Multifluido + selector global de unidades**: la página de
+  Propiedades trabaja con cualquier fluido de `core.fluids.SUPPORTED_FLUIDS`
+  (Water, R134a, R410A, R1234yf, NH₃, CO₂, Air). Selector global en
+  sidebar entre **SI** (K, Pa, J/kg, J/(kg·K)), **Técnico** (°C, bar,
+  kJ/kg, kJ/(kg·K)) — default — e **Inglés** (°F, psia, Btu/lb,
+  Btu/(lb·°R)). El sistema se persiste vía `st.session_state` y aplica
+  a Propiedades e Isoentrópicos. Interpolación respeta las unidades del
+  CSV original; ISO 6976 usa las unidades de la norma. Los pasos
+  didácticos isoentrópicos (LaTeX) quedan en Técnico hardcoded para
+  consistencia con Cengel — su conversión al sistema activo entra en
+  Fase 1.5. _Fase 1.4 cerrada._
 - ✅ **ISO 6976:2016 — Poder calorífico de gases combustibles**:
   poder calorífico bruto y neto (molar, másico, volumétrico), densidad,
   densidad relativa al aire e índices de Wobbe G y N, con propagación
