@@ -11,7 +11,7 @@ import streamlit as st
 
 from ui.branding import SUBJECT, sidebar_credits
 
-PAGE_VERSION = "0.5.0"
+PAGE_VERSION = "0.6.0"
 
 
 def _home_page() -> None:
@@ -50,12 +50,17 @@ def _home_page() -> None:
           multietapa con intercooler, en modo directo (calcular el
           estado real dado η_s) o inverso (calcular η_s dados los dos
           estados).
+        - 🔥 **ISO 6976** — poder calorífico (bruto y neto), densidad,
+          densidad relativa al aire e índice de Wobbe de mezclas
+          gaseosas combustibles, con propagación de incertidumbre y los
+          ejemplos del Annex D precargados (matriz identidad; matriz
+          de normalización deferida a fase futura por requerir
+          ISO 14912:2003).
 
         ### En desarrollo
 
         Diagramas, ciclos Rankine / refrigeración / Brayton / combinado,
-        psicrometría, combustión, poder calorífico, ISO 6976, exergía.
-        Ver el
+        psicrometría, combustión, exergía. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
         """
@@ -69,6 +74,7 @@ pages = [
     st.Page("pages/1_Propiedades.py", title="Propiedades", icon="💧"),
     st.Page("pages/2_Interpolacion.py", title="Interpolación", icon="📐"),
     st.Page("pages/3_Isoentropicos.py", title="Isoentrópicos", icon="⚙️"),
+    st.Page("pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
 ]
 pg = st.navigation(pages)
 pg.run()

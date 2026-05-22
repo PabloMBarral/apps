@@ -42,7 +42,7 @@ from core.units import (
 )
 from ui.branding import SUBJECT, sidebar_credits
 
-PAGE_VERSION = "0.5.0"
+PAGE_VERSION = "0.6.0"
 
 EXAMPLE_LINEAR_CSV = """T [°C],h_f [kJ/kg]
 100,419.06

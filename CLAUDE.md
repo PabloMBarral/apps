@@ -48,7 +48,7 @@ apps/
 │   ├── 7_Psicrometria.py
 │   ├── 8_Combustion.py
 │   ├── 9_Poder_Calorifico.py
-│   ├── 10_ISO_6976.py
+│   ├── 4_ISO6976.py           # ✅ Fase 2.3 (matriz identidad)
 │   ├── 11_Exergia.py
 │   └── 99_Acerca.py           # Créditos, licencias, citas
 ├── core/                      # Lógica pura, sin dependencia de Streamlit
@@ -63,7 +63,9 @@ apps/
 │   │   ├── fuels.py           # Modelos de combustible (sólido/líquido/gas)
 │   │   ├── stoichiometry.py   # Reacciones, exceso aire, productos
 │   │   ├── heating_value.py   # PCI/PCS por correlaciones (último/próximo)
-│   │   └── iso6976.py         # ISO 6976:2016 — gases combustibles
+│   │   └── iso6976.py         # ✅ Fase 2.3 — ISO 6976:2016 (matriz identidad)
+│   │                          # Normalization matrix: pendiente, requiere
+│   │                          # ISO 14912:2003 Formula (69) — deferido.
 │   ├── cycles/
 │   │   ├── rankine.py
 │   │   ├── refrigeration.py

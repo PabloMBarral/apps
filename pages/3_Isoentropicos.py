@@ -37,7 +37,7 @@ from core.isentropic import (
 from core.units import bar_to_pa, c_to_k, j_to_kj, k_to_c, kj_to_j, pa_to_bar
 from ui.branding import SUBJECT, sidebar_credits
 
-PAGE_VERSION = "0.5.0"
+PAGE_VERSION = "0.6.0"
 
 # Códigos de par independiente reconocidos por core.fluids.state_from_pair,
 # ordenados por uso didáctico.

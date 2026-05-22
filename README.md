@@ -36,6 +36,14 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   `CoolProp.PhaseSI`. Procedimiento paso a paso con LaTeX y narrativa en
   español. Comparación opt-in en bomba contra el modelo de líquido
   incompresible `w_p ≈ v_1·Δp/η_s`. _Fase 1.3 cerrada._
+- ✅ **ISO 6976:2016 — Poder calorífico de gases combustibles**:
+  poder calorífico bruto y neto (molar, másico, volumétrico), densidad,
+  densidad relativa al aire e índices de Wobbe G y N, con propagación
+  de incertidumbre estándar (matriz identidad; la matriz de normalización
+  queda deferida a fase futura por requerir ISO 14912:2003). Composición
+  editable in-place con autocompletado de los 60 componentes de la norma.
+  Ejemplos del Annex D (D.2, D.3, D.4) precargados y verificados contra
+  los valores tabulados de la norma. _Fase 2.3 cerrada._
 
 ### En desarrollo (roadmap)
 - **Multifluido**: refrigerantes (R134a, R410A, R1234yf, NH₃, CO₂), aire,
