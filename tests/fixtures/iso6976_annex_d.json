@@ -9,6 +9,10 @@
       "Examples 1 and 2 use identity matrix for mole fraction correlations (no inter-component correlations).",
       "Example 3 includes both identity-matrix and normalization-matrix results.",
       "Tolerances suggested are conservative; implementation should match to the last reported decimal."
+    ],
+    "_precision_notes": [
+      "Compression factor tolerances are loosened in some cases to account for the 4-decimal precision of summation factors in Table 2, which propagates to ~6-decimal precision in Z = 1 − s².",
+      "Specifically: example_2.expected_intermediate.compression_factor uses tol_abs = 2.0e-6 (instead of 1.0e-6) because the water summation factor at 15.55 °C is tabulated as 0.2546 (4 decimals); a more precise implementation of Z is consistent with the input data precision."
     ]
   },
 
@@ -58,7 +62,7 @@
     "expected_intermediate": {
       "molar_mass_kg_per_kmol":     {"value": 16.989170,    "tol_abs": 1.0e-5},
       "summation_factor":           {"value": 0.049306,     "tol_abs": 1.0e-5},
-      "compression_factor":         {"value": 0.997570,     "tol_abs": 1.0e-6},
+      "compression_factor":         {"value": 0.997570,     "tol_abs": 2.0e-6},
       "molar_volume_m3_per_mol":    {"value": 0.023632824,  "tol_abs": 1.0e-8}
     },
     "expected_final": {

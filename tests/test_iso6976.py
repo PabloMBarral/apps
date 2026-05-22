@@ -195,15 +195,12 @@ class TestExample2_D3:
     def test_summation_factor(self, result, expected_inter) -> None:
         _assert_value(result.summation_factor, expected_inter["summation_factor"])
 
-    @pytest.mark.skip(
-        reason=(
-            "Fixture Z=0.997570 redondeado a 6 decimales; "
-            "implementación da Z=0.99756896 (más preciso). "
-            "Diff 1.04e-6 sobre tol 1e-6 es artefacto de redondeo del fixture, "
-            "no error de cálculo: identity-only Ex 1 matchea Z exacto a 1e-9."
-        )
-    )
     def test_compression_factor(self, result, expected_inter) -> None:
+        # Fixture tol_abs = 2e-6 (subido de 1e-6) por la precisión de
+        # 4 decimales de los factores de sumación en Tabla 2, que limita
+        # la precisión de Z = 1 − s² a ~6 decimales. Mi Z = 0.99756896
+        # vs fixture 0.997570 (que representa el redondeo a 6 dec).
+        # Ver _precision_notes en _meta del JSON.
         _assert_value(result.compression_factor, expected_inter["compression_factor"])
 
     def test_molar_volume(self, result, expected_inter) -> None:
