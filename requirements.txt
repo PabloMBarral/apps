@@ -17,7 +17,11 @@ tespy>=0.9.14
 
 # --- Diagramas de fluidos ---
 # fluprodia: log p-h, T-s, h-s, p-v con isolineas
-fluprodia>=4.0
+fluprodia>=4.2
+
+# --- Renderizado interactivo de diagramas ---
+# plotly: usado por fluprodia.draw_isolines_plotly y st.plotly_chart
+plotly>=5.0
 
 # --- Stack científico ---
 numpy>=1.26

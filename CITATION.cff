@@ -32,8 +32,8 @@ keywords:
   - fluprodia
   - iso-6976
 license: MIT
-version: "0.7.0"
-date-released: "2026-05-22"
+version: "0.8.0"
+date-released: "2026-05-23"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"
@@ -83,6 +83,13 @@ references:
       - name: "Streamlit Inc."
     title: "Streamlit"
     url: "https://streamlit.io"
+  - type: software
+    scope: "Renderizado interactivo de diagramas"
+    authors:
+      - name: "Plotly Technologies Inc."
+    title: "plotly.py"
+    url: "https://plotly.com/python/"
+    repository-code: "https://github.com/plotly/plotly.py"
   - type: standard
     scope: "Cálculo de poder calorífico de gas natural"
     title: >-

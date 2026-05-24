@@ -19,11 +19,17 @@ from __future__ import annotations
 
 import streamlit as st
 
-from core.fluids import SUPPORTED_FLUIDS, state_from_pair
+from core.fluids import SUPPORTED_FLUIDS, StatePoint, state_from_pair
 from ui.branding import SUBJECT, sidebar_credits
-from ui.units_ui import number_input_si, quantity_label, render_units_selector
+from ui.diagrams import DiagramPoint, diagram_type_selector, render_diagram_plotly
+from ui.units_ui import (
+    get_current_system,
+    number_input_si,
+    quantity_label,
+    render_units_selector,
+)
 
-PAGE_VERSION = "0.7.0"
+PAGE_VERSION = "0.8.0"
 
 _NO_COHERENT = "Revisá que sean coherentes los valores ingresados, y volvé a intentarlo."
 
@@ -71,6 +77,33 @@ def _render_result_table(
     st.write(f"- Entalpía: **{label_h}**")
     st.write(f"- Entropía: **{label_s}**")
     st.write(f"- Título (calidad x): **{x:.4g}** (-1 = fuera de campana)")
+
+
+def _render_diagram_expander(
+    fluid: str,
+    state_si: tuple[float, float, float, float, float],
+    *,
+    selector_key: str,
+    chart_key: str,
+) -> None:
+    """Muestra un expansor con el diagrama del fluido y el punto calculado.
+
+    Usa ``ui.diagrams.render_diagram_plotly`` con un único ``DiagramPoint``
+    etiquetado ``"●"``. El selector de tipo de diagrama persiste en
+    ``st.session_state`` con ``selector_key``.
+    """
+    T_K, P_Pa, h_J, s_J, x = state_si
+    state = StatePoint(T_K=T_K, P_Pa=P_Pa, h_J_per_kg=h_J, s_J_per_kg_K=s_J, x=x)
+    with st.expander("📈 Diagrama del fluido", expanded=False):
+        diagram_type = diagram_type_selector(key=selector_key, default="logph")
+        system = get_current_system()
+        render_diagram_plotly(
+            fluid=fluid,
+            diagram_type=diagram_type,
+            system=system,
+            points=[DiagramPoint(state=state, label="●", color="#d62728")],
+            chart_key=chart_key,
+        )
 
 
 # ---------------------------------------------------------------------
@@ -147,6 +180,12 @@ if option == "t y p":
                     quantity_label(p_Pa, "pressure", precision=4),
                 ),
             )
+            _render_diagram_expander(
+                fluid,
+                result,
+                selector_key="diag_type_tp",
+                chart_key="diag_chart_tp",
+            )
         else:
             st.write(_NO_COHERENT)
 
@@ -180,6 +219,12 @@ elif option == "p y h":
                     quantity_label(p_Pa, "pressure", precision=4),
                 ),
             )
+            _render_diagram_expander(
+                fluid,
+                result,
+                selector_key="diag_type_ph",
+                chart_key="diag_chart_ph",
+            )
         else:
             st.write(_NO_COHERENT)
 
@@ -212,6 +257,12 @@ elif option == "h y s":
                     quantity_label(h_J, "specific_enthalpy", precision=6),
                     quantity_label(s_J, "specific_entropy", precision=6),
                 ),
+            )
+            _render_diagram_expander(
+                fluid,
+                result,
+                selector_key="diag_type_hs",
+                chart_key="diag_chart_hs",
             )
         else:
             st.write(_NO_COHERENT)
@@ -248,6 +299,12 @@ elif option == "p y x":
                     f"x = {x:.4f}",
                 ),
             )
+            _render_diagram_expander(
+                fluid,
+                result,
+                selector_key="diag_type_px",
+                chart_key="diag_chart_px",
+            )
         else:
             st.write(_NO_COHERENT)
 
@@ -283,6 +340,12 @@ elif option == "t y x":
                     f"x = {x:.4f}",
                 ),
             )
+            _render_diagram_expander(
+                fluid,
+                result,
+                selector_key="diag_type_tx",
+                chart_key="diag_chart_tx",
+            )
         else:
             st.write(_NO_COHERENT)
 
@@ -316,6 +379,12 @@ elif option == "p y s":
                     quantity_label(s_J, "specific_entropy", precision=6),
                 ),
             )
+            _render_diagram_expander(
+                fluid,
+                result,
+                selector_key="diag_type_ps",
+                chart_key="diag_chart_ps",
+            )
         else:
             st.write(_NO_COHERENT)
 
@@ -348,6 +417,12 @@ elif option == "t y s":
                     quantity_label(t_K, "temperature", precision=4),
                     quantity_label(s_J, "specific_entropy", precision=6),
                 ),
+            )
+            _render_diagram_expander(
+                fluid,
+                result,
+                selector_key="diag_type_ts",
+                chart_key="diag_chart_ts",
             )
         else:
             st.write(_NO_COHERENT)

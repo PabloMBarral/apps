@@ -39,9 +39,9 @@ y UI (Streamlit).
 apps/
 ├── streamlit_app.py           # Home / landing
 ├── pages/                     # Una página por módulo (numeradas)
-│   ├── 1_Propiedades.py
+│   ├── 1_Propiedades.py       # ✅ Fase 1.5a (+ diagrama del estado)
 │   ├── 2_Interpolacion.py     # ✅ Fase 1.1
-│   ├── 3_Isoentropicos.py     # ✅ Fase 1.3
+│   ├── 3_Isoentropicos.py     # ✅ Fase 1.3 + ✅ 1.5a (diagrama del proceso)
 │   ├── 5_Rankine.py
 │   ├── 6_Refrigeracion.py
 │   ├── 7_Psicrometria.py
@@ -60,6 +60,9 @@ apps/
 │   ├── fluids.py              # Wrappers cacheados sobre CoolProp
 │   ├── interpolation.py       # ✅ Fase 1.1 — Interpolación lineal y doble entrada
 │   ├── isentropic.py          # ✅ Fase 1.3 — Turbina / compresor / bomba; multietapa
+│   ├── diagrams.py            # ✅ Fase 1.5a — Wrappers tipados sobre fluprodia.
+│   │                          # FLUPRODIA_UNITS, DEFAULT_RANGES, build_diagram,
+│   │                          # isentropic/isobaric/isothermal_process, overlays.
 │   ├── exergy.py              # Exergía física y química
 │   ├── combustion/
 │   │   ├── __init__.py
@@ -75,6 +78,12 @@ apps/
 │   │   ├── brayton.py
 │   │   └── combined.py
 │   └── plots.py               # fluprodia + matplotlib helpers
+├── ui/                        # Helpers de UI que sí importan Streamlit
+│   ├── branding.py            # Bloque de créditos compartido (sidebar)
+│   ├── units_ui.py            # ✅ Fase 1.4 — Selector global + number_input_si
+│   └── diagrams.py            # ✅ Fase 1.5a — Cache de FluidPropertyDiagram
+│                              # (@st.cache_resource), render_diagram_plotly
+│                              # con overlays de puntos / procesos.
 ├── tests/                     # pytest: tests/test_<modulo>.py
 ├── data/                      # Tablas, propiedades por componente, etc.
 │   ├── iso6976_components.csv # Valores tabulados por componente puro

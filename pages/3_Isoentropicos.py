@@ -30,6 +30,13 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from core.diagrams import (
+    DiagramSpec,
+    ProcessOverlay,
+    isentropic_process,
+    isobaric_process,
+    linear_segment_overlay,
+)
 from core.fluids import SUPPORTED_FLUIDS, StatePoint, state_from_pair
 from core.isentropic import (
     IsentropicResult,
@@ -44,6 +51,12 @@ from core.isentropic import (
 )
 from core.units_system import convert_from_si
 from ui.branding import SUBJECT, sidebar_credits
+from ui.diagrams import (
+    DiagramPoint,
+    diagram_type_selector,
+    get_diagram,
+    render_diagram_plotly,
+)
 from ui.units_ui import (
     current_unit_label,
     get_current_system,
@@ -52,7 +65,7 @@ from ui.units_ui import (
     render_units_selector,
 )
 
-PAGE_VERSION = "0.7.0"
+PAGE_VERSION = "0.8.0"
 
 # Códigos de par independiente reconocidos por core.fluids.state_from_pair,
 # ordenados por uso didáctico.
@@ -212,6 +225,255 @@ def _format_specific_work(value_si: float) -> str:
 
 
 # ---------------------------------------------------------------------
+# Overlays para el diagrama del proceso (Fase 1.5a)
+# ---------------------------------------------------------------------
+
+
+_DIAGRAM_CAPTION = (
+    "ℹ️ Las **líneas rectas** que unen estados reales con sus contrapartes "
+    "isoentrópicas (2s→2) son **referencias visuales**, no representan la "
+    "trayectoria termodinámica real del fluido. El segmento 1→2s sí es la "
+    "isoentrópica calculada por CoolProp."
+)
+
+
+def _isentropic_overlays(fluid: str, result: IsentropicResult) -> list[ProcessOverlay]:
+    """Overlays para una expansión/compresión simple (turbina, compresor, bomba).
+
+    Devuelve tres curvas:
+
+    - 1 → 2s (isoentrópica real, calculada por fluprodia/CoolProp).
+    - 2s → 2 (segmento recto, referencia visual).
+    - 1 → 2 (segmento recto, ayuda a leer la diferencia con 1→2s).
+    """
+    system = get_current_system()
+    try:
+        diagram = get_diagram(fluid, system)
+        proc = isentropic_process(
+            diagram,
+            DiagramSpec(fluid=fluid, system=system),
+            s_J_per_kg_K=result.state_in.s_J_per_kg_K,
+            p_start_Pa=result.state_in.P_Pa,
+            p_end_Pa=result.state_out_isen.P_Pa,
+        )
+        curve_1_2s = ProcessOverlay(
+            name="1 → 2s (isoentrópico)",
+            color="#2ca02c",
+            dash="solid",
+            coords_si=proc,
+        )
+    except Exception:
+        # Si CoolProp/fluprodia falla (p.ej. estado fuera de rango), caemos
+        # a segmento recto para no romper la UI.
+        curve_1_2s = linear_segment_overlay(
+            name="1 → 2s (referencia)",
+            color="#2ca02c",
+            dash="dot",
+            start=result.state_in,
+            end=result.state_out_isen,
+        )
+    seg_2s_2 = linear_segment_overlay(
+        name="2s → 2 (referencia)",
+        color="#7f7f7f",
+        dash="dot",
+        start=result.state_out_isen,
+        end=result.state_out_real,
+    )
+    seg_1_2 = linear_segment_overlay(
+        name="1 → 2 (real, ref.)",
+        color="#d62728",
+        dash="dash",
+        start=result.state_in,
+        end=result.state_out_real,
+    )
+    return [curve_1_2s, seg_2s_2, seg_1_2]
+
+
+def _polytropic_overlays(fluid: str, result: PolytropicResult) -> list[ProcessOverlay]:
+    """Overlays para un compresor multietapa.
+
+    Por cada etapa k: 1_k → 2s_k (isoentrópica), 2s_k → 2_k (segmento real).
+    Si hay intercooler tras la etapa k, agrega 2_k → 1_{k+1} (isobárica).
+    """
+    system = get_current_system()
+    overlays: list[ProcessOverlay] = []
+    spec = DiagramSpec(fluid=fluid, system=system)
+    try:
+        diagram = get_diagram(fluid, system)
+    except Exception:
+        diagram = None
+
+    palette = [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#17becf",
+        "#bcbd22",
+        "#7f7f7f",
+    ]
+
+    for k, stage in enumerate(result.stages):
+        color = palette[k % len(palette)]
+        # 1_k → 2s_k (isoentrópica)
+        if diagram is not None:
+            try:
+                proc = isentropic_process(
+                    diagram,
+                    spec,
+                    s_J_per_kg_K=stage.state_in.s_J_per_kg_K,
+                    p_start_Pa=stage.state_in.P_Pa,
+                    p_end_Pa=stage.state_out_isen.P_Pa,
+                )
+                overlays.append(
+                    ProcessOverlay(
+                        name=f"Etapa {stage.index}: isoen.",
+                        color=color,
+                        dash="solid",
+                        coords_si=proc,
+                    )
+                )
+            except Exception:
+                overlays.append(
+                    linear_segment_overlay(
+                        name=f"Etapa {stage.index}: isoen. (ref)",
+                        color=color,
+                        dash="dot",
+                        start=stage.state_in,
+                        end=stage.state_out_isen,
+                    )
+                )
+        else:
+            overlays.append(
+                linear_segment_overlay(
+                    name=f"Etapa {stage.index}: isoen. (ref)",
+                    color=color,
+                    dash="dot",
+                    start=stage.state_in,
+                    end=stage.state_out_isen,
+                )
+            )
+        # 2s_k → 2_k (referencia visual)
+        overlays.append(
+            linear_segment_overlay(
+                name=f"Etapa {stage.index}: real (ref)",
+                color=color,
+                dash="dash",
+                start=stage.state_out_isen,
+                end=stage.state_out_real,
+            )
+        )
+        # Intercooler aguas abajo de la etapa k (isobárica)
+        if stage.cooled_after and (k + 1) < len(result.stages):
+            next_in = result.stages[k + 1].state_in
+            if diagram is not None:
+                try:
+                    proc_ic = isobaric_process(
+                        diagram,
+                        spec,
+                        p_Pa=stage.state_out_real.P_Pa,
+                        t_start_K=stage.state_out_real.T_K,
+                        t_end_K=next_in.T_K,
+                    )
+                    overlays.append(
+                        ProcessOverlay(
+                            name=f"Intercooler {stage.index}→{stage.index + 1}",
+                            color="#1f77b4",
+                            dash="solid",
+                            coords_si=proc_ic,
+                        )
+                    )
+                    continue
+                except Exception:
+                    pass
+            overlays.append(
+                linear_segment_overlay(
+                    name=f"Intercooler {stage.index}→{stage.index + 1} (ref)",
+                    color="#1f77b4",
+                    dash="dot",
+                    start=stage.state_out_real,
+                    end=next_in,
+                )
+            )
+    return overlays
+
+
+def _render_isentropic_diagram(
+    fluid: str,
+    result: IsentropicResult,
+    *,
+    selector_key: str,
+    chart_key: str,
+    default_diagram: str = "Ts",
+) -> None:
+    """Expansor con el diagrama del proceso simple (turbina/compresor/bomba)."""
+    with st.expander("📈 Diagrama del proceso", expanded=False):
+        st.caption(_DIAGRAM_CAPTION)
+        diagram_type = diagram_type_selector(
+            key=selector_key,
+            default=default_diagram,  # type: ignore[arg-type]
+        )
+        system = get_current_system()
+        overlays = _isentropic_overlays(fluid, result)
+        points = [
+            DiagramPoint(state=result.state_in, label="1", color="#1f77b4"),
+            DiagramPoint(state=result.state_out_isen, label="2s", color="#2ca02c"),
+            DiagramPoint(state=result.state_out_real, label="2", color="#d62728"),
+        ]
+        render_diagram_plotly(
+            fluid=fluid,
+            diagram_type=diagram_type,
+            system=system,
+            points=points,
+            overlays=overlays,
+            chart_key=chart_key,
+        )
+
+
+def _render_polytropic_diagram(
+    fluid: str,
+    result: PolytropicResult,
+    *,
+    selector_key: str,
+    chart_key: str,
+) -> None:
+    """Expansor con el diagrama del proceso multietapa."""
+    with st.expander("📈 Diagrama del proceso multietapa", expanded=False):
+        st.caption(_DIAGRAM_CAPTION)
+        diagram_type = diagram_type_selector(key=selector_key, default="logph")
+        system = get_current_system()
+        overlays = _polytropic_overlays(fluid, result)
+        points: list[DiagramPoint] = []
+        points.append(DiagramPoint(state=result.stages[0].state_in, label="1", color="#1f77b4"))
+        for stage in result.stages:
+            points.append(
+                DiagramPoint(
+                    state=stage.state_out_isen,
+                    label=f"{stage.index}s",
+                    color="#2ca02c",
+                )
+            )
+            points.append(
+                DiagramPoint(
+                    state=stage.state_out_real,
+                    label=f"{stage.index}",
+                    color="#d62728",
+                )
+            )
+        render_diagram_plotly(
+            fluid=fluid,
+            diagram_type=diagram_type,
+            system=system,
+            points=points,
+            overlays=overlays,
+            chart_key=chart_key,
+        )
+
+
+# ---------------------------------------------------------------------
 # Layout principal
 # ---------------------------------------------------------------------
 
@@ -329,6 +591,13 @@ with tab_turbine:
             ]
         )
         _render_procedure(result.steps)
+        _render_isentropic_diagram(
+            fluid,
+            result,
+            selector_key="diag_type_turb",
+            chart_key="diag_chart_turb",
+            default_diagram="Ts",
+        )
 
 
 # =====================================================================
@@ -418,6 +687,13 @@ with tab_compressor:
             ]
         )
         _render_procedure(result.steps)
+        _render_isentropic_diagram(
+            fluid,
+            result,
+            selector_key="diag_type_comp",
+            chart_key="diag_chart_comp",
+            default_diagram="logph",
+        )
 
 
 # =====================================================================
@@ -507,6 +783,13 @@ with tab_pump:
             ]
         )
         _render_procedure(result.steps)
+        _render_isentropic_diagram(
+            fluid,
+            result,
+            selector_key="diag_type_pump",
+            chart_key="diag_chart_pump",
+            default_diagram="Ts",
+        )
 
         # Comparación opt-in vs modelo incompresible.
         if st.button("🆚 Comparar contra modelo incompresible", key="pump_compare_btn"):
@@ -681,3 +964,9 @@ with tab_polytropic:
                     )
         _render_states_table(rows)
         _render_procedure(result.steps)
+        _render_polytropic_diagram(
+            fluid,
+            result,
+            selector_key="diag_type_poly",
+            chart_key="diag_chart_poly",
+        )

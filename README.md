@@ -55,13 +55,18 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   editable in-place con autocompletado de los 60 componentes de la norma.
   Ejemplos del Annex D (D.2, D.3, D.4) precargados y verificados contra
   los valores tabulados de la norma. _Fase 2.3 cerrada._
+- ✅ **Diagramas de propiedades** (log p–h, T–s, h–s, p–log v) con
+  [fluprodia](https://github.com/fwitte/fluprodia) + plotly. La página de
+  **Propiedades** dibuja el estado calculado sobre el diagrama elegido
+  para los 7 fluidos del proyecto. La página de **Isoentrópicos** dibuja
+  el proceso completo: la isoentrópica real 1→2s vía CoolProp, los
+  segmentos 2s→2 y 1→2 como referencia visual (línea recta que **no**
+  representa la trayectoria termodinámica real), y para el compresor
+  multietapa cada etapa con su intercooler isobárico. Diagrama por
+  ``(fluido, sistema de unidades)`` cacheado con `@st.cache_resource`
+  para amortizar el cálculo de isolíneas. _Fase 1.5a cerrada._
 
 ### En desarrollo (roadmap)
-- **Multifluido**: refrigerantes (R134a, R410A, R1234yf, NH₃, CO₂), aire,
-  combustibles puros y mezclas.
-- **Diagramas de propiedades** (log p-h, T-s, h-s, p-v) con
-  [fluprodia](https://github.com/fwitte/fluprodia), con superposición de
-  puntos y procesos calculados.
 - **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
   Rankine (simple, con recalentamiento, con regeneración),
   refrigeración por compresión de vapor (simple, con economizador, cascada),

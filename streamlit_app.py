@@ -12,7 +12,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.7.0"
+PAGE_VERSION = "0.8.0"
 
 
 def _home_page() -> None:
@@ -51,17 +51,21 @@ def _home_page() -> None:
         - ⚙️ **Isoentrópicos** — turbina, compresor, bomba y compresor
           multietapa con intercooler, en modo directo (calcular el
           estado real dado η_s) o inverso (calcular η_s dados los dos
-          estados).
+          estados). Con **diagramas T–s / log p–h / h–s** del proceso.
         - 🔥 **ISO 6976** — poder calorífico (bruto y neto), densidad,
           densidad relativa al aire e índice de Wobbe de mezclas
           gaseosas combustibles, con propagación de incertidumbre y los
           ejemplos del Annex D precargados (matriz identidad; matriz
           de normalización deferida a fase futura por requerir
           ISO 14912:2003).
+        - 📈 **Diagramas** — Propiedades e Isoentrópicos ahora incluyen
+          gráficos interactivos con isolíneas (log p–h, T–s, h–s,
+          p–log v) y overlay del estado / proceso calculado, vía
+          [fluprodia](https://github.com/fwitte/fluprodia).
 
         ### En desarrollo
 
-        Diagramas, ciclos Rankine / refrigeración / Brayton / combinado,
+        Ciclos Rankine / refrigeración / Brayton / combinado,
         psicrometría, combustión, exergía. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
