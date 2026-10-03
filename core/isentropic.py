@@ -52,7 +52,7 @@ from core.fluids import (
     saturation_at_pressure,
     saturation_at_temperature,
 )
-from core.latex import latex_number, latex_quantity, latex_value, text_quantity
+from core.latex import latex_number, latex_paren, latex_quantity, latex_value, text_quantity
 from core.state_report import states_table
 from core.units_system import UnitSystem, convert_from_si, unit_label
 
@@ -711,7 +711,7 @@ def suggested_device_inputs(fluid: str, device: DeviceName) -> DeviceDefaults:
       → 0,5 bar; bomba de condensado 0,1 bar → 150 bar) y compresión de
       vapor sobrecalentado (recompresión mecánica).
     - Aire: turbina de gas (10 bar / 900 °C → 1 atm), compresor de aire
-      (1 → 8 bar) y bomba de aire líquido.
+      (1 → 8 bar) y bomba de aire líquido subenfriado (2 → 20 bar).
     - Refrigerantes, amoníaco y CO₂: compresión de vapor saturado del
       evaporador (−10 °C) a la presión del condensador (40 °C, o T_c − 5 K
       si la crítica es más baja, como en el CO₂), dos etapas desde −30 °C,
@@ -742,7 +742,11 @@ def suggested_device_inputs(fluid: str, device: DeviceName) -> DeviceDefaults:
         if device == "turbine":
             return DeviceDefaults("TP", {"t": 1173.15, "p": 1.0e6}, p_out_Pa=101_325.0, eta_s=0.88)
         if device == "pump":
-            return DeviceDefaults("PX", {"p": 101_325.0, "x": 0.0}, p_out_Pa=2.0e6, eta_s=0.75)
+            # Aire líquido subenfriado (T_sat a 2 bar ≈ −188 °C), como piden las
+            # bombas criogénicas para no cavitar. Líquido saturado a 1 atm es el
+            # estado de referencia de CoolProp (h = s = 0): con el ruido numérico
+            # la tabla mostraba h₁ = −1.2×10⁻⁵ kJ/kg.
+            return DeviceDefaults("TP", {"t": 78.15, "p": 2.0e5}, p_out_Pa=2.0e6, eta_s=0.75)
         if device == "compressor":
             return DeviceDefaults("TP", {"t": 298.15, "p": 1.0e5}, p_out_Pa=8.0e5, eta_s=0.80)
         return DeviceDefaults(
@@ -942,6 +946,20 @@ def multistage_steps(result: PolytropicResult, system: UnitSystem) -> Isentropic
     )
 
 
+def _enthalpies(*states: StatePoint) -> tuple[float, ...]:
+    """Entalpías de los estados, con el ruido de CoolProp alrededor de h = 0 en 0.
+
+    En el estado de referencia del fluido (p. ej. aire líquido saturado a
+    1 atm, h = 0 por convención NBP) CoolProp devuelve ~1e-8 J/kg: con 5
+    cifras significativas el paso mostraría "h₁ = −1.2352×10⁻⁵ kJ/kg".
+    Lo que está por debajo de 1e-5 veces la mayor entalpía del proceso es
+    ruido numérico y se muestra como 0.
+    """
+    values = tuple(s.h_J_per_kg for s in states)
+    scale = max(abs(v) for v in values)
+    return tuple(0.0 if abs(v) < 1e-5 * scale else v for v in values)
+
+
 def _build_steps_turbine_direct(
     state_in: StatePoint,
     state_out_isen: StatePoint,
@@ -958,16 +976,17 @@ def _build_steps_turbine_direct(
         r"w_t &= h_1 - h_2"
         r"\end{aligned}"
     )
-    h1, h2s, h2 = state_in.h_J_per_kg, state_out_isen.h_J_per_kg, state_out_real.h_J_per_kg
+    h1, h2s, h2 = _enthalpies(state_in, state_out_isen, state_out_real)
     w_t = h1 - h2
     n1, n2s, n2 = (latex_value(h, _EH, system) for h in (h1, h2s, h2))
     substituted = (
         r"\begin{aligned}"
         rf"h_1 &= {latex_quantity(h1, _EH, system)} \\"
         rf"h_{{2s}} &= {latex_quantity(h2s, _EH, system)} \\"
-        rf"h_2 &= {n1} - {latex_number(eta_s, 4)}\cdot({n1} - {n2s}) "
-        rf"= {latex_quantity(h2, _EH, system)} \\"
-        rf"w_t &= {n1} - {n2} = {latex_quantity(w_t, _EH, system)}"
+        rf"h_2 &= {n1} - {latex_number(eta_s, 4)}\cdot({n1} - {latex_paren(n2s)}) \\"
+        rf"&= {latex_quantity(h2, _EH, system)} \\"
+        rf"w_t &= {n1} - {latex_paren(n2)} \\"
+        rf"&= {latex_quantity(w_t, _EH, system)}"
         r"\end{aligned}"
     )
     narrative = (
@@ -997,14 +1016,15 @@ def _build_steps_turbine_inverse(
         r"\eta_s &= \frac{h_1 - h_2}{h_1 - h_{2s}}"
         r"\end{aligned}"
     )
-    h1, h2s, h2 = state_in.h_J_per_kg, state_out_isen.h_J_per_kg, state_out_real.h_J_per_kg
+    h1, h2s, h2 = _enthalpies(state_in, state_out_isen, state_out_real)
     n1, n2s, n2 = (latex_value(h, _EH, system) for h in (h1, h2s, h2))
     substituted = (
         r"\begin{aligned}"
-        rf"h_1 &= {latex_quantity(h1, _EH, system)},\quad "
-        rf"h_2 = {latex_quantity(h2, _EH, system)},\quad "
-        rf"h_{{2s}} = {latex_quantity(h2s, _EH, system)} \\"
-        rf"\eta_s &= \frac{{{n1} - {n2}}}{{{n1} - {n2s}}} = {latex_number(eta_s, 4)}"
+        rf"h_1 &= {latex_quantity(h1, _EH, system)} \\"
+        rf"h_2 &= {latex_quantity(h2, _EH, system)} \\"
+        rf"h_{{2s}} &= {latex_quantity(h2s, _EH, system)} \\"
+        rf"\eta_s &= \frac{{{n1} - {latex_paren(n2)}}}{{{n1} - {latex_paren(n2s)}}} \\"
+        rf"&= {latex_number(eta_s, 4)}"
         r"\end{aligned}"
     )
     narrative = (
@@ -1038,17 +1058,18 @@ def _build_steps_compressor_or_pump_direct(
         + r" &= h_2 - h_1"
         + r"\end{aligned}"
     )
-    h1, h2s, h2 = state_in.h_J_per_kg, state_out_isen.h_J_per_kg, state_out_real.h_J_per_kg
+    h1, h2s, h2 = _enthalpies(state_in, state_out_isen, state_out_real)
     w = h2 - h1
     n1, n2s, n2 = (latex_value(h, _EH, system) for h in (h1, h2s, h2))
     substituted = (
         r"\begin{aligned}"
         rf"h_1 &= {latex_quantity(h1, _EH, system)} \\"
         rf"h_{{2s}} &= {latex_quantity(h2s, _EH, system)} \\"
-        rf"h_2 &= {n1} + \dfrac{{{n2s} - {n1}}}{{{latex_number(eta_s, 4)}}}"
-        rf" = {latex_quantity(h2, _EH, system)} \\"
+        rf"h_2 &= {n1} + \dfrac{{{n2s} - {latex_paren(n1)}}}{{{latex_number(eta_s, 4)}}} \\"
+        rf"&= {latex_quantity(h2, _EH, system)} \\"
         + work_label
-        + rf" &= {n2} - {n1} = {latex_quantity(w, _EH, system)}"
+        + rf" &= {n2} - {latex_paren(n1)} \\"
+        + rf"&= {latex_quantity(w, _EH, system)}"
         + r"\end{aligned}"
     )
     narrative = (
@@ -1080,14 +1101,15 @@ def _build_steps_compressor_or_pump_inverse(
         r"\eta_s &= \frac{h_{2s} - h_1}{h_2 - h_1}"
         r"\end{aligned}"
     )
-    h1, h2s, h2 = state_in.h_J_per_kg, state_out_isen.h_J_per_kg, state_out_real.h_J_per_kg
+    h1, h2s, h2 = _enthalpies(state_in, state_out_isen, state_out_real)
     n1, n2s, n2 = (latex_value(h, _EH, system) for h in (h1, h2s, h2))
     substituted = (
         r"\begin{aligned}"
-        rf"h_1 &= {latex_quantity(h1, _EH, system)},\quad "
-        rf"h_2 = {latex_quantity(h2, _EH, system)},\quad "
-        rf"h_{{2s}} = {latex_quantity(h2s, _EH, system)} \\"
-        rf"\eta_s &= \frac{{{n2s} - {n1}}}{{{n2} - {n1}}} = {latex_number(eta_s, 4)}"
+        rf"h_1 &= {latex_quantity(h1, _EH, system)} \\"
+        rf"h_2 &= {latex_quantity(h2, _EH, system)} \\"
+        rf"h_{{2s}} &= {latex_quantity(h2s, _EH, system)} \\"
+        rf"\eta_s &= \frac{{{n2s} - {latex_paren(n1)}}}{{{n2} - {latex_paren(n1)}}} \\"
+        rf"&= {latex_number(eta_s, 4)}"
         r"\end{aligned}"
     )
     narrative = (
@@ -1118,12 +1140,10 @@ def _build_steps_multistage(
     )
     formula = (
         r"\begin{aligned}"
-        r"\Pi &= \left(\dfrac{P_\text{out}}{P_\text{in}}\right)^{1/n} "
-        r"\quad \text{(relación de compresión por etapa)} \\"
-        r"\text{Por etapa } i: \quad &h_{i,\text{out}} = h_{i,\text{in}} "
+        r"\Pi &= \left(\dfrac{P_\text{out}}{P_\text{in}}\right)^{1/n} \\"
+        r"h_{i,\text{out}} &= h_{i,\text{in}} "
         r"+ \dfrac{h_{i,\text{isen}} - h_{i,\text{in}}}{\eta_s} \\"
-        r"\text{Si hay intercooler: } &T_{i+1,\text{in}} = T_\text{ic} "
-        r"\text{ a } P_{i,\text{out}} \\"
+        r"T_{i+1,\text{in}} &= T_\text{ic} \quad \text{(intercooler)} \\"
         r"\Delta h_\text{total} &= \sum_{i=1}^{n} (h_{i,\text{out}} - h_{i,\text{in}})"
         r"\end{aligned}"
     )
@@ -1134,8 +1154,8 @@ def _build_steps_multistage(
     )
     substituted = (
         r"\begin{aligned}"
-        rf"n &= {n_stages},\quad \eta_s = {latex_number(eta_s_per_stage, 4)},\quad "
-        rf"\Pi = {latex_number(pressure_ratio, 5)} \\"
+        rf"n &= {n_stages},\quad \eta_s = {latex_number(eta_s_per_stage, 4)} \\"
+        rf"\Pi &= {latex_number(pressure_ratio, 5)} \\"
         rf"\Delta h_\text{{total}} &= {latex_quantity(total_delta_h, _EH, system)} \\"
         rf"\Delta h_\text{{1 etapa}} &= {latex_quantity(single_stage_delta_h, _EH, system)}"
         r"\end{aligned}"

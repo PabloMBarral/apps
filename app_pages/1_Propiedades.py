@@ -564,9 +564,12 @@ def _render_theory() -> None:
             "T y p **no** son independientes (T = T_sat(p)): hace falta otra propiedad, "
             "como el título."
         )
-        st.markdown("**Vapor húmedo** (§12) — título, regla de la palanca y calor latente:")
+        st.markdown(
+            "**Vapor húmedo** (§12) — título, regla de la palanca (para y = v, u, h o s) y "
+            "calor latente:"
+        )
         st.latex(r"x \equiv \frac{m_g}{m_f + m_g}")
-        st.latex(r"y = y_f + x\,(y_g - y_f) \qquad y \in \{v,\ u,\ h,\ s\}")
+        st.latex(r"y = y_f + x\,(y_g - y_f)")
         st.latex(r"x = \frac{y - y_f}{y_g - y_f} \qquad h_{fg} \equiv h_g - h_f")
         st.markdown("**Entalpía** (§3.2):")
         st.latex(r"h \equiv u + p\,v")
@@ -574,10 +577,8 @@ def _render_theory() -> None:
             "**Líquido comprimido** — si no hay tabla, aproximación de líquido incompresible "
             "a la misma temperatura (§13; Cengel §3-5):"
         )
-        st.latex(
-            r"v \approx v_f(T) \quad u \approx u_f(T) \quad s \approx s_f(T) \quad "
-            r"h \approx h_f(T) + v_f(T)\,[p - p_{\mathrm{sat}}(T)]"
-        )
+        st.latex(r"v \approx v_f(T) \quad u \approx u_f(T) \quad s \approx s_f(T)")
+        st.latex(r"h \approx h_f(T) + v_f(T)\,[p - p_{\mathrm{sat}}(T)]")
         st.markdown(
             "**Vapor sobrecalentado** — grado de sobrecalentamiento y desvío respecto del "
             "gas ideal (§7.3):"

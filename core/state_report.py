@@ -49,7 +49,7 @@ from core.fluids import (
     SaturatedPhase,
     SaturationProperties,
 )
-from core.latex import latex_number, latex_unit
+from core.latex import latex_chain, latex_number, latex_paren, latex_unit
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, convert_to_si, unit_label
 
 # ---------------------------------------------------------------------
@@ -523,10 +523,14 @@ def _lever_line(y: str, x: float, sat: SaturationProperties, system: UnitSystem)
     yf = _sat_value(sat.liquid, y)
     yg = _sat_value(sat.vapor, y)
     result = yf + x * (yg - yf)
-    return (
-        rf"{y} = {y}_f + x\,({y}_g - {y}_f) = {_n(yf, kind, system)} + "
-        rf"{latex_number(x, 5)}\,({_n(yg, kind, system)} - {_n(yf, kind, system)}) = "
-        rf"{_q(result, kind, system)}"
+    # y_f y el salto x·(y_g − y_f) en renglones separados: juntos no entran
+    # en un celular (v_f tiene muchas cifras: 0.0011272).
+    return latex_chain(
+        y,
+        rf"{y}_f + x\,({y}_g - {y}_f)",
+        rf"{_n(yf, kind, system)} \\ &\quad + "
+        rf"{latex_number(x, 5)}\,({_n(yg, kind, system)} - {latex_paren(_n(yf, kind, system))})",
+        _q(result, kind, system),
     )
 
 
@@ -538,13 +542,37 @@ def _sat_table_lines(
         lines.append(rf"T_{{\mathrm{{sat}}}}(p) = {_q(sat.T_sat_K, 'temperature', system)}")
     else:
         lines.append(rf"p_{{\mathrm{{sat}}}}(T) = {_q(sat.P_sat_Pa, 'pressure', system)}")
-    for y in ys:
+    if len(ys) == 1:
+        y = ys[0]
         kind = _Y_KIND[y]
         lines.append(
-            rf"{y}_f = {_q(_sat_value(sat.liquid, y), kind, system)} \qquad "
-            rf"{y}_g = {_q(_sat_value(sat.vapor, y), kind, system)}"
+            rf"\begin{{aligned}}{y}_f &= {_q(_sat_value(sat.liquid, y), kind, system)} \\ "
+            rf"{y}_g &= {_q(_sat_value(sat.vapor, y), kind, system)}\end{{aligned}}"
         )
+        return lines
+    # Como en las tablas de saturación: una fila por propiedad, columnas f y
+    # g. Las unidades van en el texto del paso (sat_units_text): una columna
+    # más no entra en el ancho de un celular.
+    rows = [
+        rf"{y} & {_n(_sat_value(sat.liquid, y), _Y_KIND[y], system)} & "
+        rf"{_n(_sat_value(sat.vapor, y), _Y_KIND[y], system)}"
+        for y in ys
+    ]
+    lines.append(
+        r"\begin{array}{c|rr} & \text{líquido } (f) & \text{vapor } (g) \\ \hline "
+        + r" \\ ".join(rows)
+        + r"\end{array}"
+    )
     return lines
+
+
+def _sat_units_text(system: UnitSystem, ys: tuple[str, ...] = ("v", "u", "h", "s")) -> str:
+    """``"Unidades: v en m³/kg; u y h en kJ/kg; s en kJ/(kg·K)."`` para la tabla f | g."""
+    groups: dict[str, list[str]] = {}
+    for y in ys:
+        groups.setdefault(unit_label(_Y_KIND[y], system), []).append(y)
+    parts = [f"{' y '.join(names)} en {unit}" for unit, names in groups.items()]
+    return "Unidades: " + "; ".join(parts) + "."
 
 
 def _table_name(sat_basis: Literal["P", "T"]) -> str:
@@ -624,7 +652,7 @@ def _step_data(state: FluidState, pair: PairCode, system: UnitSystem) -> Procedu
             f"Fluido: **{name}**. Para una sustancia pura simple compresible, dos propiedades "
             "intensivas independientes fijan el estado (postulado de estado)."
         ),
-        latex=(r" \qquad ".join(parts),),
+        latex=tuple(parts),
     )
 
 
@@ -639,7 +667,8 @@ def _steps_quality_given(
             title="Propiedades de saturación",
             text=(
                 f"Con {anchor} se entra a la tabla de saturación {_table_name(sat.basis)} y "
-                "se leen las propiedades del líquido saturado (f) y del vapor saturado (g):"
+                "se leen las propiedades del líquido saturado (f) y del vapor saturado (g). "
+                f"{_sat_units_text(system)}"
             ),
             latex=tuple(_sat_table_lines(sat, system)),
         )
@@ -732,7 +761,10 @@ def _steps_anchor(
         compare = rf"{y_tex} > {y}_g = {_n(yg, kind, system)}"
         where = "a la derecha de la campana: **vapor sobrecalentado**."
     else:
-        compare = rf"{y}_f = {_n(yf, kind, system)} \le {y_tex} \le {y}_g = {_n(yg, kind, system)}"
+        compare = (
+            rf"\begin{{aligned}}{y}_f = {_n(yf, kind, system)} &\le {y_tex} \\ "
+            rf"&\le {y}_g = {_n(yg, kind, system)}\end{{aligned}}"
+        )
         where = "dentro de la campana: **vapor húmedo**."
     steps.append(
         ProcedureStep(
@@ -748,10 +780,12 @@ def _steps_anchor(
             if anchor == "p"
             else rf"p = p_{{\mathrm{{sat}}}} = {_q(state.P_Pa, 'pressure', system)}"
         )
-        quality = (
-            rf"x = \frac{{{y} - {y}_f}}{{{y}_g - {y}_f}} = "
-            rf"\frac{{{_n(y_val, kind, system)} - {_n(yf, kind, system)}}}"
-            rf"{{{_n(yg, kind, system)} - {_n(yf, kind, system)}}} = {latex_number(state.x, 5)}"
+        quality = latex_chain(
+            "x",
+            rf"\frac{{{y} - {y}_f}}{{{y}_g - {y}_f}}",
+            rf"\frac{{{_n(y_val, kind, system)} - {latex_paren(_n(yf, kind, system))}}}"
+            rf"{{{_n(yg, kind, system)} - {latex_paren(_n(yf, kind, system))}}}",
+            latex_number(state.x, 5),
         )
         others = tuple(_lever_line(z, state.x, sat, system) for z in ("v", "u", "h", "s") if z != y)
         steps.append(
@@ -873,7 +907,7 @@ def _steps_hs(state: FluidState, system: UnitSystem) -> list[ProcedureStep]:
                 "la s dada. La ecuación de estado lo resuelve numéricamente:"
             ),
             latex=(
-                rf"p = {_q(state.P_Pa, 'pressure', system)} \qquad "
+                rf"p = {_q(state.P_Pa, 'pressure', system)}",
                 rf"T = {_q(state.T_K, 'temperature', system)}",
             ),
         )
@@ -886,18 +920,20 @@ def _steps_hs(state: FluidState, system: UnitSystem) -> list[ProcedureStep]:
     if state.is_two_phase and state.x is not None:
         x_h = (h - sat.liquid.h_J_per_kg) / sat.h_fg_J_per_kg
         x_s = (s - sat.liquid.s_J_per_kg_K) / sat.s_fg_J_per_kg_K
-        lines.append(
-            rf"x = \frac{{h - h_f}}{{h_g - h_f}} = {latex_number(x_h, 5)} \qquad "
-            rf"x = \frac{{s - s_f}}{{s_g - s_f}} = {latex_number(x_s, 5)}"
-        )
+        lines += [
+            rf"x = \frac{{h - h_f}}{{h_g - h_f}} = {latex_number(x_h, 5)}",
+            rf"x = \frac{{s - s_f}}{{s_g - s_f}} = {latex_number(x_s, 5)}",
+        ]
         text = (
             "Verificación con la tabla de saturación a esa presión: h y s caen entre f y g "
-            "(**vapor húmedo**) y el título que se despeja con cualquiera de las dos es el mismo:"
+            "(**vapor húmedo**) y el título que se despeja con cualquiera de las dos es el "
+            f"mismo. {_sat_units_text(system, ('h', 's'))}"
         )
     else:
         text = (
             "Verificación con la tabla de saturación a esa presión: el estado queda fuera de "
-            f"la campana (**{REGION_LABELS_ES[state.region].lower()}**)."
+            f"la campana (**{REGION_LABELS_ES[state.region].lower()}**). "
+            f"{_sat_units_text(system, ('h', 's'))}"
         )
     steps.append(
         ProcedureStep(title="Verificación con la saturación", text=text, latex=tuple(lines))
@@ -918,15 +954,35 @@ def _step_incompressible(state: FluidState, system: UnitSystem) -> ProcedureStep
     correction = vf * (state.P_Pa - sat.P_sat_Pa)
     h_approx = sat.liquid.h_J_per_kg + correction
     eh = "specific_enthalpy"
+    approx = r"\approx"
     lines = (
-        rf"v \approx v_f(T) = {_q(vf, 'specific_volume', system)}{_pct(vf, state.v_m3_per_kg)}",
-        rf"u \approx u_f(T) = {_q(sat.liquid.u_J_per_kg, eh, system)}"
-        rf"{_pct(sat.liquid.u_J_per_kg, state.u_J_per_kg)}",
-        rf"h \approx h_f(T) + v_f(T)\,[p - p_{{\mathrm{{sat}}}}(T)] = "
-        rf"{_n(sat.liquid.h_J_per_kg, eh, system)} + {_n(correction, eh, system)} = "
-        rf"{_q(h_approx, eh, system)}{_pct(h_approx, state.h_J_per_kg)}",
-        rf"s \approx s_f(T) = {_q(sat.liquid.s_J_per_kg_K, 'specific_entropy', system)}"
-        rf"{_pct(sat.liquid.s_J_per_kg_K, state.s_J_per_kg_K)}",
+        latex_chain(
+            "v",
+            "v_f(T)",
+            rf"{_q(vf, 'specific_volume', system)}{_pct(vf, state.v_m3_per_kg)}",
+            relation=approx,
+        ),
+        latex_chain(
+            "u",
+            "u_f(T)",
+            rf"{_q(sat.liquid.u_J_per_kg, eh, system)}"
+            rf"{_pct(sat.liquid.u_J_per_kg, state.u_J_per_kg)}",
+            relation=approx,
+        ),
+        latex_chain(
+            "h",
+            r"h_f(T) + v_f(T)\,[p - p_{\mathrm{sat}}(T)]",
+            rf"{_n(sat.liquid.h_J_per_kg, eh, system)} + {_n(correction, eh, system)}",
+            rf"{_q(h_approx, eh, system)}{_pct(h_approx, state.h_J_per_kg)}",
+            relation=approx,
+        ),
+        latex_chain(
+            "s",
+            "s_f(T)",
+            rf"{_q(sat.liquid.s_J_per_kg_K, 'specific_entropy', system)}"
+            rf"{_pct(sat.liquid.s_J_per_kg_K, state.s_J_per_kg_K)}",
+            relation=approx,
+        ),
     )
     return ProcedureStep(
         title="Aproximación de líquido incompresible",
@@ -986,18 +1042,19 @@ def _step_consistency(state: FluidState, system: UnitSystem) -> ProcedureStep:
     p_unit = unit_label("pressure", system)
     v_unit = unit_label("specific_volume", system)
     e_unit = unit_label(eh, system)
+    product = (
+        rf"({_q(state.P_Pa, 'pressure', system)})\,"
+        rf"({_q(state.v_m3_per_kg, 'specific_volume', system)})"
+    )
     if math.isclose(factor, 1.0):
-        pv_line = (
-            rf"p\,v = ({_q(state.P_Pa, 'pressure', system)})"
-            rf"({_q(state.v_m3_per_kg, 'specific_volume', system)}) = {_q(pv_si, eh, system)}"
-        )
+        pv_line = latex_chain(r"p\,v", product, _q(pv_si, eh, system))
         units_txt = ""
     else:
-        pv_line = (
-            rf"p\,v = ({_q(state.P_Pa, 'pressure', system)})"
-            rf"({_q(state.v_m3_per_kg, 'specific_volume', system)})"
-            rf"\cdot {latex_number(factor, 5)}\,\frac{{{latex_unit(e_unit)}}}"
-            rf"{{{latex_unit(p_unit + '·' + v_unit)}}} = {_q(pv_si, eh, system)}"
+        pv_line = latex_chain(
+            r"p\,v",
+            rf"{product} \\ &\quad \cdot {latex_number(factor, 5)}\,"
+            rf"\frac{{{latex_unit(e_unit)}}}{{{latex_unit(p_unit + '·' + v_unit)}}}",
+            _q(pv_si, eh, system),
         )
         units_txt = (
             f" Ojo con las unidades de p·v: 1 {p_unit}·{v_unit} = "
@@ -1009,8 +1066,11 @@ def _step_consistency(state: FluidState, system: UnitSystem) -> ProcedureStep:
         text=f"La entalpía es h = u + p·v (vademecum §3.2).{units_txt}",
         latex=(
             pv_line,
-            rf"u + p\,v = {_n(state.u_J_per_kg, eh, system)} + {_n(pv_si, eh, system)} = "
-            rf"{_q(total, eh, system)} = h\ \checkmark",
+            latex_chain(
+                r"u + p\,v",
+                rf"{_n(state.u_J_per_kg, eh, system)} + {_n(pv_si, eh, system)}",
+                rf"{_q(total, eh, system)} = h\ \checkmark",
+            ),
         ),
     )
 

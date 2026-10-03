@@ -279,9 +279,9 @@ class TestProcedure:
         assert "Título y demás propiedades (regla de la palanca)" in titles
         assert titles[-1] == "Verificación: h = u + p·v"
         tex = _all_latex(steps)
-        assert r"x = \frac{h - h_f}{h_g - h_f}" in tex
+        assert r"x &= \frac{h - h_f}{h_g - h_f}" in tex
         assert "0.61426" in tex
-        assert r"\le h = 2000 \le" in tex
+        assert r"\le h = 2000" in tex
 
     def test_quality_given_uses_lever_rule(self) -> None:
         state = fluid_state_from_pair(WATER, "PX", p=1.0e5, x=0.5)
@@ -289,7 +289,7 @@ class TestProcedure:
         assert "Regla de la palanca" in _titles(steps)
         tex = _all_latex(steps)
         for y in ("v", "u", "h", "s"):
-            assert rf"{y} = {y}_f + x\,({y}_g - {y}_f)" in tex
+            assert rf"{y} &= {y}_f + x\,({y}_g - {y}_f)" in tex
 
     def test_compressed_liquid_includes_incompressible_approximation(
         self, compressed: FluidState
@@ -298,7 +298,7 @@ class TestProcedure:
         assert "Aproximación de líquido incompresible" in _titles(steps)
         tex = _all_latex(steps)
         assert r"p = 50\ \mathrm{bar} > p_{\mathrm{sat}}(T)" in tex
-        assert r"h \approx h_f(T) + v_f(T)\,[p - p_{\mathrm{sat}}(T)]" in tex
+        assert r"h &\approx h_f(T) + v_f(T)\,[p - p_{\mathrm{sat}}(T)]" in tex
 
     def test_superheated_includes_ideal_gas_check(self, superheated: FluidState) -> None:
         steps = build_procedure(superheated, "TP", "Técnico")

@@ -190,15 +190,18 @@ def _render_theory() -> None:
             r"\overline{PCS} - \overline{PCI} = \nu_{\mathrm{H_2O}}\,\bar{h}_{fg}(T_{\mathrm{ref}})"
         )
         st.markdown("**Cálculo a partir de la composición** (ISO 6976:2016):")
-        st.latex(r"M = \sum_j x_j\,M_j \qquad s = \sum_j x_j\,s_j(T_m) \qquad Z = 1 - s^2")
-        st.latex(r"V_m = \frac{Z\,R\,T_m}{p_m}")
         st.latex(
-            r"H_{c,G} = \sum_j x_j\,H_{c,j}(T_c) \qquad "
-            r"H_{c,N} = H_{c,G} - \Big(\sum_j x_j\,\frac{b_j}{2}\Big)\,L_0(T_c)"
+            r"\begin{aligned}M &= \sum_j x_j\,M_j \\ s &= \sum_j x_j\,s_j(T_m) \\"
+            r"Z &= 1 - s^2 \\ V_m &= \frac{Z\,R\,T_m}{p_m}\end{aligned}"
         )
         st.latex(
-            r"H_v = \frac{H_c}{V_m} \qquad d = \frac{M\,Z_{\mathrm{aire}}}{M_{\mathrm{aire}}\,Z}"
-            r" \qquad W = \frac{H_v}{\sqrt{d}}"
+            r"\begin{aligned}H_{c,G} &= \sum_j x_j\,H_{c,j}(T_c) \\"
+            r"H_{c,N} &= H_{c,G} - \Big(\sum_j x_j\,\frac{b_j}{2}\Big)\,L_0(T_c)\end{aligned}"
+        )
+        st.latex(
+            r"\begin{aligned}H_v &= \frac{H_c}{V_m} \\"
+            r"d &= \frac{M\,Z_{\mathrm{aire}}}{M_{\mathrm{aire}}\,Z} \\"
+            r"W &= \frac{H_v}{\sqrt{d}}\end{aligned}"
         )
         st.markdown(
             "b_j es el número de átomos de hidrógeno del componente j (cada 2 H forman una "

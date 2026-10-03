@@ -618,10 +618,8 @@ def _render_theory() -> None:
             r"\eta_{s,C} = \frac{w_{\mathrm{ideal}}}{w_{\mathrm{real}}}"
             r" = \frac{h_{2s} - h_1}{h_2 - h_1}"
         )
-        st.latex(
-            r"\eta_{s,P} \simeq \frac{v\,(p_2 - p_1)}{h_2 - h_1}"
-            r" \qquad \text{(líquido incompresible)}"
-        )
+        st.markdown("En la bomba, con el líquido como incompresible (w_s ≈ v·Δp):")
+        st.latex(r"\eta_{s,P} \simeq \frac{v\,(p_2 - p_1)}{h_2 - h_1}")
         st.markdown(
             "**Primer principio** en régimen permanente, adiabático y sin variaciones de "
             "energía cinética ni potencial (§3.3):"

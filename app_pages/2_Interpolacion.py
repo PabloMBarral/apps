@@ -232,12 +232,15 @@ def _render_theory() -> None:
         st.markdown("**Interpolación simple** entre los nodos (x₁, y₁) y (x₂, y₂):")
         st.latex(r"y = y_1 + \frac{y_2 - y_1}{x_2 - x_1}\,(x - x_1)")
         st.markdown(
-            "**Interpolación doble**, con vértices f_ij = f(x_i, y_j): primero dos "
+            "**Interpolación doble**, con vértices $f_{ij} = f(x_i, y_j)$: primero dos "
             "interpolaciones en x (sobre las filas y₁ e y₂) y después una en y:"
         )
         st.latex(r"f(x, y_1) = f_{11} + \frac{f_{21} - f_{11}}{x_2 - x_1}\,(x - x_1)")
         st.latex(r"f(x, y_2) = f_{12} + \frac{f_{22} - f_{12}}{x_2 - x_1}\,(x - x_1)")
-        st.latex(r"f(x, y) = f(x, y_1) + \frac{f(x, y_2) - f(x, y_1)}{y_2 - y_1}\,(y - y_1)")
+        st.latex(
+            r"\begin{aligned}f(x, y) &= f(x, y_1) \\"
+            r"&\quad + \frac{f(x, y_2) - f(x, y_1)}{y_2 - y_1}\,(y - y_1)\end{aligned}"
+        )
         st.markdown(
             "Interpolar supone que la propiedad varía linealmente entre nodos: el error "
             "crece con el paso de la tabla y con la curvatura (por ejemplo, cerca del punto "

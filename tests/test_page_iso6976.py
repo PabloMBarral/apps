@@ -45,7 +45,7 @@ def test_theory_expander_cites_the_vademecum() -> None:
     at = _new_app()
     theory = next(e for e in at.expander if "Fórmulas teóricas" in e.label)
     assert any("§16.9" in md.value for md in theory.markdown)
-    assert len(theory.latex) == 5
+    assert len(theory.latex) == 4
 
 
 @pytest.mark.parametrize("example", EXAMPLES)
