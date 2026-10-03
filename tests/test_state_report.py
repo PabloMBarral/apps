@@ -178,7 +178,13 @@ class TestSaturationRows:
 class TestFormatValue:
     @pytest.mark.parametrize(
         "value,expected",
-        [(None, "—"), (0.0, "0"), (3051.632, "3051.63"), (0.001043153, "0.00104315")],
+        [
+            (None, "—"),
+            (float("nan"), "—"),
+            (0.0, "0"),
+            (3051.632, "3051.63"),
+            (0.001043153, "0.00104315"),
+        ],
     )
     def test_format(self, value: float | None, expected: str) -> None:
         assert format_value(value) == expected
@@ -404,3 +410,42 @@ class TestExport:
         # Incluye las dos tablas de saturación (a p y a T).
         assert any(r[0] == "Saturación a p" for r in rows)
         assert any(r[0] == "Saturación a T" for r in rows)
+
+
+# ---------------------------------------------------------------------
+# Tabla de varios estados
+# ---------------------------------------------------------------------
+
+
+class TestStatesTable:
+    def test_rows_in_tecnico(self, superheated: FluidState, wet: FluidState) -> None:
+        from core.state_report import states_table
+
+        rows = states_table([("1", superheated), ("2", wet)], "Técnico")
+        assert [r["Estado"] for r in rows] == ["1", "2"]
+        assert rows[0]["T [°C]"] == pytest.approx(300.0)
+        assert rows[0]["h [kJ/kg]"] == pytest.approx(3051.6, abs=0.15)
+        assert rows[0]["x [-]"] is None
+        assert rows[1]["x [-]"] == pytest.approx(wet.x)
+        assert rows[1]["Región"].startswith("Vapor húmedo")
+        assert rows[0]["Fluido"] == "Agua"
+
+    def test_headers_follow_unit_system(self, superheated: FluidState) -> None:
+        from core.state_report import states_table
+
+        row = states_table([("A", superheated)], "Inglés")[0]
+        assert "T [°F]" in row and "s [Btu/(lb·°R)]" in row
+
+    def test_csv(self, superheated: FluidState, wet: FluidState) -> None:
+        from core.state_report import states_table_csv
+
+        text = states_table_csv([("1", superheated), ("2", wet)], "Técnico")
+        rows = list(csv.DictReader(io.StringIO(text)))
+        assert len(rows) == 2
+        assert rows[0]["x [-]"] == ""  # fuera de la campana
+        assert float(rows[1]["p [bar]"]) == pytest.approx(10.0)
+
+    def test_csv_of_empty_table(self) -> None:
+        from core.state_report import states_table_csv
+
+        assert states_table_csv([], "SI") == ""

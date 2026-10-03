@@ -116,3 +116,85 @@ def test_other_fluid_defaults_compute() -> None:
     _submit(at)
     assert not at.error
     assert at.metric
+
+
+# ---------------------------------------------------------------------
+# Tabla de estados (ciclo Rankine simple, Cengel ej. 10-1 con 80 bar / 500 °C)
+# ---------------------------------------------------------------------
+
+
+def _compute(at: AppTest, pair: str, **values: float) -> None:
+    at.selectbox(key="prop_pair").set_value(pair).run()
+    for kw, value in values.items():
+        suffix = "" if kw == "x" else "@Técnico"
+        at.number_input(key=f"prop_in_Water_{pair}_{kw}{suffix}").set_value(value)
+    _submit(at)
+
+
+def _add(at: AppTest, label: str | None = None) -> None:
+    if label is not None:
+        at.text_input(key="prop_state_label").set_value(label)
+    at.button(key="prop_add_state").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+
+
+@pytest.fixture(scope="module")
+def rankine() -> AppTest:
+    at = _new_app()
+    _compute(at, "PX", p=0.1, x=0.0)
+    _add(at)
+    s1 = float(_metric(at, "Entropía s"))
+    _compute(at, "PS", p=80.0, s=s1)
+    _add(at)
+    _compute(at, "TP", t=500.0, p=80.0)
+    _add(at)
+    s3 = float(_metric(at, "Entropía s"))
+    _compute(at, "PS", p=0.1, s=s3)
+    _add(at)
+    return at
+
+
+def _states_frame(at: AppTest):
+    return at.dataframe[-1].value
+
+
+def test_cycle_states_are_tabulated(rankine: AppTest) -> None:
+    frame = _states_frame(rankine)
+    assert list(frame["Estado"]) == ["1", "2", "3", "4"]
+    h = [float(v) for v in frame["h [kJ/kg]"]]
+    # Trabajo de bomba ≈ 8 kJ/kg; turbina ≈ 1269 kJ/kg; x4 ≈ 0.81.
+    assert h[1] - h[0] == pytest.approx(8.06, abs=0.05)
+    assert h[2] - h[3] == pytest.approx(1269.3, abs=0.5)
+    assert float(frame["x [-]"].iloc[3]) == pytest.approx(0.8104, abs=1e-3)
+    assert frame["x [-]"].iloc[2] == "—"  # fuera de la campana, no "nan"
+
+
+def test_label_auto_increments(rankine: AppTest) -> None:
+    assert rankine.text_input(key="prop_state_label").value == "5"
+
+
+def test_cycle_on_diagram(rankine: AppTest) -> None:
+    rankine.toggle(key="prop_diagram_connect").set_value(True).run()
+    assert not rankine.exception
+    assert len(rankine.get("plotly_chart")) == 1
+
+
+def test_same_label_replaces_state() -> None:
+    at = _new_app()
+    _submit(at)
+    _add(at, "A")
+    _add(at, "A")
+    assert len(_states_frame(at)) == 1
+    assert any("actualizado" in t.value for t in at.toast)
+
+
+def test_remove_last_and_clear() -> None:
+    at = _new_app()
+    _submit(at)
+    _add(at)
+    _add(at, "B")
+    at.button(key="prop_remove_last").click().run()
+    assert list(_states_frame(at)["Estado"]) == ["1"]
+    at.button(key="prop_clear_states").click().run()
+    assert not any("Tabla de estados" in m.value for m in at.markdown)
+    assert at.text_input(key="prop_state_label").value == "1"

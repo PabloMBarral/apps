@@ -298,8 +298,12 @@ def saturation_rows(sat: SaturationProperties, system: UnitSystem) -> list[Prope
 
 
 def format_value(value: float | None, sig: int = 6) -> str:
-    """Número con ``sig`` cifras significativas, o ``"—"`` si no está definido."""
-    if value is None:
+    """Número con ``sig`` cifras significativas, o ``"—"`` si no está definido.
+
+    ``NaN`` cuenta como no definido (pandas convierte ``None`` en ``NaN``
+    en las columnas numéricas).
+    """
+    if value is None or math.isnan(value):
         return "—"
     if value == 0.0:
         return "0"
@@ -1107,4 +1111,53 @@ def state_to_csv(state: FluidState, pair: PairCode, system: UnitSystem) -> str:
         writer.writerow(
             [r.group, r.name, r.symbol, "" if r.value is None else repr(r.value), r.unit, r.note]
         )
+    return buffer.getvalue()
+
+
+# ---------------------------------------------------------------------
+# Tabla de varios estados (para resolver ciclos)
+# ---------------------------------------------------------------------
+
+
+def states_table(
+    labeled_states: list[tuple[str, FluidState]], system: UnitSystem
+) -> list[dict[str, Any]]:
+    """Una fila por estado con T, p, v, u, h, s, x y región, en ``system``.
+
+    Las claves llevan la unidad (``"h [kJ/kg]"``) para poder armar la
+    tabla o el CSV directamente. ``x`` es ``None`` fuera de la campana.
+    """
+    columns: tuple[tuple[str, str, QuantityKind], ...] = (
+        ("T", "T_K", "temperature"),
+        ("p", "P_Pa", "pressure"),
+        ("v", "v_m3_per_kg", "specific_volume"),
+        ("u", "u_J_per_kg", "specific_enthalpy"),
+        ("h", "h_J_per_kg", "specific_enthalpy"),
+        ("s", "s_J_per_kg_K", "specific_entropy"),
+    )
+    rows: list[dict[str, Any]] = []
+    for label, state in labeled_states:
+        row: dict[str, Any] = {
+            "Estado": label,
+            "Fluido": FLUID_NAMES_ES.get(state.fluid, state.fluid),
+        }
+        for symbol, attr, kind in columns:
+            header = f"{symbol} [{unit_label(kind, system)}]"
+            row[header] = convert_from_si(getattr(state, attr), kind, system)
+        row["x [-]"] = state.x
+        row["Región"] = REGION_LABELS_ES[state.region]
+        rows.append(row)
+    return rows
+
+
+def states_table_csv(labeled_states: list[tuple[str, FluidState]], system: UnitSystem) -> str:
+    """CSV de :func:`states_table` (celdas vacías para propiedades no definidas)."""
+    rows = states_table(labeled_states, system)
+    if not rows:
+        return ""
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=list(rows[0]))
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({k: ("" if v is None else v) for k, v in row.items()})
     return buffer.getvalue()

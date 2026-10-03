@@ -22,11 +22,13 @@ unidades.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pandas as pd
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
+from core.diagrams import DiagramSpec, cycle_overlays
 from core.fluids import (
     FLUID_NAMES_ES,
     PAIR_KWARGS,
@@ -50,16 +52,27 @@ from core.state_report import (
     state_notes,
     state_to_csv,
     state_to_dict,
+    states_table,
+    states_table_csv,
 )
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, unit_label
 from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_credits
-from ui.diagrams import DiagramPoint, diagram_type_selector, render_diagram_plotly
+from ui.diagrams import (
+    DiagramPoint,
+    auto_point_colors,
+    diagram_type_selector,
+    get_diagram,
+    render_diagram_plotly,
+)
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
 PAGE_VERSION = "0.9.0"
 
 _RESULT_KEY = "prop_result"
 _LAST_INPUTS_KEY = "prop_last_inputs"
+_STATES_KEY = "prop_states"  # tabla de estados: [{label, fluid, pair, inputs_si}]
+_STATE_LABEL_KEY = "prop_state_label"
+_TOAST_KEY = "prop_toast"
 
 _REGION_ICONS: dict[str, str] = {
     "compressed_liquid": "💧",
@@ -140,6 +153,128 @@ def _render_inputs(fluid: str, pair: PairCode, system: UnitSystem) -> dict[str, 
                     format=_input_format(spec.kind, system),
                 )
     return values
+
+
+# ---------------------------------------------------------------------
+# Tabla de estados (para armar un ciclo estado por estado)
+# ---------------------------------------------------------------------
+
+
+def _table_entries() -> list[dict[str, Any]]:
+    return st.session_state.setdefault(_STATES_KEY, [])
+
+
+def _next_label(entries: list[dict[str, Any]]) -> str:
+    """Primer número natural que todavía no se usó como nombre de estado."""
+    used = {e["label"] for e in entries}
+    n = 1
+    while str(n) in used:
+        n += 1
+    return str(n)
+
+
+def _entry_state(entry: dict[str, Any]) -> FluidState | None:
+    try:
+        return _state_cached(
+            entry["fluid"], entry["pair"], tuple(sorted(entry["inputs_si"].items()))
+        )
+    except ValueError:
+        return None
+
+
+def _labeled_states(fluid: str | None = None) -> list[tuple[str, FluidState]]:
+    """Estados de la tabla (opcionalmente solo los de ``fluid``), ya calculados."""
+    out: list[tuple[str, FluidState]] = []
+    for entry in _table_entries():
+        if fluid is not None and entry["fluid"] != fluid:
+            continue
+        state = _entry_state(entry)
+        if state is not None:
+            out.append((entry["label"], state))
+    return out
+
+
+def _add_result_to_table() -> None:
+    """Callback del botón: agrega (o reemplaza, si el nombre existe) el estado actual."""
+    result = st.session_state.get(_RESULT_KEY)
+    if result is None:
+        return
+    entries = _table_entries()
+    label = str(st.session_state.get(_STATE_LABEL_KEY, "")).strip() or _next_label(entries)
+    new_entry = {
+        "label": label,
+        "fluid": result["fluid"],
+        "pair": result["pair"],
+        "inputs_si": dict(result["inputs_si"]),
+    }
+    for i, entry in enumerate(entries):
+        if entry["label"] == label:
+            entries[i] = new_entry
+            st.session_state[_TOAST_KEY] = f"Estado «{label}» actualizado en la tabla."
+            break
+    else:
+        entries.append(new_entry)
+        st.session_state[_TOAST_KEY] = f"Estado «{label}» agregado a la tabla."
+    st.session_state[_STATE_LABEL_KEY] = _next_label(entries)
+
+
+def _remove_last_state() -> None:
+    entries = _table_entries()
+    if entries:
+        entries.pop()
+    st.session_state[_STATE_LABEL_KEY] = _next_label(entries)
+
+
+def _clear_states() -> None:
+    st.session_state[_STATES_KEY] = []
+    st.session_state[_STATE_LABEL_KEY] = "1"
+
+
+def _render_add_to_table() -> None:
+    st.session_state.setdefault(_STATE_LABEL_KEY, _next_label(_table_entries()))
+    left, right = st.columns([3, 2], vertical_alignment="bottom")
+    left.text_input(
+        "Nombre del estado",
+        key=_STATE_LABEL_KEY,
+        help="Por ejemplo 1, 2s o «salida de turbina». Si ya existe, se reemplaza.",
+    )
+    right.button(
+        "➕ Agregar a la tabla de estados",
+        key="prop_add_state",
+        on_click=_add_result_to_table,
+        help="Para armar un ciclo: calculá cada estado y agregalo con su nombre.",
+    )
+
+
+def _render_states_table(system: UnitSystem) -> None:
+    labeled = _labeled_states()
+    if not labeled:
+        return
+    st.markdown("---")
+    st.markdown("### 🗂️ Tabla de estados")
+    st.caption(
+        "Los estados que fuiste agregando (por ejemplo, los de un ciclo), recalculados en el "
+        "sistema de unidades activo. Activá «Mostrar la tabla de estados» en el diagrama para "
+        "verlos juntos."
+    )
+    rows = states_table(labeled, system)
+    frame = pd.DataFrame(rows)
+    for column in frame.columns:
+        if column not in ("Estado", "Fluido", "Región"):
+            frame[column] = [format_value(v) for v in frame[column]]
+    if frame["Fluido"].nunique() == 1:
+        frame = frame.drop(columns="Fluido")
+    _show_table(frame)
+    left, middle, right = st.columns(3)
+    left.download_button(
+        "Descargar tabla (CSV)",
+        data=states_table_csv(labeled, system).encode("utf-8"),
+        file_name="tabla_de_estados.csv",
+        mime="text/csv",
+        key="prop_download_states",
+    )
+    middle.button("↩️ Quitar el último", key="prop_remove_last", on_click=_remove_last_state)
+    right.button("🗑️ Vaciar la tabla", key="prop_clear_states", on_click=_clear_states)
 
 
 # ---------------------------------------------------------------------
@@ -306,22 +441,62 @@ def _render_procedure(state: FluidState, pair: PairCode, system: UnitSystem) -> 
 def _render_diagram(state: FluidState, system: UnitSystem) -> None:
     with st.expander("📈 Diagrama del fluido", expanded=False):
         diagram_type = diagram_type_selector(key="prop_diagram_type", default="Ts")
+        table = _labeled_states(state.fluid)
+        show_table = connect = False
+        if table:
+            left, right = st.columns(2)
+            show_table = left.toggle(
+                "Mostrar la tabla de estados", value=True, key="prop_diagram_show_table"
+            )
+            connect = right.toggle(
+                "Unir los estados en orden (ciclo)",
+                value=False,
+                key="prop_diagram_connect",
+                disabled=not show_table or len(table) < 2,
+            )
+
+        points: list[DiagramPoint] = []
+        if show_table:
+            colors = auto_point_colors(len(table))
+            points += [
+                DiagramPoint(state=s.to_state_point(), label=label, color=color)
+                for (label, s), color in zip(table, colors, strict=True)
+            ]
+        # El estado actual, salvo que ya esté en la tabla (mismo punto).
+        if not any(s == state for _, s in table) or not show_table:
+            points.append(
+                DiagramPoint(state=state.to_state_point(), label="estado", color="#d62728")
+            )
         try:
+            overlays = []
+            if show_table and connect and len(table) >= 2:
+                overlays = cycle_overlays(
+                    get_diagram(state.fluid, system),
+                    DiagramSpec(fluid=state.fluid, system=system),
+                    [s.to_state_point() for _, s in table],
+                    close=True,
+                )
             render_diagram_plotly(
                 fluid=state.fluid,
                 diagram_type=diagram_type,
                 system=system,
-                points=[
-                    DiagramPoint(state=state.to_state_point(), label="estado", color="#d62728")
-                ],
+                points=points,
+                overlays=overlays,
                 chart_key="prop_diagram_chart",
             )
         except Exception as exc:  # el diagrama no debe tumbar la página
             st.warning(f"No se pudo dibujar el diagrama: {exc}")
-        st.caption(
+        caption = (
             "Isolíneas: T y p constantes y título constante dentro de la campana "
             "(fluprodia + CoolProp). El punto rojo es el estado calculado."
         )
+        if connect:
+            caption += (
+                " Dos estados consecutivos con la misma p se unen por la isobárica, y con la "
+                "misma s por la isoentrópica (línea llena). Si no comparten ninguna, la recta "
+                "punteada es solo una referencia: no es la trayectoria real del proceso."
+            )
+        st.caption(caption)
 
 
 def _render_export(state: FluidState, pair: PairCode, system: UnitSystem) -> None:
@@ -354,6 +529,7 @@ def _render_state(state: FluidState, pair: PairCode, system: UnitSystem) -> None
             st.info(note.text, icon="ℹ️")
 
     _render_metrics(state, system)
+    _render_add_to_table()
 
     st.markdown("#### Propiedades del estado")
     _render_properties(state, system)
@@ -480,3 +656,9 @@ else:
         "estado**. Los valores iniciales son un estado de ejemplo válido.",
         icon="👆",
     )
+
+_render_states_table(system)
+
+toast = st.session_state.pop(_TOAST_KEY, None)
+if toast:
+    st.toast(toast, icon="🗂️")

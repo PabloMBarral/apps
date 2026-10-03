@@ -38,14 +38,17 @@ from core.diagrams import (  # noqa: E402
     ProcessOverlay,
     axis_window_si,
     build_diagram,
+    cycle_overlays,
     expand_window,
     from_json,
     isentropic_process,
     isobaric_process,
+    isobaric_process_by_enthalpy,
     isothermal_process,
     linear_segment_overlay,
     pad_window,
     process_to_diagram_coords,
+    segment_between,
     state_property_si,
     state_to_diagram_coords,
     to_json,
@@ -464,3 +467,76 @@ class TestWindowHelpers:
     def test_pad_log_requires_positive_limits(self) -> None:
         with pytest.raises(ValueError, match="positivos"):
             pad_window(0.0, 10.0, log=True)
+
+
+@pytest.fixture(scope="module")
+def rankine_states() -> list:
+    """Rankine ideal 0.1 bar / 80 bar / 500 °C (Cengel, ej. 10-1 adaptado)."""
+    s1 = state_from_pair("Water", "PX", p=1.0e4, x=0.0)
+    s2 = state_from_pair("Water", "PS", p=8.0e6, s=s1.s_J_per_kg_K)
+    s3 = state_from_pair("Water", "TP", t=773.15, p=8.0e6)
+    s4 = state_from_pair("Water", "PS", p=1.0e4, s=s3.s_J_per_kg_K)
+    return [s1, s2, s3, s4]
+
+
+class TestIsobaricByEnthalpy:
+    def test_crosses_the_dome_at_constant_temperature(
+        self, water_diagram_tecnico, water_spec_tecnico, rankine_states
+    ) -> None:
+        _s1, s2, s3, _s4 = rankine_states
+        proc = isobaric_process_by_enthalpy(
+            water_diagram_tecnico,
+            water_spec_tecnico,
+            p_Pa=8.0e6,
+            h_start_J_per_kg=s2.h_J_per_kg,
+            h_end_J_per_kg=s3.h_J_per_kg,
+        )
+        assert proc["p"] == pytest.approx(np.full(len(proc["p"]), 8.0e6), rel=1e-6)
+        assert proc["h"][0] == pytest.approx(s2.h_J_per_kg, rel=1e-6)
+        assert proc["h"][-1] == pytest.approx(s3.h_J_per_kg, rel=1e-6)
+        t_sat = state_from_pair("Water", "PX", p=8.0e6, x=0.5).T_K
+        on_plateau = np.abs(proc["T"] - t_sat) < 0.5
+        assert on_plateau.sum() > 10  # tramo horizontal dentro de la campana
+
+
+class TestCycleOverlays:
+    def test_rankine_segments_are_real_processes(
+        self, water_diagram_tecnico, water_spec_tecnico, rankine_states
+    ) -> None:
+        s1, s2, s3, s4 = rankine_states
+        kinds = [
+            segment_between(water_diagram_tecnico, water_spec_tecnico, a, b)[0]
+            for a, b in ((s1, s2), (s2, s3), (s3, s4), (s4, s1))
+        ]
+        assert kinds == ["isentropic", "isobaric", "isentropic", "isobaric"]
+
+    def test_unrelated_states_are_joined_straight(
+        self, water_diagram_tecnico, water_spec_tecnico, rankine_states
+    ) -> None:
+        s1, _s2, s3, _s4 = rankine_states
+        kind, coords = segment_between(water_diagram_tecnico, water_spec_tecnico, s1, s3)
+        assert kind == "straight"
+        assert len(coords["p"]) == 2
+
+    def test_overlays_split_real_and_reference(
+        self, water_diagram_tecnico, water_spec_tecnico, rankine_states
+    ) -> None:
+        s1, s2, s3, _s4 = rankine_states
+        overlays = cycle_overlays(
+            water_diagram_tecnico, water_spec_tecnico, [s1, s2, s3], close=True
+        )
+        names = [ov.name for ov in overlays]
+        assert names == ["procesos a p o s constante", "uniones rectas (referencia)"]
+        assert overlays[1].dash == "dot"
+        # Los tramos reales se concatenan separados por NaN.
+        assert np.isnan(overlays[0].coords_si["p"]).sum() == 1
+
+    def test_full_rankine_has_no_straight_segments(
+        self, water_diagram_tecnico, water_spec_tecnico, rankine_states
+    ) -> None:
+        overlays = cycle_overlays(water_diagram_tecnico, water_spec_tecnico, rankine_states)
+        assert [ov.name for ov in overlays] == ["procesos a p o s constante"]
+
+    def test_fewer_than_two_states(self, water_diagram_tecnico, water_spec_tecnico) -> None:
+        s = state_from_pair("Water", "TP", t=573.15, p=1.0e6)
+        assert cycle_overlays(water_diagram_tecnico, water_spec_tecnico, [s]) == []

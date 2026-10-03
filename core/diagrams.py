@@ -32,7 +32,7 @@ DOI: 10.1021/ie4033999
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -416,6 +416,35 @@ def isobaric_process(
     return _process_to_si(raw, spec)
 
 
+def isobaric_process_by_enthalpy(
+    diagram: FluidPropertyDiagram,
+    spec: DiagramSpec,
+    *,
+    p_Pa: float,
+    h_start_J_per_kg: float,
+    h_end_J_per_kg: float,
+) -> dict[str, np.ndarray]:
+    """Proceso isobárico p = cte entre dos entalpías (en SI).
+
+    A diferencia de :func:`isobaric_process` (parametrizada por T), esta
+    versión recorre bien el tramo dentro de la campana, donde la
+    temperatura es constante y la entalpía no: es la que hace falta para
+    dibujar una caldera o un condensador (p. ej. 2→3 en un Rankine).
+    """
+    p_user = convert_from_si(p_Pa, "pressure", spec.system)
+    h_start_user = convert_from_si(h_start_J_per_kg, "specific_enthalpy", spec.system)
+    h_end_user = convert_from_si(h_end_J_per_kg, "specific_enthalpy", spec.system)
+    raw = diagram.calc_individual_isoline(
+        isoline_property="p",
+        isoline_value=float(p_user),
+        starting_point_property="h",
+        starting_point_value=float(h_start_user),
+        ending_point_property="h",
+        ending_point_value=float(h_end_user),
+    )
+    return _process_to_si(raw, spec)
+
+
 def isothermal_process(
     diagram: FluidPropertyDiagram,
     spec: DiagramSpec,
@@ -589,6 +618,128 @@ def linear_segment_overlay(
             "Q": np.array([start.x, end.x], dtype=float),
         },
     )
+
+
+SegmentKind = Literal["isobaric", "isentropic", "straight"]
+
+# Tolerancia relativa para considerar que dos estados comparten p o s.
+_SAME_PROPERTY_RTOL = 1e-4
+
+
+def _shares(a: float, b: float, scale: float) -> bool:
+    return abs(a - b) <= _SAME_PROPERTY_RTOL * max(abs(a), abs(b), scale)
+
+
+def _straight_coords(start: StatePoint, end: StatePoint) -> dict[str, np.ndarray]:
+    return linear_segment_overlay(name="", color="", dash="", start=start, end=end).coords_si
+
+
+def segment_between(
+    diagram: FluidPropertyDiagram,
+    spec: DiagramSpec,
+    start: StatePoint,
+    end: StatePoint,
+) -> tuple[SegmentKind, dict[str, np.ndarray]]:
+    """Trayectoria para unir dos estados consecutivos de un ciclo (en SI).
+
+    - Misma presión → isobárica real (caldera, condensador, evaporador).
+    - Misma entropía → isoentrópica real (bomba, turbina o compresor
+      ideales).
+    - Si no comparten ninguna, o si fluprodia no puede trazarla → segmento
+      recto, que es **solo una referencia visual** (p. ej. una turbina
+      real o una válvula de expansión no son procesos cuasiestáticos con
+      una trayectoria definida en el diagrama).
+    """
+    if _shares(start.P_Pa, end.P_Pa, scale=1.0) and not _shares(
+        start.h_J_per_kg, end.h_J_per_kg, scale=1.0e3
+    ):
+        try:
+            coords = isobaric_process_by_enthalpy(
+                diagram,
+                spec,
+                p_Pa=start.P_Pa,
+                h_start_J_per_kg=start.h_J_per_kg,
+                h_end_J_per_kg=end.h_J_per_kg,
+            )
+            return "isobaric", coords
+        except Exception:  # fluprodia/CoolProp no pudo: se cae a la recta
+            pass
+    if _shares(start.s_J_per_kg_K, end.s_J_per_kg_K, scale=1.0e3) and not _shares(
+        start.P_Pa, end.P_Pa, scale=1.0
+    ):
+        try:
+            coords = isentropic_process(
+                diagram,
+                spec,
+                s_J_per_kg_K=start.s_J_per_kg_K,
+                p_start_Pa=start.P_Pa,
+                p_end_Pa=end.P_Pa,
+            )
+            return "isentropic", coords
+        except Exception:
+            pass
+    return "straight", _straight_coords(start, end)
+
+
+def _join_with_gaps(chunks: list[dict[str, np.ndarray]]) -> dict[str, np.ndarray]:
+    """Concatena tramos separándolos con NaN (plotly corta la línea ahí)."""
+    keys = ("p", "T", "h", "s", "vol", "Q")
+    out: dict[str, list[float]] = {k: [] for k in keys}
+    for i, chunk in enumerate(chunks):
+        if i:
+            for k in keys:
+                out[k].append(np.nan)
+        n = len(chunk["p"])
+        for k in keys:
+            values = chunk.get(k)
+            out[k].extend(np.full(n, np.nan) if values is None else np.asarray(values, dtype=float))
+    return {k: np.array(v, dtype=float) for k, v in out.items()}
+
+
+def cycle_overlays(
+    diagram: FluidPropertyDiagram,
+    spec: DiagramSpec,
+    states: Sequence[StatePoint],
+    *,
+    close: bool = True,
+) -> list[ProcessOverlay]:
+    """Overlays para unir ``states`` en orden (y cerrar el ciclo si ``close``).
+
+    Devuelve hasta dos curvas: los tramos isobáricos/isoentrópicos reales
+    (línea llena) y las uniones rectas de referencia (punteada). Ver
+    :func:`segment_between`.
+    """
+    seq = list(states)
+    if len(seq) < 2:
+        return []
+    pairs = list(zip(seq[:-1], seq[1:], strict=True))
+    if close and len(seq) > 2:
+        pairs.append((seq[-1], seq[0]))
+    real: list[dict[str, np.ndarray]] = []
+    straight: list[dict[str, np.ndarray]] = []
+    for start, end in pairs:
+        kind, coords = segment_between(diagram, spec, start, end)
+        (straight if kind == "straight" else real).append(coords)
+    overlays: list[ProcessOverlay] = []
+    if real:
+        overlays.append(
+            ProcessOverlay(
+                name="procesos a p o s constante",
+                color="#444444",
+                dash="solid",
+                coords_si=_join_with_gaps(real),
+            )
+        )
+    if straight:
+        overlays.append(
+            ProcessOverlay(
+                name="uniones rectas (referencia)",
+                color="#444444",
+                dash="dot",
+                coords_si=_join_with_gaps(straight),
+            )
+        )
+    return overlays
 
 
 # ---------------------------------------------------------------------
