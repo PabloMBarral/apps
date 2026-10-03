@@ -14,24 +14,25 @@ Para cada modo se muestra el resultado, el procedimiento didáctico
 (LaTeX + narrativa en español) y, **bajo botón explícito**, una
 comparación contra CoolProp con autodetección de tipo de tabla.
 
-TODO (próximas fases, ver CLAUDE.md §"Páginas Streamlit"):
-- Expansor `📖 Fórmulas teóricas` con link al apartado correspondiente
-  de vademecum-termo.
-- Botón de exportar resultados (CSV / JSON).
+Incluye el expansor `📖 Fórmulas teóricas` (vademecum §2.1 y §2.2) y la
+descarga del resultado en CSV / JSON (Fase 1.7).
 """
 
 from __future__ import annotations
 
+import json
 from io import StringIO
 from typing import Any
 
 import pandas as pd
 import streamlit as st
 
+from core.export import dict_to_csv
 from core.fluids import SUPPORTED_FLUIDS, state_from_pair
 from core.interpolation import (
     InterpolationResult,
     bilinear_from_table,
+    interpolation_to_dict,
     linear_from_table,
 )
 from core.units import (
@@ -40,10 +41,10 @@ from core.units import (
     specific_from_si,
     temperature_to_kelvin,
 )
-from ui.branding import SUBJECT, sidebar_credits
+from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.7.0"
+PAGE_VERSION = "0.10.0"
 
 EXAMPLE_LINEAR_CSV = """T [°C],h_f [kJ/kg]
 100,419.06
@@ -199,6 +200,49 @@ def _render_procedure(result: InterpolationResult) -> None:
         st.latex(result.steps.substituted_latex)
         st.markdown("**En palabras:**")
         st.write(result.steps.narrative_es)
+
+
+def _render_export(result: InterpolationResult, *, labels: dict[str, str], key: str) -> None:
+    """Botones de descarga del resultado (CSV ``campo,valor`` y JSON)."""
+    data = interpolation_to_dict(result, **labels)
+    left, right = st.columns(2)
+    left.download_button(
+        "Descargar CSV",
+        data=dict_to_csv(data).encode("utf-8"),
+        file_name=f"interpolacion_{key}.csv",
+        mime="text/csv",
+        key=f"{key}_download_csv",
+    )
+    right.download_button(
+        "Descargar JSON",
+        data=json.dumps(data, ensure_ascii=False, indent=2),
+        file_name=f"interpolacion_{key}.json",
+        mime="application/json",
+        key=f"{key}_download_json",
+    )
+
+
+def _render_theory() -> None:
+    with st.expander("📖 Fórmulas teóricas", expanded=False):
+        st.markdown(
+            f"Fórmulas del [vademecum de la cátedra]({VADEMECUM_PDF_URL}) "
+            f"([DOI]({VADEMECUM_DOI_URL})): **§2.1 *Interpolación simple*** y **§2.2 "
+            "*Interpolación doble***."
+        )
+        st.markdown("**Interpolación simple** entre los nodos (x₁, y₁) y (x₂, y₂):")
+        st.latex(r"y = y_1 + \frac{y_2 - y_1}{x_2 - x_1}\,(x - x_1)")
+        st.markdown(
+            "**Interpolación doble**, con vértices f_ij = f(x_i, y_j): primero dos "
+            "interpolaciones en x (sobre las filas y₁ e y₂) y después una en y:"
+        )
+        st.latex(r"f(x, y_1) = f_{11} + \frac{f_{21} - f_{11}}{x_2 - x_1}\,(x - x_1)")
+        st.latex(r"f(x, y_2) = f_{12} + \frac{f_{22} - f_{12}}{x_2 - x_1}\,(x - x_1)")
+        st.latex(r"f(x, y) = f(x, y_1) + \frac{f(x, y_2) - f(x, y_1)}{y_2 - y_1}\,(y - y_1)")
+        st.markdown(
+            "Interpolar supone que la propiedad varía linealmente entre nodos: el error "
+            "crece con el paso de la tabla y con la curvatura (por ejemplo, cerca del punto "
+            "crítico). Para medirlo, usá la comparación contra CoolProp."
+        )
 
 
 def _render_header_help() -> None:
@@ -434,6 +478,7 @@ st.markdown(
     "(doble entrada) sobre tablas 2D, con procedimiento didáctico y "
     "comparación **opcional** contra CoolProp."
 )
+_render_theory()
 st.markdown("---")
 
 sidebar_credits(version=PAGE_VERSION, page_name="Interpolación")
@@ -613,6 +658,11 @@ with tab_linear:
                     result = st.session_state["lin_result"]
                     st.success(f"**Resultado:** {y_header} = {result.value:.6g}")
                     _render_procedure(result)
+                    _render_export(
+                        result,
+                        labels={"x_label": x_header or "x", "y_label": y_header or "y"},
+                        key="lin",
+                    )
 
                     can_compare = x_base == "t" and y_base in _SAT_PROPS
                     if can_compare:
@@ -795,6 +845,14 @@ with tab_bilinear:
                     result_b = st.session_state["bil_result"]
                     st.success(f"**Resultado:** z = {result_b.value:.6g}")
                     _render_procedure(result_b)
+                    _render_export(
+                        result_b,
+                        labels={
+                            "x_label": st.session_state.get("bil_x_header", "") or "x",
+                            "y_label": st.session_state.get("bil_y_header", "") or "y",
+                        },
+                        key="bil",
+                    )
 
                     x_base_b, x_unit_b = parse_header(
                         st.session_state.get("bil_x_header", "") or ""

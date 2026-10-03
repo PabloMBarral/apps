@@ -10,10 +10,11 @@ con propagación de incertidumbre estándar bajo matriz **identidad** (las
 mediciones de composición se asumen independientes). La opción de matriz
 de normalización (ISO 14912:2003) queda deferida a fase futura.
 
-TODO (próximas fases, ver CLAUDE.md §"Páginas Streamlit"):
+Incluye el expansor `📖 Fórmulas teóricas` (vademecum §16.9 y las
+fórmulas de la norma) y la descarga del resultado en CSV / JSON (Fase 1.7).
+
+TODO (próximas fases):
 - Matriz de correlación de normalización vía ISO 14912:2003 Formula (69).
-- Expansor `📖 Fórmulas teóricas` con link a vademecum-termo.
-- Botón de exportar resultados (CSV / JSON).
 """
 
 from __future__ import annotations
@@ -33,12 +34,14 @@ from core.combustion.iso6976 import (
     Quantity,
     ReferenceCondition,
     calculate,
+    iso6976_to_dict,
     load_tables,
 )
-from ui.branding import SUBJECT, sidebar_credits
+from core.export import dict_to_csv
+from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.7.0"
+PAGE_VERSION = "0.10.0"
 
 _FIXTURE_PATH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "iso6976_annex_d.json"
 
@@ -154,6 +157,56 @@ def _render_procedure(result: ISO6976Result) -> None:
         st.write(result.steps.narrative_es)
 
 
+def _render_export(result: ISO6976Result) -> None:
+    """Descarga del resultado completo (composición, referencias, u y U)."""
+    st.markdown("#### 💾 Exportar")
+    data = iso6976_to_dict(result)
+    left, right = st.columns(2)
+    left.download_button(
+        "Descargar CSV",
+        data=dict_to_csv(data).encode("utf-8"),
+        file_name="iso6976.csv",
+        mime="text/csv",
+        key="iso_download_csv",
+    )
+    right.download_button(
+        "Descargar JSON",
+        data=json.dumps(data, ensure_ascii=False, indent=2),
+        file_name="iso6976.json",
+        mime="application/json",
+        key="iso_download_json",
+    )
+
+
+def _render_theory() -> None:
+    with st.expander("📖 Fórmulas teóricas", expanded=False):
+        st.markdown(
+            f"La definición de poder calorífico superior e inferior está en el [vademecum "
+            f"de la cátedra]({VADEMECUM_PDF_URL}) ([DOI]({VADEMECUM_DOI_URL})), **§16.9 "
+            "*Poder calorífico***. El bruto (G) de la norma es el superior (PCS: el agua de "
+            "combustión condensa) y el neto (N) es el inferior (PCI: sale como vapor):"
+        )
+        st.latex(
+            r"\overline{PCS} - \overline{PCI} = \nu_{\mathrm{H_2O}}\,\bar{h}_{fg}(T_{\mathrm{ref}})"
+        )
+        st.markdown("**Cálculo a partir de la composición** (ISO 6976:2016):")
+        st.latex(r"M = \sum_j x_j\,M_j \qquad s = \sum_j x_j\,s_j(T_m) \qquad Z = 1 - s^2")
+        st.latex(r"V_m = \frac{Z\,R\,T_m}{p_m}")
+        st.latex(
+            r"H_{c,G} = \sum_j x_j\,H_{c,j}(T_c) \qquad "
+            r"H_{c,N} = H_{c,G} - \Big(\sum_j x_j\,\frac{b_j}{2}\Big)\,L_0(T_c)"
+        )
+        st.latex(
+            r"H_v = \frac{H_c}{V_m} \qquad d = \frac{M\,Z_{\mathrm{aire}}}{M_{\mathrm{aire}}\,Z}"
+            r" \qquad W = \frac{H_v}{\sqrt{d}}"
+        )
+        st.markdown(
+            "b_j es el número de átomos de hidrógeno del componente j (cada 2 H forman una "
+            "molécula de agua) y L₀ el calor latente molar del agua. Las incertidumbres se "
+            "propagan con matriz identidad; U = k·u con k = 2 (≈ 95 % de cobertura)."
+        )
+
+
 # ---------------------------------------------------------------------
 # Layout principal
 # ---------------------------------------------------------------------
@@ -167,6 +220,7 @@ st.markdown(
     "al aire e índice de Wobbe a partir de la composición molar y las "
     "condiciones de referencia, con propagación de incertidumbre estándar."
 )
+_render_theory()
 st.markdown("---")
 
 sidebar_credits(version=PAGE_VERSION, page_name="ISO 6976")
@@ -358,3 +412,4 @@ if "iso_result" in st.session_state:
     assert isinstance(result, ISO6976Result)
     _render_results_table(result)
     _render_procedure(result)
+    _render_export(result)

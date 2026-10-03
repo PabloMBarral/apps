@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -544,3 +544,51 @@ def _bracket_indices(xs_arr: np.ndarray, x: float) -> tuple[int, int]:
     if idx >= n:
         return n - 2, n - 1
     return idx - 1, idx
+
+
+# ---------------------------------------------------------------------
+# Exportación (Fase 1.7)
+# ---------------------------------------------------------------------
+
+
+def interpolation_to_dict(
+    result: InterpolationResult,
+    *,
+    x_label: str = "x",
+    y_label: str = "y",
+    z_label: str = "z",
+) -> dict[str, Any]:
+    """Resultado de una interpolación, serializable a JSON.
+
+    Incluye la consulta, los nodos (lineal) o los vértices e intermedios
+    (doble entrada, convención ``z01 = z(x0, y1)``), el resultado y el
+    procedimiento. ``*_label`` son los encabezados de la tabla (p. ej.
+    ``"T [°C]"``) para que el archivo se entienda solo.
+    """
+    s = result.steps
+
+    def pick(**fields: float | None) -> dict[str, float]:
+        return {k: v for k, v in fields.items() if v is not None}
+
+    data: dict[str, Any] = {
+        "tipo": "lineal" if s.kind == "linear" else "doble entrada (bilineal)",
+        "nodo_exacto": s.exact_node,
+    }
+    if s.kind == "linear":
+        data["variables"] = {"x": x_label, "y": y_label}
+        data["consulta"] = pick(x=s.x_query)
+        data["nodos"] = pick(x0=s.x0, y0=s.f0, x1=s.x1, y1=s.f1)
+    else:
+        data["variables"] = {"x": x_label, "y": y_label, "z": z_label}
+        data["consulta"] = pick(x=s.x_query, y=s.y_query)
+        data["vertices"] = pick(
+            x0=s.x0, x1=s.x1, y0=s.y0, y1=s.y1, z00=s.z00, z01=s.z01, z10=s.z10, z11=s.z11
+        )
+        data["intermedios"] = pick(z_en_y0=s.z_query_y0, z_en_y1=s.z_query_y1)
+    data["resultado"] = result.value
+    data["procedimiento"] = {
+        "formula_latex": s.formula_latex,
+        "sustitucion_latex": s.substituted_latex,
+        "explicacion": s.narrative_es,
+    }
+    return data
