@@ -39,7 +39,9 @@ y UI (Streamlit).
 apps/
 ├── streamlit_app.py           # Home / landing
 ├── pages/                     # Una página por módulo (numeradas)
-│   ├── 1_Propiedades.py       # ✅ Fase 1.5a (+ diagrama del estado)
+│   ├── 1_Propiedades.py       # ✅ Fase 1.6 — Estado completo del agua (y otros
+│   │                          # fluidos): región, tablas, procedimiento,
+│   │                          # diagrama, tabla de estados para ciclos.
 │   ├── 2_Interpolacion.py     # ✅ Fase 1.1
 │   ├── 3_Isoentropicos.py     # ✅ Fase 1.3 + ✅ 1.5a (diagrama del proceso)
 │   ├── 5_Rankine.py
@@ -57,12 +59,21 @@ apps/
 │   ├── units_system.py        # ✅ Fase 1.4 — Sistema global SI/Técnico/Inglés.
 │   │                          # Tabla (kind, system) → (factor, offset, label),
 │   │                          # API format_quantity / convert_*_si / unit_label.
-│   ├── fluids.py              # Wrappers cacheados sobre CoolProp
+│   │                          # Fase 1.6: + ΔT, ρ, velocidad, μ, k, difusividad.
+│   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
+│   │                          # StatePoint/state_from_pair (cálculo) y
+│   │                          # FluidState/fluid_state_from_pair (estado completo:
+│   │                          # región, saturación, transporte, validación con
+│   │                          # mensajes al alumno, suggested_inputs).
+│   ├── state_report.py        # ✅ Fase 1.6 — Presentación pura de un FluidState:
+│   │                          # tablas, notas, procedimiento LaTeX por sistema
+│   │                          # de unidades, export JSON/CSV, tabla de estados.
 │   ├── interpolation.py       # ✅ Fase 1.1 — Interpolación lineal y doble entrada
 │   ├── isentropic.py          # ✅ Fase 1.3 — Turbina / compresor / bomba; multietapa
 │   ├── diagrams.py            # ✅ Fase 1.5a — Wrappers tipados sobre fluprodia.
 │   │                          # FLUPRODIA_UNITS, DEFAULT_RANGES, build_diagram,
-│   │                          # isentropic/isobaric/isothermal_process, overlays.
+│   │                          # isentropic/isobaric/isothermal_process, overlays,
+│   │                          # axis_window_si, cycle_overlays (Fase 1.6).
 │   ├── exergy.py              # Exergía física y química
 │   ├── combustion/
 │   │   ├── __init__.py
@@ -81,10 +92,13 @@ apps/
 ├── ui/                        # Helpers de UI que sí importan Streamlit
 │   ├── branding.py            # Bloque de créditos compartido (sidebar)
 │   ├── units_ui.py            # ✅ Fase 1.4 — Selector global + number_input_si
+│   │                          # (key real f"{key}@{sistema}": el valor físico
+│   │                          # sobrevive al cambio de unidades, Fase 1.6).
 │   └── diagrams.py            # ✅ Fase 1.5a — Cache de FluidPropertyDiagram
 │                              # (@st.cache_resource), render_diagram_plotly
 │                              # con overlays de puntos / procesos.
-├── tests/                     # pytest: tests/test_<modulo>.py
+├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
+│                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
 │   ├── iso6976_components.csv # Valores tabulados por componente puro
 │   └── szargut_chemical_exergy.csv
@@ -131,6 +145,20 @@ Toda página debe tener, mínimo:
 6. Un expansor `🔬 Procedimiento` con las ecuaciones aplicadas en LaTeX
    y los valores reemplazados (modo didáctico).
 7. Botón de exportar resultados (CSV / JSON).
+
+Notas de implementación (aprendidas en la Fase 1.6):
+
+- Guardar el resultado en `st.session_state` y renderizarlo en cada
+  corrida: si se muestra solo dentro de `if submit:`, desaparece al tocar
+  cualquier otro widget (p. ej. el selector de diagrama).
+- Los links al vademecum salen de las constantes `VADEMECUM_*` de
+  `ui/branding.py`; citar la sección (§N) además del link.
+- Pensar en el celular: tablas con símbolo, valor y unidad primero; la
+  unidad de `st.metric` en el rótulo; selectores en el cuerpo de la
+  página (el sidebar queda oculto).
+- Testear la página con `streamlit.testing.v1.AppTest` (ver
+  `tests/test_page_propiedades.py`) y validar el LaTeX nuevo con KaTeX,
+  que es el motor de `st.latex`.
 
 ### Citas y licencias
 

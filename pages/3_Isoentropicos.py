@@ -65,7 +65,7 @@ from ui.units_ui import (
     render_units_selector,
 )
 
-PAGE_VERSION = "0.8.0"
+PAGE_VERSION = "0.9.0"
 
 # Códigos de par independiente reconocidos por core.fluids.state_from_pair,
 # ordenados por uso didáctico.

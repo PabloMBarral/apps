@@ -12,7 +12,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.8.0"
+PAGE_VERSION = "0.9.0"
 
 
 def _home_page() -> None:
@@ -42,9 +42,13 @@ def _home_page() -> None:
 
         ### Módulos disponibles
 
-        - 💧 **Propiedades** — agua y otros fluidos puros (R134a, R410A,
-          R1234yf, amoníaco, CO₂, aire) a partir de cualquier par de
-          variables independientes (T-p, p-h, h-s, p-x, T-x, p-s, T-s).
+        - 💧 **Propiedades** — estado termodinámico del agua y otros
+          fluidos puros (R134a, R410A, R1234yf, amoníaco, CO₂, aire) a
+          partir de cualquier par de propiedades independientes (T-p, p-x,
+          T-x, p-h, p-s, T-s, h-s, T-v, p-v, p-u). Región, todas las
+          propiedades (incluidas las de transporte), tablas de saturación,
+          el procedimiento para resolverlo con las tablas y una tabla de
+          estados para armar ciclos sobre el diagrama.
         - 📐 **Interpolación** — lineal simple y doble entrada (bilineal)
           sobre tablas, con procedimiento didáctico paso a paso y
           comparación opcional contra CoolProp.

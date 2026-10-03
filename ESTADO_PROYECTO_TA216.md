@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.8.0` — Fase 1.5a cerrada (2026-05-23).
+> **Versión actual**: `0.9.0` — Fase 1.6 cerrada (2026-10-03).
 
 ---
 
@@ -94,6 +94,51 @@
 - **Dependencias**: `fluprodia>=4.2`, `plotly>=5.0` agregadas a
   `requirements.txt` y `CITATION.cff`.
 
+### Fase 1.6 — Calculador de estado del agua para los alumnos
+- **Versión**: `0.9.0` (2026-10-03). Rama `claude/water-state-analyzer-f4fiev`.
+- **Commits**: `e38e9d3` (chore: `use_container_width` → `width="stretch"`,
+  Streamlit ≥ 1.51), `9dd6579` (fix: p–log v, título x = 10000 con h-s,
+  ventana de ejes por fluido), `3d13be8` (feat: magnitudes nuevas en
+  `units_system`), `ed948f2` (feat: `FluidState` en `core/fluids.py`),
+  `d5716d8` (feat: `core/state_report.py`), `e149e55` (fix: valor físico
+  de los inputs al cambiar de sistema), `872ac7b` (feat: reescritura de la
+  página), `e3d356b` (feat: tabla de estados y ciclos en el diagrama), y
+  el commit de docs que cierra la fase.
+- **Bugs corregidos** (todos reproducidos antes de arreglarlos):
+  - El primer cálculo que veía el alumno fallaba: "t y p" con 0 °C y 1 bar
+    está debajo del punto triple del agua (CoolProp: "below Tmelt"). Los
+    defaults de p-h y h-s (h = 0, s = 0) tampoco existían.
+  - Los resultados de Propiedades desaparecían al cambiar el tipo de
+    diagrama (se mostraban solo dentro de `if submit:`), y el selector
+    volvía a log p–h: en la práctica solo se podía ver un diagrama.
+  - p–log v lanzaba `ValueError` en Propiedades e Isoentrópicos
+    (`StatePoint` no tenía volumen); además `AXIS_MAP` declaraba log el
+    eje p, que fluprodia dibuja lineal.
+  - Con el par h-s, CoolProp devuelve x = 10000 fuera de la campana y la
+    página lo mostraba.
+  - Pares como T-s "resolvían" estados absurdos sin aviso (R134a a
+    44 549 bar).
+  - Al cambiar el sistema de unidades, `number_input_si` conservaba el
+    número con la unidad nueva (400 °C pasaba a 400 K) — afectaba también
+    a Isoentrópicos.
+  - La ventana fija de los diagramas dejaba fuera el vapor de agua a baja
+    presión en p–log v y achicaba la campana de los refrigerantes.
+- **Scope**: estado completo (`FluidState`): región, u, ρ, cp, cv, γ, w,
+  μ, k, ν, α, Pr, Z, sobrecalentamiento/subenfriamiento y saturación a p
+  y a T; pares nuevos T-v, p-v, p-u; validación con mensajes en
+  castellano; procedimiento "como con las tablas" en LaTeX en el sistema
+  activo; tablas pensadas para el celular; tabla de estados para armar
+  ciclos con isobáricas e isoentrópicas reales sobre el diagrama;
+  exportación CSV/JSON; expansor de fórmulas con link al vademecum
+  (§3.2, §7.3, §12, §13).
+- **Tests**: de 381 a 791 (+410). Valores contra Cengel A-4, A-5, A-6,
+  A-7 y Cengel & Ghajar A-9; AppTest de la página (defaults de los 10
+  pares, persistencia, errores, ciclo Rankine armado por la UI). El LaTeX
+  generado se validó con KaTeX (3192 expresiones, 0 errores). Revisado en
+  Chromium a 1280 px y 390 px de ancho.
+- **Referencias**: IAPWS-95 (Wagner & Pruß, 2002) agregada a
+  `CITATION.cff` y al README. Sin dependencias nuevas.
+
 ---
 
 ## Pendientes / próximas fases
@@ -101,7 +146,23 @@
 - **Fase 1.5b** — Conversión al sistema activo de los pasos didácticos
   LaTeX de Isoentrópicos (hoy hardcoded en Técnico para consistencia
   con Cengel). Implica reescribir los formatters de
-  `core/isentropic.py` para emitir LaTeX por sistema.
+  `core/isentropic.py` para emitir LaTeX por sistema. Se puede reusar
+  `latex_number` / `latex_unit` / `pv_energy_factor` de
+  `core/state_report.py`.
+- **Detectado en Fase 1.6, sin resolver**:
+  - Isoentrópicos sigue usando `state_from_pair` sin las validaciones de
+    `fluid_state_from_pair` (rango de la ecuación de estado, mensajes en
+    castellano); migrarla daría los mismos mensajes que Propiedades.
+  - Las páginas 2, 3 y 4 todavía no tienen el expansor `📖 Fórmulas
+    teóricas` (las constantes `VADEMECUM_*` ya están en `ui/branding.py`).
+  - Navegación: Streamlit decide entre `st.navigation` y la carpeta
+    `pages/` con una bandera global que se apaga recién cuando corre
+    `streamlit_app.py`. Si el primer visitante después de un reinicio
+    entra por un link directo (p. ej. `/Propiedades`), ve el menú
+    automático ("streamlit app", "Interpolacion" sin tilde) hasta que
+    alguien entre por la raíz. Se arregla renombrando `pages/` (p. ej. a
+    `app_pages/`) y actualizando las rutas de `st.Page`; queda a decisión
+    del autor porque toca la estructura documentada.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
 - **Fase 3.1** — Ciclos termodinámicos con TESPy: Rankine simple,

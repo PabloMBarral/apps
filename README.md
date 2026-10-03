@@ -19,8 +19,25 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
 ## Módulos
 
 ### Estables
-- ✅ **Propiedades del agua/vapor** a partir de cualquier par de variables
-  independientes (T-p, p-h, h-s, p-x, T-x, p-s, T-s).
+- ✅ **Estado termodinámico del agua** (y de los otros fluidos del
+  proyecto) a partir de cualquier par de propiedades independientes: T-p,
+  p-x, T-x, p-h, p-s, T-s, h-s, **T-v, p-v** (tanques rígidos) y **p-u**
+  (sistemas cerrados). Muestra la **región** (líquido comprimido, vapor
+  húmedo, vapor sobrecalentado, supercrítico) con su sobrecalentamiento,
+  subenfriamiento o título; todas las propiedades (v, ρ, u, h, s, cp, cv,
+  γ, velocidad del sonido, μ, k, ν, α, Pr y factor de compresibilidad Z);
+  la fila de las tablas de saturación a la p y a la T del estado (como en
+  Cengel A-4/A-5); advertencias didácticas (por ejemplo, T-p sobre la
+  curva de saturación); el **procedimiento para resolverlo con las
+  tablas**, en LaTeX y en el sistema de unidades activo (saturación,
+  comparación con f y g, regla de la palanca, aproximación de líquido
+  incompresible, comparación con gas ideal, verificación h = u + p·v); el
+  punto sobre el diagrama y exportación CSV/JSON. Una **tabla de estados**
+  permite armar un ciclo estado por estado y verlo sobre el diagrama, con
+  las isobáricas e isoentrópicas reales entre estados consecutivos.
+  Validación con mensajes en castellano (punto triple, título fuera de la
+  campana, estados fuera del rango de la ecuación de estado). _Fase 1.6
+  cerrada._
 - ✅ **Interpolación lineal y doble entrada** sobre tablas, con procedimiento
   paso a paso (LaTeX + explicación en español) y comparación contra el valor
   exacto de CoolProp cuando la tabla es reconocida como saturación o vapor
@@ -111,7 +128,8 @@ apps/
 ├── streamlit_app.py       # Home / landing
 ├── pages/                 # Una página Streamlit por módulo
 ├── core/                  # Lógica de cálculo, sin dependencia de Streamlit
-│   ├── fluids.py
+│   ├── fluids.py          # estado completo, saturación, región (CoolProp)
+│   ├── state_report.py    # tablas, procedimiento didáctico y export del estado
 │   ├── interpolation.py
 │   ├── isentropic.py
 │   ├── exergy.py
@@ -136,7 +154,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.2.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.9.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -178,6 +196,22 @@ las fuentes correspondientes:
 }
 ```
 
+**IAPWS-95** — formulación de las propiedades del agua que usa CoolProp:
+
+```bibtex
+@article{wagner2002iapws95,
+  author  = {Wagner, Wolfgang and Pru{\ss}, Andreas},
+  title   = {The {IAPWS} Formulation 1995 for the Thermodynamic Properties of
+             Ordinary Water Substance for General and Scientific Use},
+  journal = {Journal of Physical and Chemical Reference Data},
+  volume  = {31},
+  number  = {2},
+  pages   = {387--535},
+  year    = {2002},
+  doi     = {10.1063/1.1461829}
+}
+```
+
 **fluprodia** — diagramas de propiedades de fluidos. Witte, F.
 <https://github.com/fwitte/fluprodia>
 
@@ -194,8 +228,10 @@ Organization for Standardization, 2016.
 
 - Las unidades por defecto son: presión en bar(a), temperatura en °C,
   entalpía en kJ/kg, entropía en kJ/(kg·K), título adimensional.
-- `x = -1` en propiedades de agua/vapor indica que el estado no se
-  encuentra dentro de la campana ni en su frontera.
+- El título x solo se informa dentro de la campana; fuera de ella la
+  página muestra "—" (en la API de bajo nivel, `StatePoint.x = -1`).
+- Las propiedades del agua salen de CoolProp con la formulación
+  IAPWS-95; pueden diferir en el último decimal de las tablas impresas.
 - La precisión de los resultados depende de las librerías subyacentes.
   Usar bajo propia responsabilidad. **Esta es una herramienta didáctica**,
   no apta para diseño de equipos sin verificación independiente.
