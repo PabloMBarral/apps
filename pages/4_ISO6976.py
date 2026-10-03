@@ -122,7 +122,7 @@ def _render_results_table(result: ISO6976Result) -> None:
     st.markdown("**Intermedios:**")
     df_inter = pd.DataFrame(inter_rows)
     fmt_inter = {"valor": "{:.8g}", "u (k=1)": "{:.6g}", "U (k=2)": "{:.6g}"}
-    st.dataframe(df_inter.style.format(fmt_inter), use_container_width=True)
+    st.dataframe(df_inter.style.format(fmt_inter), width="stretch")
 
     final_rows = [
         _quantity_row("H_c,G (bruto, molar)", result.Hc_G_molar_kJ_per_mol, "kJ/mol"),
@@ -140,7 +140,7 @@ def _render_results_table(result: ISO6976Result) -> None:
     df_final = pd.DataFrame(final_rows)
     st.dataframe(
         df_final.style.format({"valor": "{:.6g}", "u (k=1)": "{:.6g}", "U (k=2)": "{:.6g}"}),
-        use_container_width=True,
+        width="stretch",
     )
 
 
@@ -232,7 +232,7 @@ default_df = (
 edited_df = st.data_editor(
     default_df,
     num_rows="dynamic",
-    use_container_width=True,
+    width="stretch",
     column_config={
         "componente": st.column_config.SelectboxColumn(
             "Componente",

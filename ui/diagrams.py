@@ -306,7 +306,7 @@ def render_diagram_plotly(
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
     )
 
-    st.plotly_chart(fig, use_container_width=True, key=chart_key)
+    st.plotly_chart(fig, width="stretch", key=chart_key)
 
 
 # ---------------------------------------------------------------------

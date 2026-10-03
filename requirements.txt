@@ -5,7 +5,7 @@
 # =============================================================================
 
 # --- Interfaz web ---
-streamlit>=1.40
+streamlit>=1.51
 
 # --- Propiedades termofísicas ---
 # CoolProp: motor de propiedades de fluidos puros y pseudo-puros

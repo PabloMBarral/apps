@@ -552,7 +552,7 @@ with tab_linear:
             edited = st.data_editor(
                 df_parsed,
                 num_rows="dynamic",
-                use_container_width=True,
+                width="stretch",
                 column_config={
                     df_parsed.columns[0]: st.column_config.Column(label=x_header or "x"),
                     df_parsed.columns[1]: st.column_config.Column(label=y_header or "y"),
@@ -709,7 +709,7 @@ with tab_bilinear:
             edited_flat = st.data_editor(
                 flat,
                 num_rows="fixed",
-                use_container_width=True,
+                width="stretch",
                 disabled=[_XS_COL],
                 column_config={
                     _XS_COL: st.column_config.Column(label=x_label_for_editor),

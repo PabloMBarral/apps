@@ -194,7 +194,7 @@ def _state_to_row(label: str, state: StatePoint) -> dict[str, Any]:
 
 def _render_states_table(rows: list[dict[str, Any]]) -> None:
     df = pd.DataFrame(rows)
-    st.dataframe(df.style.format(precision=4), use_container_width=True)
+    st.dataframe(df.style.format(precision=4), width="stretch")
 
 
 def _render_procedure(steps: Any) -> None:
