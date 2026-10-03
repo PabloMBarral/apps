@@ -37,19 +37,19 @@ _NO_COHERENT = "Revisá que sean coherentes los valores ingresados, y volvé a i
 @st.cache_data(show_spinner=False)
 def _state_cached(
     pair: str, fluid: str, **kwargs_si: float
-) -> tuple[float, float, float, float, float]:
+) -> tuple[float, float, float, float, float, float | None]:
     """Wrapper cacheado sobre :func:`core.fluids.state_from_pair`.
 
-    Devuelve la tupla ``(T_K, P_Pa, h_J_per_kg, s_J_per_kg_K, x)``
+    Devuelve la tupla ``(T_K, P_Pa, h_J_per_kg, s_J_per_kg_K, x, v_m3_per_kg)``
     en SI — la UI se encarga de la conversión al sistema del usuario.
     """
     sp = state_from_pair(fluid, pair, **kwargs_si)  # type: ignore[arg-type]
-    return sp.T_K, sp.P_Pa, sp.h_J_per_kg, sp.s_J_per_kg_K, sp.x
+    return sp.T_K, sp.P_Pa, sp.h_J_per_kg, sp.s_J_per_kg_K, sp.x, sp.v_m3_per_kg
 
 
 def _compute_si(
     pair: str, fluid: str, **kwargs_si: float
-) -> tuple[float, float, float, float, float] | None:
+) -> tuple[float, float, float, float, float, float | None] | None:
     """Llama al cache. Si CoolProp falla, muestra el error y devuelve None."""
     try:
         return _state_cached(pair, fluid, **kwargs_si)
@@ -60,12 +60,12 @@ def _compute_si(
 
 def _render_result_table(
     *,
-    state_si: tuple[float, float, float, float, float],
+    state_si: tuple[float, float, float, float, float, float | None],
     independent_vars: tuple[str, str],
 ) -> None:
     """Muestra el estado completo en el sistema actual. ``independent_vars``
     son los dos símbolos del par usado para identificar la fila destacada."""
-    T_K, P_Pa, h_J, s_J, x = state_si
+    T_K, P_Pa, h_J, s_J, x, _v = state_si
     label_T = quantity_label(T_K, "temperature", precision=4)
     label_P = quantity_label(P_Pa, "pressure", precision=4)
     label_h = quantity_label(h_J, "specific_enthalpy", precision=6)
@@ -81,7 +81,7 @@ def _render_result_table(
 
 def _render_diagram_expander(
     fluid: str,
-    state_si: tuple[float, float, float, float, float],
+    state_si: tuple[float, float, float, float, float, float | None],
     *,
     selector_key: str,
     chart_key: str,
@@ -92,8 +92,8 @@ def _render_diagram_expander(
     etiquetado ``"●"``. El selector de tipo de diagrama persiste en
     ``st.session_state`` con ``selector_key``.
     """
-    T_K, P_Pa, h_J, s_J, x = state_si
-    state = StatePoint(T_K=T_K, P_Pa=P_Pa, h_J_per_kg=h_J, s_J_per_kg_K=s_J, x=x)
+    T_K, P_Pa, h_J, s_J, x, v = state_si
+    state = StatePoint(T_K=T_K, P_Pa=P_Pa, h_J_per_kg=h_J, s_J_per_kg_K=s_J, x=x, v_m3_per_kg=v)
     with st.expander("📈 Diagrama del fluido", expanded=False):
         diagram_type = diagram_type_selector(key=selector_key, default="logph")
         system = get_current_system()

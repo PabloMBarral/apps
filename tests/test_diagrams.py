@@ -36,17 +36,21 @@ from core.diagrams import (  # noqa: E402
     DiagramSpec,
     FluidRange,
     ProcessOverlay,
+    axis_window_si,
     build_diagram,
+    expand_window,
     from_json,
     isentropic_process,
     isobaric_process,
     isothermal_process,
     linear_segment_overlay,
+    pad_window,
     process_to_diagram_coords,
+    state_property_si,
     state_to_diagram_coords,
     to_json,
 )
-from core.fluids import SUPPORTED_FLUIDS, state_from_pair  # noqa: E402
+from core.fluids import SUPPORTED_FLUIDS, StatePoint, state_from_pair  # noqa: E402
 
 # ---------------------------------------------------------------------
 # Mapeo de unidades
@@ -343,3 +347,108 @@ class TestJsonRoundTrip:
         reloaded = from_json(str(path))
         assert reloaded is not None
         assert hasattr(reloaded, "fluid")
+
+
+# ---------------------------------------------------------------------
+# p–log v con StatePoint (antes lanzaba ValueError: faltaba 'vol')
+# ---------------------------------------------------------------------
+
+
+class TestPlogvWithStatePoint:
+    def test_tecnico_returns_m3_per_kg_and_bar(self) -> None:
+        # Cengel A-6: 1 MPa, 300 °C → v = 0.25799 m³/kg.
+        state = state_from_pair("Water", "TP", t=573.15, p=1.0e6)
+        x, y = state_to_diagram_coords(state, "plogv", "Técnico")
+        assert x == pytest.approx(0.25799, rel=1e-4)
+        assert y == pytest.approx(10.0, rel=1e-9)
+
+    def test_ingles_returns_ft3_per_lb(self) -> None:
+        state = state_from_pair("Water", "TP", t=573.15, p=1.0e6)
+        x, _y = state_to_diagram_coords(state, "plogv", "Inglés")
+        # 1 m³/kg = 16.0184634 ft³/lb.
+        assert x == pytest.approx(0.25799 * 16.0184634, rel=1e-4)
+
+    def test_manual_state_without_volume_raises_clear_error(self) -> None:
+        sp = StatePoint(T_K=300.0, P_Pa=1.0e5, h_J_per_kg=1.0e5, s_J_per_kg_K=300.0, x=-1.0)
+        with pytest.raises(ValueError, match="volumen específico"):
+            state_to_diagram_coords(sp, "plogv", "Técnico")
+
+    def test_state_property_si_rejects_unknown_axis(self) -> None:
+        state = state_from_pair("Water", "TP", t=573.15, p=1.0e6)
+        with pytest.raises(ValueError, match="no es un eje"):
+            state_property_si(state, "Q")
+
+    def test_linear_segment_overlay_carries_volume(self) -> None:
+        s1 = state_from_pair("Water", "TP", t=573.15, p=1.0e6)
+        s2 = state_from_pair("Water", "PX", p=1.0e4, x=0.9)
+        ov = linear_segment_overlay(name="1→2", color="red", dash="dot", start=s1, end=s2)
+        assert ov.coords_si["vol"][0] == pytest.approx(s1.v_m3_per_kg)
+        assert ov.coords_si["vol"][1] == pytest.approx(s2.v_m3_per_kg)
+        x, _y = process_to_diagram_coords(ov.coords_si, "plogv", "Técnico")
+        assert np.all(np.isfinite(x))
+
+
+# ---------------------------------------------------------------------
+# Ventana de ejes por fluido
+# ---------------------------------------------------------------------
+
+
+class TestAxisWindow:
+    @pytest.mark.parametrize("fluid", SUPPORTED_FLUIDS)
+    def test_keys_and_order(self, fluid: str) -> None:
+        window = axis_window_si(fluid)
+        assert set(window) == {"T", "p", "h", "s", "vol"}
+        for lo, hi in window.values():
+            assert lo < hi
+
+    @pytest.mark.parametrize("fluid", SUPPORTED_FLUIDS)
+    def test_volume_window_is_positive(self, fluid: str) -> None:
+        lo, _hi = axis_window_si(fluid)["vol"]
+        assert lo > 0.0
+
+    def test_water_volume_window_reaches_condenser_states(self) -> None:
+        # Vapor saturado a 0,1 bar: v_g ≈ 14.67 m³/kg (Cengel A-5). Con la
+        # ventana fija vieja (hasta 10 m³/kg) quedaba fuera del gráfico.
+        v_g = state_from_pair("Water", "PX", p=1.0e4, x=1.0).v_m3_per_kg
+        lo, hi = axis_window_si("Water")["vol"]
+        assert lo < v_g < hi
+
+    def test_r134a_enthalpy_window_frames_the_dome(self) -> None:
+        # La campana del R134a vive en ~100–450 kJ/kg: la ventana tiene que
+        # ser mucho más angosta que los 0–4000 kJ/kg pensados para agua.
+        lo, hi = axis_window_si("R134a")["h"]
+        h_f = state_from_pair("R134a", "TX", t=273.15, x=0.0).h_J_per_kg
+        h_g = state_from_pair("R134a", "TX", t=273.15, x=1.0).h_J_per_kg
+        assert lo < h_f < h_g < hi
+        assert hi - lo < 1.0e6
+
+    def test_unknown_fluid_raises(self) -> None:
+        with pytest.raises(ValueError, match="no soportado"):
+            axis_window_si("Unobtainium")
+
+
+class TestWindowHelpers:
+    def test_expand_includes_values(self) -> None:
+        assert expand_window(0.0, 1.0, [2.5, -1.0]) == (-1.0, 2.5)
+
+    def test_expand_ignores_non_finite(self) -> None:
+        assert expand_window(0.0, 1.0, [float("nan"), float("inf")]) == (0.0, 1.0)
+
+    def test_expand_without_values(self) -> None:
+        assert expand_window(0.0, 1.0, []) == (0.0, 1.0)
+
+    def test_pad_linear(self) -> None:
+        assert pad_window(0.0, 100.0, log=False) == pytest.approx((-5.0, 105.0))
+
+    def test_pad_log_is_symmetric_in_decades(self) -> None:
+        lo, hi = pad_window(1.0, 100.0, log=True)
+        assert np.log10(lo) == pytest.approx(-0.1)
+        assert np.log10(hi) == pytest.approx(2.1)
+
+    def test_pad_degenerate_window_opens_margin(self) -> None:
+        lo, hi = pad_window(5.0, 5.0, log=False)
+        assert lo < 5.0 < hi
+
+    def test_pad_log_requires_positive_limits(self) -> None:
+        with pytest.raises(ValueError, match="positivos"):
+            pad_window(0.0, 10.0, log=True)

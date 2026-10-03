@@ -65,6 +65,11 @@ class StatePoint:
         Título de vapor (calidad), adimensional. Sigue la convención
         de CoolProp: ``-1`` indica que el estado está fuera de la
         región bifásica (líquido subenfriado o vapor sobrecalentado).
+    v_m3_per_kg : float | None
+        Volumen específico en m³/kg (= 1/ρ). Es opcional para no romper
+        el código que construye ``StatePoint`` a mano;
+        :func:`state_from_pair` siempre lo completa. Hace falta para
+        ubicar el estado en el diagrama p–log v.
     """
 
     T_K: float
@@ -72,6 +77,7 @@ class StatePoint:
     h_J_per_kg: float
     s_J_per_kg_K: float
     x: float
+    v_m3_per_kg: float | None = None
 
 
 def state_from_pair(fluid: str, pair: PairCode, **kwargs: float) -> StatePoint:
@@ -131,7 +137,8 @@ def state_from_pair(fluid: str, pair: PairCode, **kwargs: float) -> StatePoint:
         P_Pa = _solve(cp1, val1, cp2, val2, "P", fluid)
         h_J_per_kg = _solve(cp1, val1, cp2, val2, "H", fluid)
         s_J_per_kg_K = _solve(cp1, val1, cp2, val2, "S", fluid)
-        x = _solve(cp1, val1, cp2, val2, "Q", fluid)
+        x = _normalize_quality(_solve(cp1, val1, cp2, val2, "Q", fluid))
+        rho_kg_per_m3 = _solve(cp1, val1, cp2, val2, "D", fluid)
     except ValueError:
         raise
     except Exception as exc:
@@ -148,7 +155,28 @@ def state_from_pair(fluid: str, pair: PairCode, **kwargs: float) -> StatePoint:
         h_J_per_kg=float(h_J_per_kg),
         s_J_per_kg_K=float(s_J_per_kg_K),
         x=float(x),
+        v_m3_per_kg=1.0 / float(rho_kg_per_m3),
     )
+
+
+# Tolerancia para aceptar como saturado un título que CoolProp devuelve
+# apenas fuera de [0, 1] por redondeo numérico.
+_QUALITY_TOL: float = 1e-9
+
+
+def _normalize_quality(q: float) -> float:
+    """Lleva el título de CoolProp a la convención de :class:`StatePoint`.
+
+    Para estados monofásicos CoolProp devuelve un centinela fuera de
+    [0, 1]: ``-1`` en la mayoría de los pares, pero ``10000`` cuando el
+    estado se resuelve con h y s. Cualquier valor fuera de [0, 1] se
+    normaliza a ``-1``; los desbordes de redondeo (±1e-9) se recortan
+    al borde de la campana.
+    """
+    q = float(q)
+    if -_QUALITY_TOL <= q <= 1.0 + _QUALITY_TOL:
+        return min(max(q, 0.0), 1.0)
+    return -1.0
 
 
 def _solve(in1: str, val1: float, in2: str, val2: float, out: str, fluid: str) -> float:

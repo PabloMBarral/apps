@@ -31,9 +31,12 @@ DOI: 10.1021/ie4033999
 
 from __future__ import annotations
 
+import math
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Literal
 
+import CoolProp.CoolProp as cp
 import numpy as np
 from fluprodia import FluidPropertyDiagram
 
@@ -123,6 +126,88 @@ DEFAULT_RANGES: dict[str, FluidRange] = {
     "CarbonDioxide": FluidRange(T_K_min=218.15, T_K_max=423.15, p_Pa_min=5.0e5, p_Pa_max=2.0e7),
     "Air": FluidRange(T_K_min=173.15, T_K_max=1273.15, p_Pa_min=1.0e4, p_Pa_max=1.0e7),
 }
+
+
+# Ventana genérica de respaldo (la que se usaba antes de calcularla por fluido).
+_FALLBACK_WINDOW_SI: dict[str, tuple[float, float]] = {
+    "h": (0.0, 4.0e6),
+    "s": (0.0, 1.0e4),
+    "vol": (1.0e-4, 1.0e1),
+}
+
+
+def axis_window_si(fluid: str) -> dict[str, tuple[float, float]]:
+    """Ventana inicial (en SI) de cada propiedad de eje para ``fluid``.
+
+    ``T`` y ``p`` salen de :data:`DEFAULT_RANGES`. ``h``, ``s`` y ``vol``
+    se calculan con CoolProp en las cuatro esquinas del rectángulo (T, p)
+    del fluido: el mínimo cae en (T_min, p_max) — líquido frío comprimido —
+    y el máximo en (T_max, p_min) — vapor caliente a baja presión. Así la
+    campana de cada fluido ocupa una fracción razonable del gráfico (con
+    los rangos fijos pensados para agua, la campana del R134a quedaba en
+    ~10 % del ancho del log p–h, y en p–log v el vapor de agua a menos de
+    ~0,15 bar quedaba fuera de la ventana).
+
+    Devuelve un dict ``{prop: (min, max)}`` con las keys
+    ``'T', 'p', 'h', 's', 'vol'``.
+    """
+    _validate_fluid(fluid)
+    rng = DEFAULT_RANGES[fluid]
+    # CoolProp no resuelve por debajo de su T mínima (para el agua, el
+    # punto triple 0,01 °C, apenas arriba del T_K_min = 0 °C del rango).
+    t_low = max(rng.T_K_min, float(cp.PropsSI("Tmin", fluid)) + 0.01)
+    values: dict[str, list[float]] = {"h": [], "s": [], "vol": []}
+    for t_K in (t_low, rng.T_K_max):
+        for p_Pa in (rng.p_Pa_min, rng.p_Pa_max):
+            try:
+                h = float(cp.PropsSI("H", "T", t_K, "P", p_Pa, fluid))
+                s = float(cp.PropsSI("S", "T", t_K, "P", p_Pa, fluid))
+                rho = float(cp.PropsSI("D", "T", t_K, "P", p_Pa, fluid))
+            except ValueError:
+                continue
+            values["h"].append(h)
+            values["s"].append(s)
+            values["vol"].append(1.0 / rho)
+
+    window: dict[str, tuple[float, float]] = {
+        "T": (rng.T_K_min, rng.T_K_max),
+        "p": (rng.p_Pa_min, rng.p_Pa_max),
+    }
+    for prop, vals in values.items():
+        if vals:
+            window[prop] = (min(vals), max(vals))
+        else:  # pragma: no cover — ninguna esquina resolvió; ventana genérica
+            window[prop] = _FALLBACK_WINDOW_SI[prop]
+    return window
+
+
+def expand_window(lo: float, hi: float, values: Iterable[float]) -> tuple[float, float]:
+    """Agranda ``(lo, hi)`` para que contenga todos los ``values`` finitos.
+
+    Pensado para que los estados y procesos superpuestos al diagrama
+    nunca queden fuera de la ventana visible.
+    """
+    finite = [float(v) for v in values if v is not None and math.isfinite(float(v))]
+    if not finite:
+        return lo, hi
+    return min(lo, *finite), max(hi, *finite)
+
+
+def pad_window(lo: float, hi: float, *, log: bool, frac: float = 0.05) -> tuple[float, float]:
+    """Agrega un margen ``frac`` a cada lado de la ventana.
+
+    En ejes logarítmicos el margen se aplica sobre ``log10`` (requiere
+    ``lo > 0``). Si la ventana es degenerada (``lo == hi``), abre un
+    margen relativo al valor.
+    """
+    if log:
+        if lo <= 0.0 or hi <= 0.0:
+            raise ValueError(f"Un eje logarítmico requiere límites positivos (recibí {lo}, {hi}).")
+        log_lo, log_hi = math.log10(lo), math.log10(hi)
+        span = (log_hi - log_lo) or 1.0
+        return 10.0 ** (log_lo - frac * span), 10.0 ** (log_hi + frac * span)
+    span = (hi - lo) or (abs(lo) or 1.0)
+    return lo - frac * span, hi + frac * span
 
 
 # ---------------------------------------------------------------------
@@ -388,8 +473,23 @@ def process_to_diagram_coords(
     return x, y
 
 
-def _state_property(state: StatePoint, prop: str, system: UnitSystem) -> float:
-    """Devuelve el valor de ``prop`` para ``state`` en unidades del sistema."""
+def state_property_si(state: StatePoint, prop: str) -> float:
+    """Valor en SI de la propiedad de eje ``prop`` (``'T','p','h','s','vol'``).
+
+    Raises
+    ------
+    ValueError
+        Si ``prop`` no es una propiedad de eje, o si se pide ``'vol'`` de
+        un ``StatePoint`` construido a mano sin volumen específico.
+    """
+    if prop == "vol":
+        if state.v_m3_per_kg is None:
+            raise ValueError(
+                "El estado no trae volumen específico (v_m3_per_kg=None), así "
+                "que no se puede ubicar en el diagrama p–log v. Construilo con "
+                "core.fluids.state_from_pair, que siempre calcula v = 1/ρ."
+            )
+        return state.v_m3_per_kg
     si_value = {
         "T": state.T_K,
         "p": state.P_Pa,
@@ -398,12 +498,15 @@ def _state_property(state: StatePoint, prop: str, system: UnitSystem) -> float:
     }.get(prop)
     if si_value is None:
         raise ValueError(
-            f"Propiedad '{prop}' no extraíble de StatePoint (faltaría 'vol'). "
-            f"Para diagramas p–v use process_to_diagram_coords con datos de "
-            f"un proceso, o computá v=1/ρ desde CoolProp aparte."
+            f"Propiedad '{prop}' no es un eje de diagrama. Usá una de: {sorted(_PROP_TO_KIND)}."
         )
+    return si_value
+
+
+def _state_property(state: StatePoint, prop: str, system: UnitSystem) -> float:
+    """Devuelve el valor de ``prop`` para ``state`` en unidades del sistema."""
     kind = _PROP_TO_KIND[prop]
-    return convert_from_si(si_value, kind, system)  # type: ignore[arg-type]
+    return convert_from_si(state_property_si(state, prop), kind, system)  # type: ignore[arg-type]
 
 
 def _process_array_in_system(
@@ -461,7 +564,15 @@ def linear_segment_overlay(
     start: StatePoint,
     end: StatePoint,
 ) -> ProcessOverlay:
-    """Construye un :class:`ProcessOverlay` de 2 puntos (segmento recto)."""
+    """Construye un :class:`ProcessOverlay` de 2 puntos (segmento recto).
+
+    El volumen específico se toma de los estados cuando lo traen; si
+    alguno no lo tiene, ese extremo queda en NaN (plotly no lo dibuja).
+    """
+
+    def _vol(state: StatePoint) -> float:
+        return np.nan if state.v_m3_per_kg is None else state.v_m3_per_kg
+
     return ProcessOverlay(
         name=name,
         color=color,
@@ -471,7 +582,7 @@ def linear_segment_overlay(
             "T": np.array([start.T_K, end.T_K], dtype=float),
             "h": np.array([start.h_J_per_kg, end.h_J_per_kg], dtype=float),
             "s": np.array([start.s_J_per_kg_K, end.s_J_per_kg_K], dtype=float),
-            "vol": np.array([np.nan, np.nan], dtype=float),
+            "vol": np.array([_vol(start), _vol(end)], dtype=float),
             "Q": np.array([start.x, end.x], dtype=float),
         },
     )

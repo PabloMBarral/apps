@@ -33,13 +33,16 @@ from fluprodia import FluidPropertyDiagram
 
 from core.diagrams import (
     AXIS_MAP,
-    DEFAULT_RANGES,
     SUPPORTED_DIAGRAM_TYPES,
     DiagramSpec,
     DiagramType,
     ProcessOverlay,
+    axis_window_si,
     build_diagram,
+    expand_window,
+    pad_window,
     process_to_diagram_coords,
+    state_property_si,
     state_to_diagram_coords,
 )
 from core.fluids import StatePoint
@@ -157,56 +160,54 @@ def diagram_type_selector(
 # ---------------------------------------------------------------------
 
 
+@st.cache_data(show_spinner=False)
+def _axis_window_si_cached(fluid: str) -> dict[str, tuple[float, float]]:
+    """Cache sobre :func:`core.diagrams.axis_window_si` (12 llamadas a CoolProp)."""
+    return axis_window_si(fluid)
+
+
 def _axis_window_in_user_units(
-    fluid: str, diagram_type: DiagramType, system: UnitSystem
+    fluid: str,
+    diagram_type: DiagramType,
+    system: UnitSystem,
+    *,
+    points: Sequence[DiagramPoint] | None = None,
+    overlays: Sequence[ProcessOverlay] | None = None,
 ) -> tuple[float, float, float, float]:
     """Calcula ``(x_min, x_max, y_min, y_max)`` para el draw, en unidades
     del sistema activo.
 
-    Para los ejes ``h`` y ``s`` no tenemos un rango cerrado SI a priori,
-    así que dejamos ``None`` y plotly autoescala — pero fluprodia
-    requiere los 4 floats. La estrategia: para ``p`` y ``T`` usamos
-    ``DEFAULT_RANGES``; para ``h`` y ``s`` calculamos extremos típicos a
-    partir de la ventana de presión/temperatura del fluido vía CoolProp
-    sería costoso → usamos defaults razonables convertidos al sistema.
+    Parte de la ventana del fluido (:func:`core.diagrams.axis_window_si`),
+    la agranda para que entren todos los puntos y procesos superpuestos
+    (un estado fuera de la ventana no se vería) y le agrega un margen del
+    5 % (en escala log para ``p`` y ``v``).
     """
-    rng = DEFAULT_RANGES[fluid]
-    prop_x, prop_y, _x_log, _y_log = AXIS_MAP[diagram_type]
+    window_si = _axis_window_si_cached(fluid)
+    prop_x, prop_y, x_log, y_log = AXIS_MAP[diagram_type]
 
-    # Defaults SI por propiedad. Para h y s, usamos rangos amplios típicos.
-    si_window: dict[str, tuple[float, float]] = {
-        "T": (rng.T_K_min, rng.T_K_max),
-        "p": (rng.p_Pa_min, rng.p_Pa_max),
-        "h": (0.0, 4.0e6),  # 0 a 4000 kJ/kg cubre agua/refrigerantes
-        "s": (0.0, 1.0e4),  # 0 a 10 kJ/(kg·K)
-        "vol": (1.0e-4, 1.0e1),  # 1e-4 a 10 m³/kg
-    }
+    limits: list[float] = []
+    for prop, log in ((prop_x, x_log), (prop_y, y_log)):
+        lo_si, hi_si = window_si[prop]
+        extra: list[float] = []
+        for pt in points or ():
+            try:
+                extra.append(state_property_si(pt.state, prop))
+            except ValueError:
+                continue  # estado sin v: no condiciona la ventana
+        for ov in overlays or ():
+            if prop in ov.coords_si:
+                extra.extend(np.asarray(ov.coords_si[prop], dtype=float).tolist())
+        if log:  # en ejes log solo cuentan valores positivos
+            extra = [v for v in extra if v > 0.0]
+        lo_si, hi_si = expand_window(lo_si, hi_si, extra)
 
-    x_lo_si, x_hi_si = si_window[prop_x]
-    y_lo_si, y_hi_si = si_window[prop_y]
+        kind = _PROP_TO_KIND[prop]
+        lo = convert_from_si(lo_si, kind, system)  # type: ignore[arg-type]
+        hi = convert_from_si(hi_si, kind, system)  # type: ignore[arg-type]
+        lo, hi = pad_window(min(lo, hi), max(lo, hi), log=log)
+        limits.extend((lo, hi))
 
-    kind_x = _PROP_TO_KIND[prop_x]
-    kind_y = _PROP_TO_KIND[prop_y]
-
-    x_lo = convert_from_si(x_lo_si, kind_x, system)  # type: ignore[arg-type]
-    x_hi = convert_from_si(x_hi_si, kind_x, system)  # type: ignore[arg-type]
-    y_lo = convert_from_si(y_lo_si, kind_y, system)  # type: ignore[arg-type]
-    y_hi = convert_from_si(y_hi_si, kind_y, system)  # type: ignore[arg-type]
-
-    # Para ejes log, evitar valores ≤ 0 (la conversión de °C/°F puede
-    # darnos negativos en T cuando el rango incluye temperaturas bajas).
-    if _x_log and x_lo <= 0:
-        x_lo = max(x_lo, 1e-3)
-    if _y_log and y_lo <= 0:
-        y_lo = max(y_lo, 1e-3)
-
-    # Si por alguna razón el orden se invierte (no debería con factores >0),
-    # restaurarlo.
-    if x_lo > x_hi:
-        x_lo, x_hi = x_hi, x_lo
-    if y_lo > y_hi:
-        y_lo, y_hi = y_hi, y_lo
-
+    x_lo, x_hi, y_lo, y_hi = limits
     return x_lo, x_hi, y_lo, y_hi
 
 
@@ -247,7 +248,9 @@ def render_diagram_plotly(
         diagramas en una sola página).
     """
     diagram = get_diagram(fluid, system)
-    x_min, x_max, y_min, y_max = _axis_window_in_user_units(fluid, diagram_type, system)
+    x_min, x_max, y_min, y_max = _axis_window_in_user_units(
+        fluid, diagram_type, system, points=points, overlays=overlays
+    )
 
     fig = diagram.draw_isolines_plotly(
         diagram_type,
@@ -334,7 +337,3 @@ def auto_point_colors(n: int) -> list[str]:
         return []
     palette = DEFAULT_POINT_COLORS
     return [palette[i % len(palette)] for i in range(n)]
-
-
-# Silenciar warning de import no usado de numpy (se usa indirectamente).
-_ = np
