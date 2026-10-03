@@ -49,6 +49,7 @@ from core.fluids import (
     SaturatedPhase,
     SaturationProperties,
 )
+from core.latex import latex_number, latex_unit
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, convert_to_si, unit_label
 
 # ---------------------------------------------------------------------
@@ -495,28 +496,6 @@ class ProcedureStep:
     title: str
     text: str = ""
     latex: tuple[str, ...] = ()
-
-
-def latex_number(value: float, sig: int = 5) -> str:
-    """Número para LaTeX: ``1.0142`` o ``1.0142\\times 10^{5}``."""
-    if value == 0.0:
-        return "0"
-    s = f"{value:.{sig}g}"
-    if "e" in s:
-        mantissa, exponent = s.split("e")
-        return rf"{mantissa}\times 10^{{{int(exponent)}}}"
-    return s
-
-
-def latex_unit(label: str) -> str:
-    """Etiqueta de unidad (``'kJ/(kg·K)'``, ``'°C'``, ``'m³/kg'``) → LaTeX."""
-    tex = (
-        label.replace("·", r"\cdot ")
-        .replace("°", r"{}^{\circ}")
-        .replace("³", "^{3}")
-        .replace("²", "^{2}")
-    )
-    return rf"\mathrm{{{tex}}}"
 
 
 def _q(value_si: float, kind: QuantityKind, system: UnitSystem, sig: int = 5) -> str:

@@ -1,30 +1,27 @@
 """Página 3 — Rendimientos isoentrópicos.
 
 Cuatro pestañas: turbina, compresor, bomba y compresor multietapa
-(politrópico, con intercooler opcional). En cada una se puede operar en
-modo **directo** (dado η_s y P_out → calcular estado real) o **inverso**
-(dados estados de entrada y salida → recuperar η_s). El multietapa va
-solo en modo directo y trae built-in la comparación contra single-stage.
+(con intercooler opcional). En las tres primeras se puede operar en modo
+**directo** (dado η_s y P_out → estado real) o **inverso** (dados los
+estados de entrada y salida → η_s). El multietapa va solo en modo
+directo y trae la comparación contra una sola etapa.
 
-Solo la bomba ofrece comparación opt-in contra el modelo simplificado
-de líquido incompresible (``w_p ≈ v_in · Δp / η_s``).
+- Los valores iniciales dependen del fluido (siempre son calculables:
+  :func:`core.isentropic.suggested_device_inputs`).
+- Los estados se validan con :func:`core.fluids.fluid_state_from_pair`
+  (rango de la ecuación de estado, mensajes en castellano).
+- Tabla de estados, procedimiento LaTeX (Fase 1.5b: en el sistema de
+  unidades activo), diagrama del proceso y exportación CSV/JSON.
+- Cada resultado se guarda junto con su fluido: si se cambia el fluido,
+  el resultado viejo deja de mostrarse.
 
-Unidades: la tabla de estados y los KPIs se muestran en el sistema
-seleccionado en el sidebar (SI / Técnico / Inglés). Los pasos didácticos
-del expansor "🔬 Procedimiento" se mantienen en sistema Técnico
-(kJ/kg, °C, bar) — generados en ``core/isentropic.py`` para mantener la
-consistencia con la bibliografía clásica (Cengel). La conversión de los
-pasos al sistema actual queda pendiente para Fase 1.5.
-
-TODO (próximas fases, ver CLAUDE.md §"Páginas Streamlit"):
-- Diagrama T-s / h-s del proceso con fluprodia (Fase 1.5).
-- Conversión de los pasos didácticos al sistema activo (Fase 1.5).
-- Expansor `📖 Fórmulas teóricas` con link a vademecum-termo.
-- Botón de exportar resultados (CSV / JSON).
+Solo la bomba ofrece comparación contra el modelo de líquido
+incompresible (``w_p ≈ v₁·Δp / η_s``).
 """
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pandas as pd
@@ -37,20 +34,38 @@ from core.diagrams import (
     isobaric_process,
     linear_segment_overlay,
 )
-from core.fluids import SUPPORTED_FLUIDS, StatePoint, state_from_pair
+from core.fluids import (
+    FLUID_NAMES_ES,
+    SUPPORTED_FLUIDS,
+    FluidState,
+    StatePoint,
+    fluid_state_from_pair,
+)
 from core.isentropic import (
+    DeviceDefaults,
     IsentropicResult,
+    IsentropicSteps,
     PolytropicResult,
     compressor_direct,
     compressor_inverse,
     compressor_multistage,
+    isentropic_labeled_states,
+    isentropic_steps,
+    isentropic_to_dict,
+    multistage_labeled_states,
+    multistage_steps,
+    multistage_to_dict,
     pump_direct,
+    pump_incompressible_comparison,
     pump_inverse,
+    suggested_device_inputs,
+    summary_csv,
     turbine_direct,
     turbine_inverse,
 )
-from core.units_system import convert_from_si
-from ui.branding import SUBJECT, sidebar_credits
+from core.state_report import format_value, states_table
+from core.units_system import UnitSystem
+from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_credits
 from ui.diagrams import (
     DiagramPoint,
     diagram_type_selector,
@@ -58,17 +73,15 @@ from ui.diagrams import (
     render_diagram_plotly,
 )
 from ui.units_ui import (
-    current_unit_label,
     get_current_system,
     number_input_si,
     quantity_label,
     render_units_selector,
 )
 
-PAGE_VERSION = "0.9.0"
+PAGE_VERSION = "0.10.0"
 
-# Códigos de par independiente reconocidos por core.fluids.state_from_pair,
-# ordenados por uso didáctico.
+# Códigos de par independiente reconocidos por core.fluids, ordenados por uso didáctico.
 _PAIR_LABELS_TO_CODE: dict[str, str] = {
     "T y P": "TP",
     "P y h": "PH",
@@ -78,8 +91,9 @@ _PAIR_LABELS_TO_CODE: dict[str, str] = {
     "T y s": "TS",
     "h y s": "HS",
 }
+_PAIR_CODE_TO_LABEL: dict[str, str] = {v: k for k, v in _PAIR_LABELS_TO_CODE.items()}
 
-# Símbolo → (kwarg en state_from_pair, kind para el sistema de unidades, default en SI).
+# Símbolo → (kwarg de fluid_state_from_pair, magnitud, default en SI).
 _SYMBOL_SPEC: dict[str, tuple[str, str, float]] = {
     "T": ("t", "temperature", 298.15),  # 25 °C
     "P": ("p", "pressure", 1.0e5),  # 1 bar
@@ -87,10 +101,77 @@ _SYMBOL_SPEC: dict[str, tuple[str, str, float]] = {
     "S": ("s", "specific_entropy", 5000.0),  # 5 kJ/(kg·K)
     "X": ("x", "dimensionless", 0.0),
 }
+_INPUT_FORMAT: dict[str, str] = {
+    "temperature": "%.2f",
+    "pressure": "%.5f",
+    "specific_enthalpy": "%.3f",
+    "specific_entropy": "%.5f",
+}
+
+# Cómo se presenta cada dispositivo de un solo paso.
+_DEVICES: dict[str, dict[str, Any]] = {
+    "turbine": {
+        "prefix": "turb",
+        "title": "Turbina",
+        "work": "w_t",
+        "in_header": "Estado 1 (entrada)",
+        "diagram": "Ts",
+        "functions": (turbine_direct, turbine_inverse),
+    },
+    "compressor": {
+        "prefix": "comp",
+        "title": "Compresor",
+        "work": "w_c",
+        "in_header": "Estado 1 (entrada, gas o vapor)",
+        "diagram": "logph",
+        "functions": (compressor_direct, compressor_inverse),
+    },
+    "pump": {
+        "prefix": "pump",
+        "title": "Bomba",
+        "work": "w_p",
+        "in_header": "Estado 1 (entrada, líquido)",
+        "diagram": "Ts",
+        "functions": (pump_direct, pump_inverse),
+    },
+}
 
 
 # ---------------------------------------------------------------------
-# Helpers
+# Cálculo (cacheado) y valores iniciales
+# ---------------------------------------------------------------------
+
+
+@st.cache_data(show_spinner=False)
+def _defaults_cached(fluid: str, device: str) -> DeviceDefaults:
+    return suggested_device_inputs(fluid, device)  # type: ignore[arg-type]
+
+
+@st.cache_data(show_spinner=False)
+def _default_outlet_cached(fluid: str, device: str) -> tuple[float, float]:
+    """(p, h) de la salida real con los valores iniciales: default del modo inverso."""
+    d = _defaults_cached(fluid, device)
+    state_in = fluid_state_from_pair(fluid, d.pair_in, **d.inlet).to_state_point()  # type: ignore[arg-type]
+    direct = _DEVICES[device]["functions"][0]
+    result = direct(fluid=fluid, state_in=state_in, p_out_Pa=d.p_out_Pa, eta_s=d.eta_s)
+    return result.state_out_real.P_Pa, result.state_out_real.h_J_per_kg
+
+
+@st.cache_data(show_spinner=False)
+def _fluid_states_cached(
+    fluid: str, labeled: tuple[tuple[str, float, float], ...]
+) -> list[tuple[str, FluidState]]:
+    """Completa (región, x, …) los estados de un resultado a partir de (p, h)."""
+    return [(label, fluid_state_from_pair(fluid, "PH", p=p, h=h)) for label, p, h in labeled]
+
+
+def _symbol_defaults(kwargs_si: dict[str, float]) -> dict[str, float]:
+    """``{"t": …, "p": …}`` → ``{"T": …, "P": …}`` (claves de los inputs)."""
+    return {kw.upper(): value for kw, value in kwargs_si.items()}
+
+
+# ---------------------------------------------------------------------
+# Entradas
 # ---------------------------------------------------------------------
 
 
@@ -128,7 +209,7 @@ def _render_var_input(
         kind=kind,  # type: ignore[arg-type]
         default_si=default_si,
         key=key,
-        format="%.4f",
+        format=_INPUT_FORMAT[kind],
     )
     return kw_name, value_si
 
@@ -172,45 +253,65 @@ def _build_state_input(
 
 
 def _resolve_state(fluid: str, pair_code: str, kwargs_si: dict[str, float]) -> StatePoint:
-    return state_from_pair(fluid, pair_code, **kwargs_si)  # type: ignore[arg-type]
+    """Estado validado (rango de la ecuación de estado, mensajes en castellano)."""
+    return fluid_state_from_pair(fluid, pair_code, **kwargs_si).to_state_point()  # type: ignore[arg-type]
 
 
-def _state_to_row(label: str, state: StatePoint) -> dict[str, Any]:
-    """Una fila de la tabla de estados en el sistema actual."""
-    sys = get_current_system()
-    T_col = f"T [{current_unit_label('temperature')}]"
-    P_col = f"P [{current_unit_label('pressure')}]"
-    h_col = f"h [{current_unit_label('specific_enthalpy')}]"
-    s_col = f"s [{current_unit_label('specific_entropy')}]"
-    return {
-        "estado": label,
-        T_col: convert_from_si(state.T_K, "temperature", sys),
-        P_col: convert_from_si(state.P_Pa, "pressure", sys),
-        h_col: convert_from_si(state.h_J_per_kg, "specific_enthalpy", sys),
-        s_col: convert_from_si(state.s_J_per_kg_K, "specific_entropy", sys),
-        "x [-]": state.x,
-    }
+# ---------------------------------------------------------------------
+# Presentación de resultados
+# ---------------------------------------------------------------------
 
 
-def _render_states_table(rows: list[dict[str, Any]]) -> None:
-    df = pd.DataFrame(rows)
-    st.dataframe(df.style.format(precision=4), width="stretch")
+def _render_error(exc: ValueError) -> None:
+    """Mensaje para el alumno arriba; el detalle de CoolProp, aparte y chico."""
+    message, _, detail = str(exc).partition("Detalle técnico:")
+    st.error(message.strip(), icon="🚫")
+    if detail:
+        st.caption(f"Detalle técnico (CoolProp): {detail.strip()}")
 
 
-def _render_procedure(steps: Any) -> None:
+def _render_states_table(
+    fluid: str, labeled: list[tuple[str, StatePoint]], system: UnitSystem
+) -> list[tuple[str, FluidState]]:
+    """Tabla con T, p, v, u, h, s, x y región de cada estado (x = "—" fuera de la campana)."""
+    states = _fluid_states_cached(
+        fluid, tuple((label, s.P_Pa, s.h_J_per_kg) for label, s in labeled)
+    )
+    frame = pd.DataFrame(states_table(states, system)).drop(columns="Fluido")
+    for column in frame.columns:
+        if column not in ("Estado", "Región"):
+            frame[column] = [format_value(v) for v in frame[column]]
+    st.dataframe(frame, hide_index=True, width="stretch", height=35 * (len(frame) + 1) + 3)
+    return states
+
+
+def _render_procedure(steps: IsentropicSteps) -> None:
     with st.expander("🔬 Procedimiento", expanded=True):
-        st.caption(
-            "ℹ️ Los pasos se muestran siempre en sistema **Técnico** "
-            "(°C, bar, kJ/kg, kJ/(kg·K)) para consistencia con la "
-            "bibliografía clásica (Cengel). La conversión al sistema "
-            "activo de la tabla de estados queda pendiente para Fase 1.5."
-        )
         st.markdown("**Fórmula aplicada:**")
         st.latex(steps.formula_latex)
         st.markdown("**Con los valores ingresados:**")
         st.latex(steps.substituted_latex)
         st.markdown("**En palabras:**")
         st.write(steps.narrative_es)
+
+
+def _render_export(data: dict[str, Any], *, base: str, key: str) -> None:
+    st.markdown("#### 💾 Exportar")
+    left, right = st.columns(2)
+    left.download_button(
+        "Descargar CSV",
+        data=summary_csv(data).encode("utf-8"),
+        file_name=f"{base}.csv",
+        mime="text/csv",
+        key=f"{key}_csv",
+    )
+    right.download_button(
+        "Descargar JSON",
+        data=json.dumps(data, ensure_ascii=False, indent=2),
+        file_name=f"{base}.json",
+        mime="application/json",
+        key=f"{key}_json",
+    )
 
 
 def _clear_state_for(prefix: str) -> None:
@@ -221,7 +322,15 @@ def _clear_state_for(prefix: str) -> None:
 
 def _format_specific_work(value_si: float) -> str:
     """Trabajo específico en unidades del sistema actual."""
-    return quantity_label(value_si, "specific_enthalpy", precision=4)
+    return quantity_label(value_si, "specific_enthalpy", precision=5)
+
+
+def _stored_result(prefix: str, fluid: str) -> Any:
+    """Resultado guardado de la pestaña, solo si es del fluido elegido."""
+    stored = st.session_state.get(f"{prefix}_result")
+    if stored is None or stored.get("fluid") != fluid:
+        return None
+    return stored["result"]
 
 
 # ---------------------------------------------------------------------
@@ -474,56 +583,79 @@ def _render_polytropic_diagram(
 
 
 # ---------------------------------------------------------------------
-# Layout principal
+# Fórmulas teóricas
 # ---------------------------------------------------------------------
 
-st.set_page_config(page_title="Isoentrópicos", page_icon="⚙️", layout="centered")
 
-st.subheader(SUBJECT)
-st.title("⚙️ Rendimientos isoentrópicos")
-st.markdown(
-    "Calculadora de turbina, compresor, bomba y compresor multietapa con "
-    "intercooler. Modo **directo** (dado η_s calcular el estado real) o "
-    "**inverso** (dados los dos estados, recuperar η_s)."
-)
-st.markdown("---")
+def _render_theory() -> None:
+    with st.expander("📖 Fórmulas teóricas", expanded=False):
+        st.markdown(
+            f"Las relaciones de esta página están en el [vademecum de la cátedra]"
+            f"({VADEMECUM_PDF_URL}) ([DOI]({VADEMECUM_DOI_URL})): **§10.4 *Rendimientos "
+            "isoentrópicos*** (turbina, compresor, bomba), §3.3 *Sistema abierto en régimen "
+            "permanente* y §6.3 *Compresión en dos etapas con interenfriamiento*."
+        )
+        st.markdown(
+            "**Estado isoentrópico de salida** — misma entropía que la entrada, a la "
+            "presión de salida:"
+        )
+        st.latex(r"h_{2s} = h(p_2,\ s_1)")
+        st.markdown("**Turbina** (el real entrega menos trabajo que el ideal):")
+        st.latex(
+            r"\eta_{s,T} = \frac{w_{\mathrm{real}}}{w_{\mathrm{ideal}}}"
+            r" = \frac{h_1 - h_2}{h_1 - h_{2s}}"
+        )
+        st.markdown("**Compresor y bomba** (el real consume más trabajo que el ideal):")
+        st.latex(
+            r"\eta_{s,C} = \frac{w_{\mathrm{ideal}}}{w_{\mathrm{real}}}"
+            r" = \frac{h_{2s} - h_1}{h_2 - h_1}"
+        )
+        st.latex(
+            r"\eta_{s,P} \simeq \frac{v\,(p_2 - p_1)}{h_2 - h_1}"
+            r" \qquad \text{(líquido incompresible)}"
+        )
+        st.markdown(
+            "**Primer principio** en régimen permanente, adiabático y sin variaciones de "
+            "energía cinética ni potencial (§3.3):"
+        )
+        st.latex(r"w = h_1 - h_2")
+        st.markdown(
+            "**Compresor multietapa** — la misma relación de compresión en cada etapa; para "
+            "dos etapas es la presión intermedia óptima (§6.3):"
+        )
+        st.latex(
+            r"\Pi = \left(\frac{p_{\mathrm{out}}}{p_{\mathrm{in}}}\right)^{1/n}"
+            r" \qquad p_x = \sqrt{p_1\,p_2}"
+        )
 
-sidebar_credits(version=PAGE_VERSION, page_name="Isoentrópicos")
-render_units_selector()
 
-fluid = st.selectbox(
-    "Fluido (CoolProp)",
-    SUPPORTED_FLUIDS,
-    index=0,
-    key="iso_fluid",
-)
-
-tab_turbine, tab_compressor, tab_pump, tab_polytropic = st.tabs(
-    ["🌪️ Turbina", "🌀 Compresor", "💧 Bomba", "🔁 Multietapa"]
-)
+# ---------------------------------------------------------------------
+# Pestañas
+# ---------------------------------------------------------------------
 
 
-# =====================================================================
-# Tab — Turbina
-# =====================================================================
-with tab_turbine:
-    st.markdown("### Turbina")
+def _render_device_tab(device: str, fluid: str, system: UnitSystem) -> None:
+    """Turbina, compresor o bomba: entradas, cálculo y resultado."""
+    ui = _DEVICES[device]
+    prefix = ui["prefix"]
+    direct_fn, inverse_fn = ui["functions"]
+    defaults = _defaults_cached(fluid, device)
+
+    st.markdown(f"### {ui['title']}")
     mode = st.radio(
         "Modo",
         ["Directo (calcular salida dado η_s)", "Inverso (calcular η_s dados los estados)"],
-        key="turb_mode",
-        horizontal=False,
+        key=f"{prefix}_mode",
     )
     is_direct = mode.startswith("Directo")
 
-    # Defaults: vapor sobrecalentado 30 bar, 400 °C.
+    # Las keys llevan el fluido: al cambiarlo, los inputs vuelven a valores válidos.
     pair_in, kwargs_in = _build_state_input(
-        key_prefix="turb_in",
-        header="Estado 1 (entrada)",
-        defaults_si={"T": 673.15, "P": 3.0e6},  # 400 °C, 30 bar
-        default_pair_label="T y P",
+        key_prefix=f"{prefix}_in_{fluid}",
+        header=ui["in_header"],
+        defaults_si=_symbol_defaults(defaults.inlet),
+        default_pair_label=_PAIR_CODE_TO_LABEL[defaults.pair_in],
     )
-
     if is_direct:
         st.markdown("**Parámetros del proceso**")
         c1, c2 = st.columns(2)
@@ -531,370 +663,164 @@ with tab_turbine:
             p_out_Pa = number_input_si(
                 label="Presión de salida P₂",
                 kind="pressure",
-                default_si=5.0e4,  # 0.5 bar
-                key="turb_p_out",
-                format="%.4f",
+                default_si=defaults.p_out_Pa,
+                key=f"{prefix}_p_out_{fluid}",
+                format=_INPUT_FORMAT["pressure"],
             )
         with c2:
             eta_s = st.number_input(
                 "Rendimiento isoentrópico η_s",
-                value=0.90,
+                value=defaults.eta_s,
                 min_value=0.01,
                 max_value=1.00,
                 step=0.01,
                 format="%.4f",
-                key="turb_eta",
+                key=f"{prefix}_eta_{fluid}",
             )
     else:
+        p_out_default, h_out_default = _default_outlet_cached(fluid, device)
         pair_out, kwargs_out = _build_state_input(
-            key_prefix="turb_out",
+            key_prefix=f"{prefix}_out_{fluid}",
             header="Estado 2 (salida real)",
-            defaults_si={"T": 373.15, "P": 5.0e4},  # 100 °C, 0.5 bar
-            default_pair_label="T y P",
+            defaults_si={"P": p_out_default, "H": h_out_default},
+            default_pair_label="P y h",
         )
 
-    if st.button("Calcular", key="turb_btn", type="primary"):
+    if st.button("Calcular", key=f"{prefix}_btn", type="primary"):
         try:
             state_in = _resolve_state(fluid, pair_in, kwargs_in)
             if is_direct:
-                result = turbine_direct(
-                    fluid=fluid,
-                    state_in=state_in,
-                    p_out_Pa=p_out_Pa,
-                    eta_s=float(eta_s),
+                result = direct_fn(
+                    fluid=fluid, state_in=state_in, p_out_Pa=p_out_Pa, eta_s=float(eta_s)
                 )
             else:
                 state_out_real = _resolve_state(fluid, pair_out, kwargs_out)
-                result = turbine_inverse(
-                    fluid=fluid,
-                    state_in=state_in,
-                    state_out_real=state_out_real,
-                )
+                result = inverse_fn(fluid=fluid, state_in=state_in, state_out_real=state_out_real)
         except ValueError as exc:
-            st.error(f"Error: {exc}")
-            _clear_state_for("turb")
+            _render_error(exc)
+            _clear_state_for(prefix)
         else:
-            st.session_state["turb_result"] = result
+            st.session_state[f"{prefix}_result"] = {"fluid": fluid, "result": result}
 
-    if "turb_result" in st.session_state:
-        result = st.session_state["turb_result"]
-        assert isinstance(result, IsentropicResult)
-        w_t = -result.delta_h_real_J_per_kg
-        c1, c2 = st.columns(2)
-        c1.metric("η_s", f"{result.eta_s:.4f}")
-        c2.metric("Trabajo específico w_t", _format_specific_work(w_t))
-        _render_states_table(
-            [
-                _state_to_row("1 (entrada)", result.state_in),
-                _state_to_row("2s (salida isoentrópica)", result.state_out_isen),
-                _state_to_row("2 (salida real)", result.state_out_real),
-            ]
-        )
-        _render_procedure(result.steps)
-        _render_isentropic_diagram(
-            fluid,
-            result,
-            selector_key="diag_type_turb",
-            chart_key="diag_chart_turb",
-            default_diagram="Ts",
-        )
-
-
-# =====================================================================
-# Tab — Compresor
-# =====================================================================
-with tab_compressor:
-    st.markdown("### Compresor")
-    mode = st.radio(
-        "Modo",
-        ["Directo (calcular salida dado η_s)", "Inverso (calcular η_s dados los estados)"],
-        key="comp_mode",
-        horizontal=False,
+    result = _stored_result(prefix, fluid)
+    if result is None:
+        return
+    assert isinstance(result, IsentropicResult)
+    c1, c2 = st.columns(2)
+    c1.metric("η_s", f"{result.eta_s:.4f}")
+    c2.metric(
+        f"Trabajo específico {ui['work']}", _format_specific_work(result.specific_work_J_per_kg)
     )
-    is_direct = mode.startswith("Directo")
-
-    pair_in, kwargs_in = _build_state_input(
-        key_prefix="comp_in",
-        header="Estado 1 (entrada)",
-        defaults_si={"T": 298.15, "P": 1.0e5},  # 25 °C, 1 bar
-        default_pair_label="T y P",
+    if device == "compressor" and 0.0 < result.state_in.x < 1.0:
+        st.warning(
+            f"La entrada es vapor húmedo (x = {result.state_in.x:.3f}). El cálculo es "
+            "válido, pero los compresores reales necesitan vapor saturado seco o "
+            "sobrecalentado: el líquido arrastrado los daña (golpe de líquido).",
+            icon="⚠️",
+        )
+    _render_states_table(fluid, isentropic_labeled_states(result), system)
+    _render_procedure(isentropic_steps(result, system))
+    _render_isentropic_diagram(
+        fluid,
+        result,
+        selector_key=f"diag_type_{prefix}",
+        chart_key=f"diag_chart_{prefix}",
+        default_diagram=ui["diagram"],
+    )
+    if device == "pump":
+        _render_pump_comparison(result, prefix)
+    _render_export(
+        isentropic_to_dict(result, system),
+        base=f"{device}_{result.mode}_{fluid}".lower(),
+        key=f"{prefix}_download",
     )
 
-    if is_direct:
-        st.markdown("**Parámetros del proceso**")
-        c1, c2 = st.columns(2)
-        with c1:
-            p_out_Pa = number_input_si(
-                label="Presión de salida P₂",
-                kind="pressure",
-                default_si=8.0e5,  # 8 bar
-                key="comp_p_out",
-                format="%.4f",
-            )
-        with c2:
-            eta_s = st.number_input(
-                "Rendimiento isoentrópico η_s",
-                value=0.80,
-                min_value=0.01,
-                max_value=1.00,
-                step=0.01,
-                format="%.4f",
-                key="comp_eta",
-            )
-    else:
-        pair_out, kwargs_out = _build_state_input(
-            key_prefix="comp_out",
-            header="Estado 2 (salida real)",
-            defaults_si={"T": 573.15, "P": 8.0e5},  # 300 °C, 8 bar
-            default_pair_label="T y P",
-        )
 
-    if st.button("Calcular", key="comp_btn", type="primary"):
-        try:
-            state_in = _resolve_state(fluid, pair_in, kwargs_in)
-            if is_direct:
-                result = compressor_direct(
-                    fluid=fluid,
-                    state_in=state_in,
-                    p_out_Pa=p_out_Pa,
-                    eta_s=float(eta_s),
-                )
-            else:
-                state_out_real = _resolve_state(fluid, pair_out, kwargs_out)
-                result = compressor_inverse(
-                    fluid=fluid,
-                    state_in=state_in,
-                    state_out_real=state_out_real,
-                )
-        except ValueError as exc:
-            st.error(f"Error: {exc}")
-            _clear_state_for("comp")
-        else:
-            st.session_state["comp_result"] = result
-
-    if "comp_result" in st.session_state:
-        result = st.session_state["comp_result"]
-        assert isinstance(result, IsentropicResult)
-        w_c = result.delta_h_real_J_per_kg
-        c1, c2 = st.columns(2)
-        c1.metric("η_s", f"{result.eta_s:.4f}")
-        c2.metric("Trabajo específico w_c", _format_specific_work(w_c))
-        _render_states_table(
-            [
-                _state_to_row("1 (entrada)", result.state_in),
-                _state_to_row("2s (salida isoentrópica)", result.state_out_isen),
-                _state_to_row("2 (salida real)", result.state_out_real),
-            ]
-        )
-        _render_procedure(result.steps)
-        _render_isentropic_diagram(
-            fluid,
-            result,
-            selector_key="diag_type_comp",
-            chart_key="diag_chart_comp",
-            default_diagram="logph",
-        )
-
-
-# =====================================================================
-# Tab — Bomba
-# =====================================================================
-with tab_pump:
-    st.markdown("### Bomba")
-    mode = st.radio(
-        "Modo",
-        ["Directo (calcular salida dado η_s)", "Inverso (calcular η_s dados los estados)"],
-        key="pump_mode",
-        horizontal=False,
+def _render_pump_comparison(result: IsentropicResult, prefix: str) -> None:
+    if st.button("🆚 Comparar contra modelo incompresible", key=f"{prefix}_compare_btn"):
+        st.session_state[f"{prefix}_compare_active"] = True
+    if not st.session_state.get(f"{prefix}_compare_active", False):
+        return
+    st.markdown("#### 🆚 Modelo simplificado de líquido incompresible")
+    st.caption(
+        "Aproximación clásica para una bomba que mueve un líquido (vademecum §10.4): "
+        r"$w_p \approx v_1 \cdot (P_2 - P_1) / \eta_s$. "
+        "Compará contra la ecuación de estado para ver cuánto se aleja."
     )
-    is_direct = mode.startswith("Directo")
-
-    pair_in, kwargs_in = _build_state_input(
-        key_prefix="pump_in",
-        header="Estado 1 (entrada, líquido)",
-        defaults_si={"P": 1.0e4, "X": 0.0, "T": 318.96},  # 0.1 bar, x=0
-        default_pair_label="P y x (saturado)",
+    try:
+        cmp = pump_incompressible_comparison(result)
+    except ValueError as exc:
+        st.warning(f"No pude armar el modelo simple: {exc}")
+        return
+    c1, c2, c3 = st.columns(3)
+    c1.metric("w_p (ecuación de estado)", _format_specific_work(cmp.w_eos_J_per_kg))
+    c2.metric("w_p (modelo simple)", _format_specific_work(cmp.w_incompressible_J_per_kg))
+    c3.metric("Error relativo", f"{cmp.error_pct:.3f} %")
+    st.caption(
+        "Para agua subenfriada o líquido saturado y compresiones moderadas, el error típico "
+        "es < 1 %. Crece cerca del punto crítico o con fluidos más compresibles."
     )
 
-    if is_direct:
-        st.markdown("**Parámetros del proceso**")
-        c1, c2 = st.columns(2)
-        with c1:
-            p_out_Pa = number_input_si(
-                label="Presión de salida P₂",
-                kind="pressure",
-                default_si=1.5e7,  # 150 bar
-                key="pump_p_out",
-                format="%.4f",
-            )
-        with c2:
-            eta_s = st.number_input(
-                "Rendimiento isoentrópico η_s",
-                value=0.85,
-                min_value=0.01,
-                max_value=1.00,
-                step=0.01,
-                format="%.4f",
-                key="pump_eta",
-            )
-    else:
-        pair_out, kwargs_out = _build_state_input(
-            key_prefix="pump_out",
-            header="Estado 2 (salida real)",
-            defaults_si={"P": 1.5e7, "T": 319.15},  # 150 bar, 46 °C
-            default_pair_label="T y P",
-        )
 
-    if st.button("Calcular", key="pump_btn", type="primary"):
-        try:
-            state_in = _resolve_state(fluid, pair_in, kwargs_in)
-            if is_direct:
-                result = pump_direct(
-                    fluid=fluid,
-                    state_in=state_in,
-                    p_out_Pa=p_out_Pa,
-                    eta_s=float(eta_s),
-                )
-            else:
-                state_out_real = _resolve_state(fluid, pair_out, kwargs_out)
-                result = pump_inverse(
-                    fluid=fluid,
-                    state_in=state_in,
-                    state_out_real=state_out_real,
-                )
-        except ValueError as exc:
-            st.error(f"Error: {exc}")
-            _clear_state_for("pump")
-        else:
-            st.session_state["pump_result"] = result
-
-    if "pump_result" in st.session_state:
-        result = st.session_state["pump_result"]
-        assert isinstance(result, IsentropicResult)
-        w_p = result.delta_h_real_J_per_kg
-        c1, c2 = st.columns(2)
-        c1.metric("η_s", f"{result.eta_s:.4f}")
-        c2.metric("Trabajo específico w_p", _format_specific_work(w_p))
-        _render_states_table(
-            [
-                _state_to_row("1 (entrada)", result.state_in),
-                _state_to_row("2s (salida isoentrópica)", result.state_out_isen),
-                _state_to_row("2 (salida real)", result.state_out_real),
-            ]
-        )
-        _render_procedure(result.steps)
-        _render_isentropic_diagram(
-            fluid,
-            result,
-            selector_key="diag_type_pump",
-            chart_key="diag_chart_pump",
-            default_diagram="Ts",
-        )
-
-        # Comparación opt-in vs modelo incompresible.
-        if st.button("🆚 Comparar contra modelo incompresible", key="pump_compare_btn"):
-            st.session_state["pump_compare_active"] = True
-
-        if st.session_state.get("pump_compare_active", False):
-            st.markdown("#### 🆚 Modelo simplificado de líquido incompresible")
-            st.caption(
-                "Aproximación clásica para una bomba que mueve un líquido: "
-                r"$w_p \approx v_1 \cdot (P_2 - P_1) / \eta_s$. "
-                "Compará contra la EOS de CoolProp para ver cuánto se aleja."
-            )
-            try:
-                # v_1 = 1 / rho_1 a partir de CoolProp.
-                import CoolProp.CoolProp as cp
-
-                rho_in = cp.PropsSI("D", "P", result.state_in.P_Pa, "T", result.state_in.T_K, fluid)
-                v_in = 1.0 / rho_in
-                dp = result.state_out_real.P_Pa - result.state_in.P_Pa
-                w_p_simple = v_in * dp / result.eta_s
-                w_p_real = result.delta_h_real_J_per_kg
-                err_pct = (
-                    abs(w_p_real - w_p_simple) / abs(w_p_real) * 100.0
-                    if w_p_real != 0.0
-                    else float("nan")
-                )
-                c1, c2, c3 = st.columns(3)
-                c1.metric("w_p (EOS CoolProp)", _format_specific_work(w_p_real))
-                c2.metric("w_p (modelo simple)", _format_specific_work(w_p_simple))
-                c3.metric("Error relativo", f"{err_pct:.3f} %")
-                st.caption(
-                    "Para agua subenfriada / saturada líquida y compresiones "
-                    "moderadas, el error típico es < 1 %. Crece cerca del "
-                    "punto crítico o con fluidos muy compresibles."
-                )
-            except Exception as exc:
-                st.warning(f"No pude armar el modelo simple: {exc}")
-
-
-# =====================================================================
-# Tab — Compresor multietapa (politrópico)
-# =====================================================================
-with tab_polytropic:
+def _render_multistage_tab(fluid: str, system: UnitSystem) -> None:
+    prefix = "poly"
+    defaults = _defaults_cached(fluid, "multistage")
     st.markdown("### Compresor multietapa")
     st.caption(
         "Compresor de **n** etapas con relación de presión igual por etapa, "
         "η_s común a todas, e intercooler opcional entre etapas (la última no "
         "tiene intercooler aguas abajo). Solo modo directo."
     )
-
     pair_in, kwargs_in = _build_state_input(
-        key_prefix="poly_in",
-        header="Estado 1 (entrada al primer etapa)",
-        defaults_si={"T": 298.15, "P": 1.0e5},  # 25 °C, 1 bar
-        default_pair_label="T y P",
+        key_prefix=f"{prefix}_in_{fluid}",
+        header="Estado 1 (entrada a la primera etapa)",
+        defaults_si=_symbol_defaults(defaults.inlet),
+        default_pair_label=_PAIR_CODE_TO_LABEL[defaults.pair_in],
     )
-
     st.markdown("**Parámetros del proceso**")
     c1, c2 = st.columns(2)
     with c1:
         p_out_Pa = number_input_si(
             label="Presión final P_out",
             kind="pressure",
-            default_si=2.7e6,  # 27 bar
-            key="poly_p_out",
-            format="%.4f",
+            default_si=defaults.p_out_Pa,
+            key=f"{prefix}_p_out_{fluid}",
+            format=_INPUT_FORMAT["pressure"],
         )
         n_stages = st.number_input(
             "Número de etapas n",
-            value=3,
+            value=defaults.n_stages,
             min_value=1,
             max_value=10,
             step=1,
-            key="poly_n",
+            key=f"{prefix}_n_{fluid}",
         )
     with c2:
         eta_s_stage = st.number_input(
             "η_s por etapa",
-            value=0.85,
+            value=defaults.eta_s,
             min_value=0.01,
             max_value=1.00,
             step=0.01,
             format="%.4f",
-            key="poly_eta",
+            key=f"{prefix}_eta_{fluid}",
         )
         intercool = st.checkbox(
-            "Con intercooler entre etapas",
-            value=True,
-            key="poly_intercool",
+            "Con intercooler entre etapas", value=True, key=f"{prefix}_intercool_{fluid}"
         )
-
+    t_intercool_K = None
     if intercool:
         t_intercool_K = number_input_si(
             label="Temperatura del intercooler T_ic",
             kind="temperature",
-            default_si=298.15,  # 25 °C
-            key="poly_tic",
-            format="%.4f",
-            help="Default = temperatura ambiente (25 °C). En la práctica se usa "
-            "la temperatura de entrada al compresor para 'full cooling'.",
+            default_si=defaults.t_intercool_K or 298.15,
+            key=f"{prefix}_tic_{fluid}",
+            format=_INPUT_FORMAT["temperature"],
+            help="Tiene que quedar por encima de la temperatura de saturación a la presión "
+            "intermedia: si no, el fluido condensaría entre etapas.",
         )
-    else:
-        t_intercool_K = None
 
-    if st.button("Calcular", key="poly_btn", type="primary"):
+    if st.button("Calcular", key=f"{prefix}_btn", type="primary"):
         try:
             state_in = _resolve_state(fluid, pair_in, kwargs_in)
             result = compressor_multistage(
@@ -907,66 +833,84 @@ with tab_polytropic:
                 t_intercool_K=t_intercool_K,
             )
         except ValueError as exc:
-            st.error(f"Error: {exc}")
-            _clear_state_for("poly")
+            _render_error(exc)
+            _clear_state_for(prefix)
         else:
-            st.session_state["poly_result"] = result
+            st.session_state[f"{prefix}_result"] = {"fluid": fluid, "result": result}
 
-    if "poly_result" in st.session_state:
-        result = st.session_state["poly_result"]
-        assert isinstance(result, PolytropicResult)
-        c1, c2, c3 = st.columns(3)
-        c1.metric(
-            "Δh total (multietapa)",
-            _format_specific_work(result.total_delta_h_real_J_per_kg),
+    result = _stored_result(prefix, fluid)
+    if result is None:
+        return
+    assert isinstance(result, PolytropicResult)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Δh total (multietapa)", _format_specific_work(result.total_delta_h_real_J_per_kg))
+    c2.metric(
+        "Δh 1 etapa equivalente",
+        _format_specific_work(result.delta_h_single_stage_real_J_per_kg),
+    )
+    c3.metric("Ahorro vs 1 etapa", f"{result.saving_pct:+.2f} %")
+    st.caption(
+        f"Relación de compresión por etapa Π = {result.pressure_ratio_per_stage:.4f} "
+        f"({'con' if result.intercool else 'sin'} intercooler)."
+    )
+    if result.saving_pct <= 0.0:
+        st.info(
+            "Con estos datos el escalonamiento no ahorra trabajo: cada etapa real genera "
+            "entropía y calienta la entrada de la siguiente (efecto de recalentamiento), y "
+            "el intercooler no alcanza a compensarlo. Pasa sin intercooler, o con fluidos "
+            "como el R-1234yf, cuya salida de cada etapa queda apenas sobrecalentada.",
+            icon="ℹ️",
         )
-        c2.metric(
-            "Δh 1 etapa equivalente",
-            _format_specific_work(result.delta_h_single_stage_real_J_per_kg),
-        )
-        single = result.delta_h_single_stage_real_J_per_kg
-        if single != 0.0:
-            saving_pct = (single - result.total_delta_h_real_J_per_kg) / single * 100.0
-            c3.metric("Ahorro vs 1 etapa", f"{saving_pct:+.2f} %")
-        else:
-            c3.metric("Ahorro vs 1 etapa", "—")
-        st.caption(
-            f"Relación de compresión por etapa Π = "
-            f"{result.pressure_ratio_per_stage:.4f} "
-            f"({'con' if result.intercool else 'sin'} intercooler)."
-        )
+    _render_states_table(fluid, multistage_labeled_states(result), system)
+    _render_procedure(multistage_steps(result, system))
+    _render_polytropic_diagram(
+        fluid,
+        result,
+        selector_key="diag_type_poly",
+        chart_key="diag_chart_poly",
+    )
+    _render_export(
+        multistage_to_dict(result, system),
+        base=f"multietapa_{fluid}".lower(),
+        key=f"{prefix}_download",
+    )
 
-        # Tabla de estados por etapa.
-        rows: list[dict[str, Any]] = []
-        rows.append(_state_to_row("1 (entrada)", result.stages[0].state_in))
-        for stage in result.stages:
-            rows.append(
-                _state_to_row(
-                    f"Etapa {stage.index} — salida isen.",
-                    stage.state_out_isen,
-                )
-            )
-            rows.append(
-                _state_to_row(
-                    f"Etapa {stage.index} — salida real",
-                    stage.state_out_real,
-                )
-            )
-            if stage.cooled_after:
-                next_idx = stage.index + 1
-                # El estado de entrada de la siguiente etapa es post-intercooler.
-                if next_idx - 1 < len(result.stages):
-                    rows.append(
-                        _state_to_row(
-                            f"→ Intercooler a etapa {next_idx}",
-                            result.stages[next_idx - 1].state_in,
-                        )
-                    )
-        _render_states_table(rows)
-        _render_procedure(result.steps)
-        _render_polytropic_diagram(
-            fluid,
-            result,
-            selector_key="diag_type_poly",
-            chart_key="diag_chart_poly",
-        )
+
+# ---------------------------------------------------------------------
+# Layout principal
+# ---------------------------------------------------------------------
+
+st.set_page_config(page_title="Isoentrópicos", page_icon="⚙️", layout="centered")
+
+sidebar_credits(version=PAGE_VERSION, page_name="Isoentrópicos")
+render_units_selector()
+system = get_current_system()
+
+st.subheader(SUBJECT)
+st.title("⚙️ Rendimientos isoentrópicos")
+st.markdown(
+    "Calculadora de turbina, compresor, bomba y compresor multietapa con "
+    "intercooler. Modo **directo** (dado η_s calcular el estado real) o "
+    "**inverso** (dados los dos estados, recuperar η_s)."
+)
+_render_theory()
+st.markdown("---")
+
+fluid = st.selectbox(
+    "Fluido",
+    SUPPORTED_FLUIDS,
+    format_func=lambda f: FLUID_NAMES_ES.get(f, f),
+    key="iso_fluid",
+)
+
+tab_turbine, tab_compressor, tab_pump, tab_polytropic = st.tabs(
+    ["🌪️ Turbina", "🌀 Compresor", "💧 Bomba", "🔁 Multietapa"]
+)
+with tab_turbine:
+    _render_device_tab("turbine", fluid, system)
+with tab_compressor:
+    _render_device_tab("compressor", fluid, system)
+with tab_pump:
+    _render_device_tab("pump", fluid, system)
+with tab_polytropic:
+    _render_multistage_tab(fluid, system)
