@@ -19,7 +19,7 @@ Licencia: MIT.
 ## Stack
 
 - Python 3.11+
-- **Streamlit** — UI (multipágina con carpeta `pages/`)
+- **Streamlit** — UI (multipágina con `st.navigation`; páginas en `app_pages/`)
 - **CoolProp** — propiedades termofísicas punto a punto
 - **TESPy** — simulación de ciclos termodinámicos
 - **fluprodia** — diagramas de propiedades de fluidos
@@ -38,7 +38,8 @@ y UI (Streamlit).
 ```
 apps/
 ├── streamlit_app.py           # Home / landing
-├── pages/                     # Una página por módulo (numeradas)
+├── app_pages/                 # Una página por módulo (numeradas). NO se llama
+│                              # pages/: ver «Navegación» más abajo.
 │   ├── 1_Propiedades.py       # ✅ Fase 1.6 — Estado completo del agua (y otros
 │   │                          # fluidos): región, tablas, procedimiento,
 │   │                          # diagrama, tabla de estados para ciclos.
@@ -126,12 +127,24 @@ apps/
 - Funciones puras, sin estado global. Resultados como `dataclass`
   cuando hay varios valores (`StatePoint`, `CycleResult`, etc.).
 - Cache de CoolProp con `@st.cache_data` en los wrappers de Streamlit
-  (`pages/`) que envuelven funciones de `core.fluids`. `core/` no
+  (`app_pages/`) que envuelven funciones de `core.fluids`. `core/` no
   importa Streamlit.
 - Idioma de la UI: **español rioplatense**. Los identificadores de
   código en inglés, comentarios y docstrings en español.
 - Cada función académicamente relevante incluye en su docstring una
   cita corta a la fuente (libro de texto, paper, norma).
+
+### Navegación
+
+- `streamlit_app.py` arma el menú con `st.navigation` + `st.Page` y es
+  el único entry point. Las páginas viven en `app_pages/` y la URL de
+  cada una sale del nombre de archivo sin el número (`1_Propiedades.py`
+  → `/Propiedades`).
+- **No crear una carpeta `pages/`** en la raíz: Streamlit la detecta y
+  arranca en el modo multipágina viejo (bandera global del proceso)
+  hasta que corre `st.navigation`; los links directos a una página
+  después de un reinicio mostraban el menú con nombres de archivo. Un
+  test (`tests/test_navigation.py`) lo vigila.
 
 ### Páginas Streamlit
 

@@ -18,7 +18,7 @@ from streamlit.testing.v1 import AppTest
 
 from core.state_report import PAIR_ORDER
 
-PAGE = str(Path(__file__).resolve().parents[1] / "pages" / "1_Propiedades.py")
+PAGE = str(Path(__file__).resolve().parents[1] / "app_pages" / "1_Propiedades.py")
 
 
 def _new_app() -> AppTest:

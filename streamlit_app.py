@@ -1,8 +1,17 @@
 """Entry point — TA216 Apps.
 
 Define la navegación explícita con :func:`st.navigation` y :class:`st.Page`
-(API introducida en Streamlit 1.36). Los archivos físicos en ``pages/``
-no se renombran: se referencian por path con un label e ícono custom.
+(API introducida en Streamlit 1.36). Las páginas viven en ``app_pages/`` y
+se referencian por path con un label e ícono custom.
+
+La carpeta **no** se llama ``pages/`` a propósito: si existe una carpeta
+``pages/`` junto a este script, Streamlit arranca en el modo multipágina
+viejo (una bandera global del proceso) hasta que este script llama a
+``st.navigation``. Así, si el primer visitante después de un reinicio
+entraba por un link directo (p. ej. ``/Propiedades``), la página corría
+sin pasar por acá y el menú mostraba los nombres de archivo
+("streamlit app", "Interpolacion" sin tilde) hasta que alguien entrara
+por la raíz.
 """
 
 from __future__ import annotations
@@ -93,10 +102,10 @@ def _home_page() -> None:
 
 pages = [
     st.Page(_home_page, title="Home", icon="🏠", default=True),
-    st.Page("pages/1_Propiedades.py", title="Propiedades", icon="💧"),
-    st.Page("pages/2_Interpolacion.py", title="Interpolación", icon="📐"),
-    st.Page("pages/3_Isoentropicos.py", title="Isoentrópicos", icon="⚙️"),
-    st.Page("pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
+    st.Page("app_pages/1_Propiedades.py", title="Propiedades", icon="💧"),
+    st.Page("app_pages/2_Interpolacion.py", title="Interpolación", icon="📐"),
+    st.Page("app_pages/3_Isoentropicos.py", title="Isoentrópicos", icon="⚙️"),
+    st.Page("app_pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
 ]
 pg = st.navigation(pages)
 pg.run()

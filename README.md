@@ -126,7 +126,7 @@ streamlit run streamlit_app.py
 ```
 apps/
 ├── streamlit_app.py       # Home / landing
-├── pages/                 # Una página Streamlit por módulo
+├── app_pages/             # Una página Streamlit por módulo (no se llama pages/: ver CLAUDE.md)
 ├── core/                  # Lógica de cálculo, sin dependencia de Streamlit
 │   ├── fluids.py          # estado completo, saturación, región (CoolProp)
 │   ├── state_report.py    # tablas, procedimiento didáctico y export del estado
