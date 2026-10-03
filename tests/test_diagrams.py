@@ -5,7 +5,10 @@ Cubre:
 - Mapeo ``FLUPRODIA_UNITS`` (incluyendo el quirk de pint en sistema
   Inglés: ``Btu/(lb*degR)``).
 - :data:`DEFAULT_RANGES` cubre todos los fluidos soportados.
-- :func:`build_diagram` corre para los 7 fluidos del proyecto.
+- :func:`build_diagram` corre para los 7 fluidos del proyecto, y las
+  isolíneas salen en las unidades de cada sistema (regresión 0.9.0: en
+  SI eran isotermas de 0–600 K e isobaras de 0,01–1000 Pa, y con aire
+  fallaba CoolProp).
 - Procesos (isoentrópico, isobárico, isotérmico): devuelven dicts con
   las keys SI esperadas, no vacíos, y monotonía en la coordenada esperada.
 - Validaciones (fluido, sistema, tipo de diagrama) lanzan ``ValueError``
@@ -36,6 +39,7 @@ from core.diagrams import (  # noqa: E402
     DiagramSpec,
     FluidRange,
     ProcessOverlay,
+    _isoline_grid,  # noqa: E402
     axis_window_si,
     build_diagram,
     cycle_overlays,
@@ -54,6 +58,7 @@ from core.diagrams import (  # noqa: E402
     to_json,
 )
 from core.fluids import SUPPORTED_FLUIDS, StatePoint, state_from_pair  # noqa: E402
+from core.units_system import convert_to_si  # noqa: E402
 
 # ---------------------------------------------------------------------
 # Mapeo de unidades
@@ -126,6 +131,38 @@ class TestBuildDiagram:
         # Atributo público de fluprodia: nombre del fluido.
         # Es defensivo: si fluprodia cambia el atributo, este aserto guía.
         assert hasattr(diagram, "fluid")
+
+
+class TestIsolinesPerSystem:
+    """``set_isolines`` lee los valores en las unidades activas del
+    diagrama: las isolíneas tienen que generarse en las de cada sistema."""
+
+    @pytest.mark.parametrize("system", ["SI", "Técnico", "Inglés"])
+    @pytest.mark.parametrize("fluid", SUPPORTED_FLUIDS)
+    def test_isolines_cover_the_fluid_range(self, fluid: str, system: str) -> None:
+        rng = DEFAULT_RANGES[fluid]
+        grid = _isoline_grid(fluid, system)  # type: ignore[arg-type]
+        T_K = [convert_to_si(float(t), "temperature", system) for t in grid["T"]]  # type: ignore[arg-type]
+        p_Pa = [convert_to_si(float(p), "pressure", system) for p in grid["p"]]  # type: ignore[arg-type]
+        assert len(T_K) >= 5
+        assert rng.T_K_min - 1e-6 <= min(T_K) and max(T_K) <= rng.T_K_max + 1e-6
+        assert min(p_Pa) <= rng.p_Pa_min * (1 + 1e-9)
+        assert max(p_Pa) >= rng.p_Pa_max * (1 - 1e-9)
+        # Valores redondos en las unidades del sistema (rótulos legibles).
+        assert all(float(t).is_integer() for t in grid["T"])
+
+    @pytest.mark.parametrize("system", ["SI", "Inglés"])
+    def test_air_builds_outside_tecnico(self, system: str) -> None:
+        # En SI, las isotermas "en °C" de -50 a 1000 se leían como kelvin
+        # (negativos) y calc_isolines lanzaba ValueError.
+        assert build_diagram(DiagramSpec(fluid="Air", system=system)) is not None
+
+    def test_water_si_has_the_same_isobars_as_tecnico(self) -> None:
+        diagram = build_diagram(DiagramSpec(fluid="Water", system="SI"))
+        p_Pa = sorted(diagram.pressure["isolines"].values())  # fluprodia las guarda en SI
+        assert p_Pa == pytest.approx([1e3, 1e4, 1e5, 1e6, 1e7, 1e8])
+        T_K = sorted(diagram.temperature["isolines"].values())
+        assert T_K[0] >= 273.15
 
 
 class TestBuildDiagramValidations:

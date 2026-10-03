@@ -9,7 +9,9 @@ Regresiones de la versión 0.9.0 de la página:
   anterior (y el diagrama mezclaba isolíneas de un fluido con estados de
   otro);
 - la tabla mostraba x = -1 fuera de la campana;
-- los pasos LaTeX estaban siempre en sistema Técnico (Fase 1.5b).
+- los pasos LaTeX estaban siempre en sistema Técnico (Fase 1.5b);
+- con aire en SI el diagrama lanzaba una excepción que tumbaba la página
+  (las isolíneas se generaban en °C aunque el diagrama estuviera en K).
 """
 
 from __future__ import annotations
@@ -46,6 +48,17 @@ def test_every_tab_computes_with_defaults(fluid: str) -> None:
         _click(at, key)
         assert not at.error, (fluid, key, [e.value for e in at.error])
     assert len(at.dataframe) == 4  # una tabla de estados por pestaña
+
+
+@pytest.mark.parametrize("system", ["SI", "Inglés"])
+def test_air_in_other_unit_systems(system: str) -> None:
+    at = _new_app()
+    at.selectbox(key="units_system").set_value(system).run()
+    at.selectbox(key="iso_fluid").set_value("Air").run()
+    for key in BUTTONS:
+        _click(at, key)
+        assert not at.error, (system, key, [e.value for e in at.error])
+    assert not any("No se pudo dibujar" in w.value for w in at.warning)
 
 
 @pytest.mark.parametrize("prefix", ["turb", "comp", "pump"])

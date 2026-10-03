@@ -29,6 +29,7 @@ import streamlit as st
 
 from core.diagrams import (
     DiagramSpec,
+    DiagramType,
     ProcessOverlay,
     isentropic_process,
     isobaric_process,
@@ -532,14 +533,7 @@ def _render_isentropic_diagram(
             DiagramPoint(state=result.state_out_isen, label="2s", color="#2ca02c"),
             DiagramPoint(state=result.state_out_real, label="2", color="#d62728"),
         ]
-        render_diagram_plotly(
-            fluid=fluid,
-            diagram_type=diagram_type,
-            system=system,
-            points=points,
-            overlays=overlays,
-            chart_key=chart_key,
-        )
+        _plot_diagram(fluid, diagram_type, system, points, overlays, chart_key)
 
 
 def _render_polytropic_diagram(
@@ -572,6 +566,18 @@ def _render_polytropic_diagram(
                     color="#d62728",
                 )
             )
+        _plot_diagram(fluid, diagram_type, system, points, overlays, chart_key)
+
+
+def _plot_diagram(
+    fluid: str,
+    diagram_type: DiagramType,
+    system: UnitSystem,
+    points: list[DiagramPoint],
+    overlays: list[ProcessOverlay],
+    chart_key: str,
+) -> None:
+    try:
         render_diagram_plotly(
             fluid=fluid,
             diagram_type=diagram_type,
@@ -580,6 +586,8 @@ def _render_polytropic_diagram(
             overlays=overlays,
             chart_key=chart_key,
         )
+    except Exception as exc:  # el diagrama no debe tumbar la página
+        st.warning(f"No se pudo dibujar el diagrama: {exc}")
 
 
 # ---------------------------------------------------------------------

@@ -269,31 +269,35 @@ def _validate_diagram_type(diagram_type: str) -> None:
 # ---------------------------------------------------------------------
 
 
-def _isoline_grid(fluid: str) -> dict[str, np.ndarray]:
-    """Retorna las isolíneas "limpias" (T, p, Q) para el fluido.
+def _isoline_grid(fluid: str, system: UnitSystem = "Técnico") -> dict[str, np.ndarray]:
+    """Isolíneas "redondas" (T, p, Q) del fluido, en las unidades de ``system``.
 
-    Valores expresados en unidades del sistema **Técnico** porque
-    fluprodia tiene `set_unit_system` configurado y este helper solo
-    se llama después de eso, con system fijo a `Técnico`. Para los
-    otros sistemas, la conversión la hace fluprodia internamente
-    al cambiar la unidad de la magnitud.
+    ``FluidPropertyDiagram.set_isolines`` interpreta los valores en las
+    unidades activas (las de ``set_unit_system``), así que se generan
+    directamente en las del diagrama: °C y bar (Técnico), K y Pa (SI),
+    °F y psia (Inglés). Hasta la versión 0.9.0 se generaban siempre en
+    °C / bar: en SI quedaban isotermas de 0 a 600 K e isobaras de 0,01 a
+    1000 Pa (y con aire, isotermas en kelvin negativos que hacían fallar
+    a CoolProp); en Inglés, isotermas de 0 a 600 °F.
     """
     rng = DEFAULT_RANGES[fluid]
-    # Temperatura en °C: paso 25 o 50 °C según el rango.
-    T_min_C = rng.T_K_min - 273.15
-    T_max_C = rng.T_K_max - 273.15
-    span = T_max_C - T_min_C
-    step_T = 25.0 if span <= 400.0 else 50.0
+    # Temperatura: paso de 25 o 50 grados (°C o K) según el rango; en °F,
+    # el doble (el grado Fahrenheit es 1/1,8 del Celsius).
+    step_T = 25.0 if rng.T_K_max - rng.T_K_min <= 400.0 else 50.0
+    if system == "Inglés":
+        step_T *= 2.0
+    T_min = convert_from_si(rng.T_K_min, "temperature", system)
+    T_max = convert_from_si(rng.T_K_max, "temperature", system)
     T_isolines = np.arange(
-        np.ceil(T_min_C / step_T) * step_T,
-        np.floor(T_max_C / step_T) * step_T + step_T / 2,
+        np.ceil(T_min / step_T) * step_T,
+        np.floor(T_max / step_T) * step_T + step_T / 2,
         step_T,
     )
-    # Presión en bar: una década, decades cubiertas según rango.
-    p_min_bar = rng.p_Pa_min * 1.0e-5
-    p_max_bar = rng.p_Pa_max * 1.0e-5
-    log_min = int(np.floor(np.log10(p_min_bar)))
-    log_max = int(np.ceil(np.log10(p_max_bar)))
+    # Presión: una isobara por década que cubra el rango.
+    p_min = convert_from_si(rng.p_Pa_min, "pressure", system)
+    p_max = convert_from_si(rng.p_Pa_max, "pressure", system)
+    log_min = int(np.floor(np.log10(p_min)))
+    log_max = int(np.ceil(np.log10(p_max)))
     p_isolines = np.array([10.0**k for k in range(log_min, log_max + 1)])
     # Calidad: 11 puntos en [0, 1].
     Q_isolines = np.linspace(0.0, 1.0, 11)
@@ -319,7 +323,8 @@ def build_diagram(spec: DiagramSpec) -> FluidPropertyDiagram:
     diagram = FluidPropertyDiagram(spec.fluid, backend=None)
     diagram.set_unit_system(**FLUPRODIA_UNITS[spec.system])
 
-    isolines = _isoline_grid(spec.fluid)
+    # Después de set_unit_system: los valores se leen en esas unidades.
+    isolines = _isoline_grid(spec.fluid, spec.system)
     diagram.set_isolines(**isolines)
     diagram.calc_isolines()
     return diagram
