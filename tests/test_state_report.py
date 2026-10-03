@@ -147,8 +147,9 @@ class TestSaturationRows:
     def test_pure_fluid_at_pressure(self) -> None:
         rows = saturation_rows(saturation_at_pressure(WATER, 1.0e6), "Técnico")
         by = _by_symbol(rows)
-        assert len(rows) == 13
-        assert rows[0].symbol == "T_sat"
+        assert len(rows) == 14
+        assert [r.symbol for r in rows[:2]] == ["T_sat", "p_sat"]
+        assert by["p_sat"].value == pytest.approx(10.0)
         assert by["T_sat"].value == pytest.approx(179.88, abs=0.01)
         assert by["h_f"].value == pytest.approx(762.51, abs=0.15)
         assert by["h_fg"].value == pytest.approx(2014.6, abs=0.15)
@@ -156,15 +157,22 @@ class TestSaturationRows:
         assert by["s_g"].unit == "kJ/(kg·K)"
 
     def test_pure_fluid_at_temperature(self, compressed: FluidState) -> None:
-        rows = saturation_rows(compressed.sat_at_T, "Técnico")
-        assert rows[0].symbol == "p_sat"
-        assert rows[0].value == pytest.approx(1.0142, abs=1e-4)
+        by = _by_symbol(saturation_rows(compressed.sat_at_T, "Técnico"))
+        assert by["T_sat"].value == pytest.approx(100.0)
+        assert by["p_sat"].value == pytest.approx(1.0142, abs=1e-4)
 
     def test_pseudo_pure_shows_bubble_and_dew(self) -> None:
         rows = saturation_rows(saturation_at_pressure("Air", 1.0e5), "SI")
         symbols = [r.symbol for r in rows]
-        assert symbols[:2] == ["T_f", "T_g"]
+        assert symbols[:3] == ["T_f", "T_g", "p_sat"]
         assert rows[1].value - rows[0].value > 2.0
+
+    def test_pseudo_pure_at_temperature_shows_bubble_and_dew_pressures(self) -> None:
+        from core.fluids import saturation_at_temperature
+
+        rows = saturation_rows(saturation_at_temperature("Air", 90.0), "SI")
+        assert [r.symbol for r in rows[:3]] == ["T_sat", "p_f", "p_g"]
+        assert rows[1].value > rows[2].value  # p_burbuja > p_rocío a T fija
 
 
 class TestFormatValue:

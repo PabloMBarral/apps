@@ -330,6 +330,18 @@ class TestDiagramTypes:
     def test_axis_map_covers_all_types(self) -> None:
         assert set(AXIS_MAP) == set(SUPPORTED_DIAGRAM_TYPES)
 
+    @pytest.mark.parametrize("diagram_type", SUPPORTED_DIAGRAM_TYPES)
+    def test_axis_map_matches_fluprodia_scales(self, diagram_type: str) -> None:
+        # Si no coinciden, la ventana de ejes se calcula en una escala distinta
+        # de la que dibuja fluprodia (en p–log v, p es lineal).
+        from fluprodia import FluidPropertyDiagram
+
+        spec = FluidPropertyDiagram("Water", backend=None).supported_diagrams[diagram_type]
+        prop_x, prop_y, x_log, y_log = AXIS_MAP[diagram_type]  # type: ignore[index]
+        assert (prop_x, prop_y) == (spec["x_property"], spec["y_property"])
+        assert x_log == (spec["x_scale"] == "log")
+        assert y_log == (spec["y_scale"] == "log")
+
 
 # ---------------------------------------------------------------------
 # JSON round-trip

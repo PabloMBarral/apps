@@ -258,35 +258,30 @@ def property_rows(state: FluidState, system: UnitSystem) -> list[PropertyRow]:
 def saturation_rows(sat: SaturationProperties, system: UnitSystem) -> list[PropertyRow]:
     """Fila de la tabla de saturación (Cengel A-4 si ``basis='T'``, A-5 si ``'P'``).
 
-    Si el fluido tiene glide (pseudo-puro), muestra por separado la
-    temperatura (o presión) de burbuja y de rocío.
+    Siempre trae T y p de saturación (una de las dos es el dato) y, para
+    v, u, h y s, los valores f, fg y g; así las filas a p y a T del mismo
+    estado se pueden poner lado a lado. Si el fluido tiene glide
+    (pseudo-puro), la variable que no es dato se muestra por separado en
+    el punto de burbuja (f) y en el de rocío (g).
     """
     group = "Saturación a p" if sat.basis == "P" else "Saturación a T"
     rows: list[PropertyRow] = []
-    if sat.basis == "P":
-        if abs(sat.glide_K) > 1e-6:
-            rows.append(
-                _row(group, "Temperatura de burbuja", "T_f", sat.liquid.T_K, "temperature", system)
-            )
-            rows.append(
-                _row(group, "Temperatura de rocío", "T_g", sat.vapor.T_K, "temperature", system)
-            )
-        else:
-            rows.append(
-                _row(
-                    group, "Temperatura de saturación", "T_sat", sat.T_sat_K, "temperature", system
-                )
-            )
+    if sat.basis == "P" and abs(sat.glide_K) > 1e-6:
+        rows.append(
+            _row(group, "Temperatura de burbuja", "T_f", sat.liquid.T_K, "temperature", system)
+        )
+        rows.append(
+            _row(group, "Temperatura de rocío", "T_g", sat.vapor.T_K, "temperature", system)
+        )
     else:
-        if not math.isclose(sat.liquid.P_Pa, sat.vapor.P_Pa, rel_tol=1e-9):
-            rows.append(
-                _row(group, "Presión de burbuja", "p_f", sat.liquid.P_Pa, "pressure", system)
-            )
-            rows.append(_row(group, "Presión de rocío", "p_g", sat.vapor.P_Pa, "pressure", system))
-        else:
-            rows.append(
-                _row(group, "Presión de saturación", "p_sat", sat.P_sat_Pa, "pressure", system)
-            )
+        rows.append(
+            _row(group, "Temperatura de saturación", "T_sat", sat.T_sat_K, "temperature", system)
+        )
+    if sat.basis == "T" and not math.isclose(sat.liquid.P_Pa, sat.vapor.P_Pa, rel_tol=1e-9):
+        rows.append(_row(group, "Presión de burbuja", "p_f", sat.liquid.P_Pa, "pressure", system))
+        rows.append(_row(group, "Presión de rocío", "p_g", sat.vapor.P_Pa, "pressure", system))
+    else:
+        rows.append(_row(group, "Presión de saturación", "p_sat", sat.P_sat_Pa, "pressure", system))
 
     specs: tuple[tuple[str, str, str, QuantityKind, float], ...] = (
         ("Volumen específico", "v", "v_m3_per_kg", "specific_volume", sat.v_fg_m3_per_kg),
@@ -295,27 +290,10 @@ def saturation_rows(sat: SaturationProperties, system: UnitSystem) -> list[Prope
         ("Entropía", "s", "s_J_per_kg_K", "specific_entropy", sat.s_fg_J_per_kg_K),
     )
     for name, sym, attr, kind, fg in specs:
-        rows.append(
-            _row(
-                group,
-                f"{name} del líquido saturado",
-                f"{sym}_f",
-                getattr(sat.liquid, attr),
-                kind,
-                system,
-            )
-        )
-        rows.append(_row(group, f"{name}: diferencia g − f", f"{sym}_fg", fg, kind, system))
-        rows.append(
-            _row(
-                group,
-                f"{name} del vapor saturado",
-                f"{sym}_g",
-                getattr(sat.vapor, attr),
-                kind,
-                system,
-            )
-        )
+        liquid, vapor = getattr(sat.liquid, attr), getattr(sat.vapor, attr)
+        rows.append(_row(group, f"{name}, líquido saturado", f"{sym}_f", liquid, kind, system))
+        rows.append(_row(group, f"{name} de vaporización (g − f)", f"{sym}_fg", fg, kind, system))
+        rows.append(_row(group, f"{name}, vapor saturado", f"{sym}_g", vapor, kind, system))
     return rows
 
 
@@ -997,14 +975,13 @@ def _step_ideal_gas(state: FluidState, system: UnitSystem) -> ProcedureStep:
         text=(
             "Se compara con la ecuación de estado del gas ideal pv = RT (vademecum §4.2) "
             "mediante el factor de compresibilidad Z (vademecum §7.3), con T absoluta. "
-            f"{verdict}"
+            f"Usar pv = RT erraría el volumen específico en {error_pct:.2f} %. {verdict}"
         ),
         latex=(
             rf"R = \frac{{R_u}}{{M}} = {_q(R, 'specific_entropy', system)}",
             rf"v_{{\mathrm{{gi}}}} = \frac{{R\,T}}{{p}} = {_q(v_ig, 'specific_volume', system)}",
             rf"Z = \frac{{p\,v}}{{R\,T}} = \frac{{v}}{{v_{{\mathrm{{gi}}}}}} = "
-            rf"{latex_number(state.Z, 5)}"
-            rf"\quad (\text{{error del gas ideal en }} v\text{{: }} {error_pct:.2f}\,\%)",
+            rf"{latex_number(state.Z, 5)}",
         ),
     )
 

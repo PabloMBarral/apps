@@ -180,7 +180,8 @@ def _axis_window_in_user_units(
     Parte de la ventana del fluido (:func:`core.diagrams.axis_window_si`),
     la agranda para que entren todos los puntos y procesos superpuestos
     (un estado fuera de la ventana no se vería) y le agrega un margen del
-    5 % (en escala log para ``p`` y ``v``).
+    5 % (sobre log10 en los ejes logarítmicos). En ejes lineales de p o v
+    el margen no baja de cero.
     """
     window_si = _axis_window_si_cached(fluid)
     prop_x, prop_y, x_log, y_log = AXIS_MAP[diagram_type]
@@ -204,8 +205,10 @@ def _axis_window_in_user_units(
         kind = _PROP_TO_KIND[prop]
         lo = convert_from_si(lo_si, kind, system)  # type: ignore[arg-type]
         hi = convert_from_si(hi_si, kind, system)  # type: ignore[arg-type]
-        lo, hi = pad_window(min(lo, hi), max(lo, hi), log=log)
-        limits.extend((lo, hi))
+        padded_lo, hi = pad_window(min(lo, hi), max(lo, hi), log=log)
+        if not log and prop in ("p", "vol"):  # presión y volumen no son negativos
+            padded_lo = max(padded_lo, 0.0)
+        limits.extend((padded_lo, hi))
 
     x_lo, x_hi, y_lo, y_hi = limits
     return x_lo, x_hi, y_lo, y_hi

@@ -19,6 +19,11 @@ LINKEDIN_HANDLE = "pablo-barral"
 GITHUB_REPO_URL = "https://github.com/PabloMBarral/apps"
 README_URL = "https://github.com/PabloMBarral/apps/blob/main/README.md"
 
+# Repo hermano con las fórmulas teóricas (cada página linkea su sección).
+VADEMECUM_REPO_URL = "https://github.com/PabloMBarral/vademecum-termo"
+VADEMECUM_PDF_URL = "https://github.com/PabloMBarral/vademecum-termo/blob/main/vademecum.pdf"
+VADEMECUM_DOI_URL = "https://doi.org/10.5281/zenodo.20092635"
+
 
 def sidebar_credits(*, version: str, page_name: str | None = None) -> None:
     """Renderiza el bloque de créditos en ``st.sidebar``.

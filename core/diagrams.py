@@ -216,12 +216,15 @@ def pad_window(lo: float, hi: float, *, log: bool, frac: float = 0.05) -> tuple[
 #
 # Las keys 'h','T','s','vol','p','Q' coinciden con las que devuelve
 # ``calc_individual_isoline`` y con las que acepta ``draw_isolines_plotly``.
+# Las escalas tienen que coincidir con las que dibuja fluprodia
+# (``FluidPropertyDiagram.supported_diagrams``): en "p–log v" solo v es
+# logarítmico, p es lineal.
 
 AXIS_MAP: dict[DiagramType, tuple[str, str, bool, bool]] = {
     "logph": ("h", "p", False, True),
     "Ts": ("s", "T", False, False),
     "hs": ("s", "h", False, False),
-    "plogv": ("vol", "p", True, True),
+    "plogv": ("vol", "p", True, False),
 }
 
 # Para cada axis-property, qué QuantityKind de units_system aplica.
