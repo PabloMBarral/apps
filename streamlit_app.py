@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.9.0"
+PAGE_VERSION = "0.10.0"
 
 
 def _home_page() -> None:
@@ -76,6 +76,11 @@ def _home_page() -> None:
           p–log v) y overlay del estado / proceso calculado, vía
           [fluprodia](https://github.com/fwitte/fluprodia).
 
+        Cada página trae las fórmulas del vademecum (📖 *Fórmulas
+        teóricas*), el procedimiento con los valores reemplazados
+        (🔬 *Procedimiento*) y la descarga de resultados en CSV / JSON.
+        Está pensada para usarse también desde el celular.
+
         ### En desarrollo
 
         Ciclos Rankine / refrigeración / Brayton / combinado,
@@ -87,7 +92,8 @@ def _home_page() -> None:
 
         ### Sistema de unidades
 
-        En el sidebar (después de los créditos) podés elegir entre **SI**
+        En el sidebar (después de los créditos; en el celular se abre con
+        la flecha **»** de arriba a la izquierda) podés elegir entre **SI**
         (K, Pa, J/kg, J/(kg·K)), **Técnico** (°C, bar, kJ/kg, kJ/(kg·K))
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a

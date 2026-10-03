@@ -43,14 +43,15 @@ apps/
 │   ├── 1_Propiedades.py       # ✅ Fase 1.6 — Estado completo del agua (y otros
 │   │                          # fluidos): región, tablas, procedimiento,
 │   │                          # diagrama, tabla de estados para ciclos.
-│   ├── 2_Interpolacion.py     # ✅ Fase 1.1
-│   ├── 3_Isoentropicos.py     # ✅ Fase 1.3 + ✅ 1.5a (diagrama del proceso)
+│   ├── 2_Interpolacion.py     # ✅ Fase 1.1 (+ teoría y export, Fase 1.7)
+│   ├── 3_Isoentropicos.py     # ✅ Fase 1.3 + 1.5a (diagrama del proceso) +
+│   │                          # 1.5b y validaciones / defaults por fluido (1.7)
 │   ├── 5_Rankine.py
 │   ├── 6_Refrigeracion.py
 │   ├── 7_Psicrometria.py
 │   ├── 8_Combustion.py
 │   ├── 9_Poder_Calorifico.py
-│   ├── 4_ISO6976.py           # ✅ Fase 2.3 (matriz identidad)
+│   ├── 4_ISO6976.py           # ✅ Fase 2.3 (matriz identidad; teoría y export 1.7)
 │   ├── 11_Exergia.py
 │   └── 99_Acerca.py           # Créditos, licencias, citas
 ├── core/                      # Lógica pura, sin dependencia de Streamlit
@@ -69,8 +70,17 @@ apps/
 │   ├── state_report.py        # ✅ Fase 1.6 — Presentación pura de un FluidState:
 │   │                          # tablas, notas, procedimiento LaTeX por sistema
 │   │                          # de unidades, export JSON/CSV, tabla de estados.
+│   ├── latex.py               # ✅ Fase 1.7 — latex_number/unit/quantity,
+│   │                          # latex_chain (una igualdad por renglón) y
+│   │                          # latex_paren (negativos tras un signo).
+│   ├── export.py              # ✅ Fase 1.7 — flatten / dict_to_csv: el dict de
+│   │                          # un resultado → CSV (campo, valor) y JSON.
 │   ├── interpolation.py       # ✅ Fase 1.1 — Interpolación lineal y doble entrada
-│   ├── isentropic.py          # ✅ Fase 1.3 — Turbina / compresor / bomba; multietapa
+│   │                          # (+ interpolation_to_dict, Fase 1.7).
+│   ├── isentropic.py          # ✅ Fase 1.3 — Turbina / compresor / bomba; multietapa.
+│   │                          # Fase 1.7: validaciones al alumno, DeviceDefaults /
+│   │                          # suggested_device_inputs, pasos por sistema (1.5b),
+│   │                          # tabla de estados y *_to_dict para exportar.
 │   ├── diagrams.py            # ✅ Fase 1.5a — Wrappers tipados sobre fluprodia.
 │   │                          # FLUPRODIA_UNITS, DEFAULT_RANGES, build_diagram,
 │   │                          # isentropic/isobaric/isothermal_process, overlays,
@@ -81,7 +91,8 @@ apps/
 │   │   ├── fuels.py           # Modelos de combustible (sólido/líquido/gas)
 │   │   ├── stoichiometry.py   # Reacciones, exceso aire, productos
 │   │   ├── heating_value.py   # PCI/PCS por correlaciones (último/próximo)
-│   │   └── iso6976.py         # ✅ Fase 2.3 — ISO 6976:2016 (matriz identidad)
+│   │   └── iso6976.py         # ✅ Fase 2.3 — ISO 6976:2016 (matriz identidad;
+│   │                          # iso6976_to_dict, Fase 1.7)
 │   │                          # Normalization matrix: pendiente, requiere
 │   │                          # ISO 14912:2003 Formula (69) — deferido.
 │   ├── cycles/
@@ -172,6 +183,31 @@ Notas de implementación (aprendidas en la Fase 1.6):
 - Testear la página con `streamlit.testing.v1.AppTest` (ver
   `tests/test_page_propiedades.py`) y validar el LaTeX nuevo con KaTeX,
   que es el motor de `st.latex`.
+
+Notas de la Fase 1.7:
+
+- **Ancho de las ecuaciones**: KaTeX no parte una ecuación en renglones
+  y en un celular de 390 px hay ~324 px útiles (dentro de un expansor).
+  Las sustituciones con números se escriben con `core.latex.latex_chain`
+  (una igualdad por renglón, `aligned`); si un renglón sigue largo, se
+  corta antes de un `+`/`−` con `\\ &\quad +`. Dos ecuaciones en la
+  misma línea (`\qquad`) solo si son cortas; si no, van en `st.latex`
+  separados o en un `aligned`. Los negativos después de un signo, con
+  `latex_paren`. Medir el ancho real renderizando con KaTeX en un
+  navegador (p. ej. Chromium con Playwright) en los tres sistemas de
+  unidades; en SI, los números con ×10ⁿ J/kg pueden quedar más anchos
+  (se deslizan).
+- **Isolíneas de fluprodia**: `set_isolines` interpreta los valores en
+  las unidades activas del diagrama (`set_unit_system`). Generarlas en
+  las unidades de cada sistema (`core.diagrams._isoline_grid(fluid,
+  system)`); hasta la 0.9.0 iban siempre en °C/bar y en SI quedaban
+  isobaras de 0,01–1000 Pa.
+- Un diagrama que falla no debe tumbar la página: envolverlo en
+  `try/except` y mostrar `st.warning` (como Propiedades e Isoentrópicos).
+- Los valores por defecto de cada página tienen que ser calculables para
+  todos los fluidos (`suggested_inputs`, `suggested_device_inputs`) y
+  hay tests que los recorren; evitar el estado de referencia de CoolProp
+  (h = s = 0), donde el ruido numérico se ve como −1×10⁻⁵.
 
 ### Citas y licencias
 

@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.9.0` — Fase 1.6 cerrada (2026-10-03).
+> **Versión actual**: `0.10.0` — Fase 1.7 cerrada (2026-10-03).
 
 ---
 
@@ -139,30 +139,71 @@
 - **Referencias**: IAPWS-95 (Wagner & Pruß, 2002) agregada a
   `CITATION.cff` y al README. Sin dependencias nuevas.
 
+### Fase 1.7 — Isoentrópicos, fórmulas y export en todas las páginas, celular
+- **Versión**: `0.10.0` (2026-10-03). Rama `claude/water-state-analyzer-f4fiev`.
+- **Commits**: `3df17ae` (fix: `pages/` → `app_pages/`), `704bd1b` (feat:
+  Isoentrópicos con validaciones, defaults por fluido, pasos por sistema
+  — Fase 1.5b — y export), `dd05941` (feat: fórmulas teóricas y export en
+  Interpolación e ISO 6976), `5ad2890` (fix: isolíneas de los diagramas en
+  SI e Inglés), `2ef9cfe` (fix: ecuaciones que entran en un celular) y el
+  commit de docs que cierra la fase.
+- **Bugs corregidos** (todos reproducidos antes de arreglarlos):
+  - Links directos (`/Propiedades`) después de un reinicio mostraban el
+    menú automático con nombres de archivo: la carpeta `pages/` activa el
+    modo multipágina viejo con una bandera global del proceso.
+  - Isoentrópicos: con R410A y CO₂ la bomba fallaba con los valores
+    iniciales (errores en inglés); con R134a la turbina "calculaba" a
+    400 °C, por encima del máximo de su ecuación de estado (182 °C), sin
+    aviso; al cambiar de fluido seguía el resultado del anterior (y el
+    diagrama mezclaba isolíneas de un fluido con estados de otro); la
+    tabla mostraba x = −1 fuera de la campana.
+  - Diagramas en SI: las isolíneas se generaban en °C/bar pero fluprodia
+    las leía en K/Pa (isobaras de 0,01–1000 Pa, isotermas de 0–600 K); con
+    aire, CoolProp fallaba y la página de Isoentrópicos se caía. En
+    Inglés el diagrama del agua quedaba recortado a 315 °C y 69 bar.
+  - Ecuaciones más anchas que la pantalla del celular: en Técnico, 148 de
+    289 superaban los ~324 px útiles a 390 px de ancho (hasta 684 px) y
+    KaTeX las cortaba con un scroll horizontal que no se ve.
+  - Restas con negativos sin paréntesis (`a − −3`) en interpolación (tablas
+    en °C bajo cero) e Isoentrópicos (aire), y la bomba de aire líquido
+    arrancaba en el estado de referencia de CoolProp (h₁ = −1,2×10⁻⁵ kJ/kg,
+    "líquido comprimido" para un líquido saturado).
+- **Scope**: Isoentrópicos con las validaciones de `fluid_state_from_pair`
+  (mensajes en castellano: entrada líquida a un compresor, vapor en la
+  bomba, interenfriador que condensaría), valores iniciales calculables
+  para los 7 fluidos (`suggested_device_inputs`), tabla de estados con la
+  región, pasos LaTeX en el sistema activo (Fase 1.5b, con
+  `core/latex.py`) y comparación de la bomba con el modelo incompresible.
+  Las cuatro páginas cumplen el mínimo de CLAUDE.md: expansor `📖
+  Fórmulas teóricas` con la sección del vademecum (§2.1/§2.2, §10.4,
+  §3.3, §6.3, §16.9) y descarga CSV/JSON (`core/export.py`). Ecuaciones
+  en renglones cortos (`latex_chain`): en Técnico ya no hay ninguna más
+  ancha que el celular.
+- **Tests**: de 791 a 921 (+130): AppTest de Isoentrópicos (7 fluidos ×
+  4 dispositivos, modo inverso, errores, unidades, aire en SI e Inglés),
+  de Interpolación y de ISO 6976; navegación por las cuatro páginas;
+  isolíneas por sistema (7 fluidos × 3 sistemas); export y helpers de
+  LaTeX. Las 890 ecuaciones distintas de las páginas 1–4 (24 estados de
+  Propiedades, 7 fluidos × 4 dispositivos, 3 sistemas) validan con KaTeX
+  en modo estricto y se midió su ancho renderizado en Chromium.
+- Sin dependencias nuevas.
+
 ---
 
 ## Pendientes / próximas fases
 
-- **Fase 1.5b** — Conversión al sistema activo de los pasos didácticos
-  LaTeX de Isoentrópicos (hoy hardcoded en Técnico para consistencia
-  con Cengel). Implica reescribir los formatters de
-  `core/isentropic.py` para emitir LaTeX por sistema. Se puede reusar
-  `latex_number` / `latex_unit` / `pv_energy_factor` de
-  `core/state_report.py`.
-- **Detectado en Fase 1.6, sin resolver**:
-  - Isoentrópicos sigue usando `state_from_pair` sin las validaciones de
-    `fluid_state_from_pair` (rango de la ecuación de estado, mensajes en
-    castellano); migrarla daría los mismos mensajes que Propiedades.
-  - Las páginas 2, 3 y 4 todavía no tienen el expansor `📖 Fórmulas
-    teóricas` (las constantes `VADEMECUM_*` ya están en `ui/branding.py`).
-  - Navegación: Streamlit decide entre `st.navigation` y la carpeta
-    `pages/` con una bandera global que se apaga recién cuando corre
-    `streamlit_app.py`. Si el primer visitante después de un reinicio
-    entra por un link directo (p. ej. `/Propiedades`), ve el menú
-    automático ("streamlit app", "Interpolacion" sin tilde) hasta que
-    alguien entre por la raíz. Se arregla renombrando `pages/` (p. ej. a
-    `app_pages/`) y actualizando las rutas de `st.Page`; queda a decisión
-    del autor porque toca la estructura documentada.
+- **Detectado en Fase 1.7, sin resolver**:
+  - En sistema SI (J/kg con ×10ⁿ) algunas sustituciones siguen siendo más
+    anchas que el celular (regla de la palanca, h₂ de Isoentrópicos: hasta
+    475 px) y se deslizan; en Inglés, 4 apenas pasadas (≤ 339 px). Se
+    resolvería mostrando las energías en kJ/kg dentro del SI o con otro
+    formato de número.
+  - Aire (pseudo-puro): un líquido saturado reconstruido desde (p, h) se
+    clasifica como líquido comprimido (afecta a la tabla de estados de
+    Isoentrópicos si se elige x = 0 a mano; el valor inicial lo evita).
+  - Un fixture con scope de clase usado como método de instancia en un
+    test viejo (`TestWaterSubcooledAt25C1Bar`) emite
+    `PytestRemovedIn10Warning`.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
 - **Fase 3.1** — Ciclos termodinámicos con TESPy: Rankine simple,
@@ -185,7 +226,7 @@
 
 - **Versionado**: bump al cierre de cada fase. Sincronizar
   `CITATION.cff`, `streamlit_app.py:PAGE_VERSION` y la version label
-  de cada `pages/N_*.py` afectada.
+  de cada `app_pages/N_*.py` afectada.
 - **Checklist de cierre de fase** (todas obligatorias):
   1. `ruff check .` + `ruff format .` limpios.
   2. `pytest -v` en verde, incluyendo tests nuevos del módulo.
