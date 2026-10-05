@@ -13,7 +13,9 @@ CoolProp>=6.6
 
 # --- Simulación de ciclos termodinámicos ---
 # TESPy: modela ciclos completos (Rankine, refrigeración, Brayton, etc.)
-tespy>=0.9.14
+# core/cycles usa la API de unidades de la 0.11 (network.units.set_defaults);
+# la 0.12 cambia el manejo de presiones y diferencias de presión.
+tespy>=0.11.2,<0.12
 
 # --- Diagramas de fluidos ---
 # fluprodia: log p-h, T-s, h-s, p-v con isolineas
