@@ -57,7 +57,7 @@ from core.diagrams import (  # noqa: E402
     state_to_diagram_coords,
     to_json,
 )
-from core.fluids import SUPPORTED_FLUIDS, StatePoint, state_from_pair  # noqa: E402
+from core.fluids import SUPPORTED_FLUIDS, StatePoint, fluid_limits, state_from_pair  # noqa: E402
 from core.units_system import convert_to_si  # noqa: E402
 
 # ---------------------------------------------------------------------
@@ -113,6 +113,15 @@ class TestDefaultRanges:
         assert rng.T_K_min > 0.0
         assert rng.p_Pa_min > 0.0
 
+    @pytest.mark.parametrize("fluid", ["R245fa", "R1233zd(E)", "Isopentane", "Toluene"])
+    def test_orc_range_fits_the_equation_of_state(self, fluid: str) -> None:
+        # Los fluidos de ORC se usan hasta cerca de la temperatura máxima de su
+        # ecuación de estado (el R-245fa llega solo a 167 °C).
+        rng = DEFAULT_RANGES[fluid]
+        lim = fluid_limits(fluid)
+        assert lim.T_min_K <= rng.T_K_min and rng.T_K_max <= lim.T_max_K
+        assert rng.p_Pa_max <= lim.P_max_Pa
+
 
 # ---------------------------------------------------------------------
 # Construcción del diagrama — uno por fluido
@@ -150,6 +159,11 @@ class TestIsolinesPerSystem:
         assert max(p_Pa) >= rng.p_Pa_max * (1 - 1e-9)
         # Valores redondos en las unidades del sistema (rótulos legibles).
         assert all(float(t).is_integer() for t in grid["T"])
+
+    @pytest.mark.parametrize("system", ["SI", "Inglés"])
+    @pytest.mark.parametrize("fluid", ["R245fa", "R1233zd(E)", "Isopentane", "Toluene"])
+    def test_orc_fluids_build_in_every_system(self, fluid: str, system: str) -> None:
+        assert build_diagram(DiagramSpec(fluid=fluid, system=system)) is not None
 
     @pytest.mark.parametrize("system", ["SI", "Inglés"])
     def test_air_builds_outside_tecnico(self, system: str) -> None:

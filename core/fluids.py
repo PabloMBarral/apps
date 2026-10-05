@@ -57,6 +57,11 @@ SUPPORTED_FLUIDS: list[str] = [
     "Ammonia",
     "CarbonDioxide",
     "Air",
+    # Fluidos orgánicos para el ciclo de Rankine orgánico (ORC, Fase 3.1c).
+    "R245fa",
+    "R1233zd(E)",
+    "Isopentane",
+    "Toluene",
 ]
 
 #: Nombre en castellano de cada fluido soportado (para títulos y selectores).
@@ -68,6 +73,10 @@ FLUID_NAMES_ES: dict[str, str] = {
     "Ammonia": "Amoníaco (R-717)",
     "CarbonDioxide": "Dióxido de carbono (R-744)",
     "Air": "Aire",
+    "R245fa": "R-245fa",
+    "R1233zd(E)": "R-1233zd(E)",
+    "Isopentane": "Isopentano (R-601a)",
+    "Toluene": "Tolueno",
 }
 
 # (kwarg en la API, símbolo CoolProp). El volumen específico viaja como
@@ -871,6 +880,10 @@ _FLUID_WITH_ARTICLE: dict[str, str] = {
     "Ammonia": "el amoníaco",
     "CarbonDioxide": "el dióxido de carbono",
     "Air": "el aire",
+    "R245fa": "el R-245fa",
+    "R1233zd(E)": "el R-1233zd(E)",
+    "Isopentane": "el isopentano",
+    "Toluene": "el tolueno",
 }
 
 

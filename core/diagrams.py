@@ -125,6 +125,13 @@ DEFAULT_RANGES: dict[str, FluidRange] = {
     "Ammonia": FluidRange(T_K_min=223.15, T_K_max=473.15, p_Pa_min=1.0e4, p_Pa_max=1.0e7),
     "CarbonDioxide": FluidRange(T_K_min=218.15, T_K_max=423.15, p_Pa_min=5.0e5, p_Pa_max=2.0e7),
     "Air": FluidRange(T_K_min=173.15, T_K_max=1273.15, p_Pa_min=1.0e4, p_Pa_max=1.0e7),
+    # Fluidos de ORC: de la condensación (~20–40 °C) hasta la temperatura máxima
+    # de su ecuación de estado (R-245fa: 167 °C; R-1233zd(E): 177 °C;
+    # isopentano: 227 °C; tolueno: 427 °C).
+    "R245fa": FluidRange(T_K_min=233.15, T_K_max=433.15, p_Pa_min=1.0e4, p_Pa_max=4.0e6),
+    "R1233zd(E)": FluidRange(T_K_min=233.15, T_K_max=443.15, p_Pa_min=1.0e4, p_Pa_max=4.0e6),
+    "Isopentane": FluidRange(T_K_min=223.15, T_K_max=498.15, p_Pa_min=1.0e4, p_Pa_max=4.0e6),
+    "Toluene": FluidRange(T_K_min=273.15, T_K_max=673.15, p_Pa_min=1.0e3, p_Pa_max=5.0e6),
 }
 
 
