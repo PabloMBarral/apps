@@ -40,7 +40,7 @@ import CoolProp.CoolProp as cp
 import numpy as np
 from fluprodia import FluidPropertyDiagram
 
-from core.fluids import SUPPORTED_FLUIDS, StatePoint
+from core.fluids import SUPPORTED_FLUIDS, StatePoint, state_from_pair
 from core.units_system import UnitSystem, convert_from_si
 
 # ---------------------------------------------------------------------
@@ -646,6 +646,40 @@ def _straight_coords(start: StatePoint, end: StatePoint) -> dict[str, np.ndarray
     return linear_segment_overlay(name="", color="", dash="", start=start, end=end).coords_si
 
 
+# Una caída de presión de menos de 1/4 (relación entre 0,75 y 1,33) es la de un
+# intercambiador o una cañería con fricción, no la de una turbina o una bomba.
+_HEAT_EXCHANGE_P_RATIO = 1.0 / 0.75
+
+
+def _friction_coords(
+    spec: DiagramSpec, start: StatePoint, end: StatePoint, n: int = 40
+) -> dict[str, np.ndarray]:
+    """Calentamiento o enfriamiento con caída de presión (Cengel §10-5).
+
+    Se dibuja con la presión variando linealmente con la entalpía entre los
+    dos estados: el proceso real va casi sobre la isobara, perdiendo presión
+    de a poco por la fricción.
+    """
+    hs = np.linspace(start.h_J_per_kg, end.h_J_per_kg, n)
+    ps = start.P_Pa + (end.P_Pa - start.P_Pa) * (hs - start.h_J_per_kg) / (
+        end.h_J_per_kg - start.h_J_per_kg
+    )
+    points = [
+        state_from_pair(spec.fluid, "PH", p=float(p), h=float(h))
+        for p, h in zip(ps, hs, strict=True)
+    ]
+    return {
+        "p": ps,
+        "T": np.array([pt.T_K for pt in points], dtype=float),
+        "h": hs,
+        "s": np.array([pt.s_J_per_kg_K for pt in points], dtype=float),
+        "vol": np.array(
+            [np.nan if pt.v_m3_per_kg is None else pt.v_m3_per_kg for pt in points], dtype=float
+        ),
+        "Q": np.array([pt.x for pt in points], dtype=float),
+    }
+
+
 def segment_between(
     diagram: FluidPropertyDiagram,
     spec: DiagramSpec,
@@ -657,10 +691,13 @@ def segment_between(
     - Misma presión → isobárica real (caldera, condensador, evaporador).
     - Misma entropía → isoentrópica real (bomba, turbina o compresor
       ideales).
-    - Si no comparten ninguna, o si fluprodia no puede trazarla → segmento
-      recto, que es **solo una referencia visual** (p. ej. una turbina
-      real o una válvula de expansión no son procesos cuasiestáticos con
-      una trayectoria definida en el diagrama).
+    - Presión apenas distinta (intercambiador o cañería con fricción, ciclo
+      real de Cengel §10-5) → casi isobárica: la presión baja de a poco
+      mientras cambia la entalpía.
+    - Si no, o si fluprodia no puede trazarla → segmento recto, que es
+      **solo una referencia visual** (p. ej. una turbina real o una válvula
+      de expansión no son procesos cuasiestáticos con una trayectoria
+      definida en el diagrama).
     """
     if _shares(start.P_Pa, end.P_Pa, scale=1.0) and not _shares(
         start.h_J_per_kg, end.h_J_per_kg, scale=1.0e3
@@ -688,6 +725,14 @@ def segment_between(
                 p_end_Pa=end.P_Pa,
             )
             return "isentropic", coords
+        except Exception:
+            pass
+    ratio = start.P_Pa / end.P_Pa
+    if 1.0 / _HEAT_EXCHANGE_P_RATIO < ratio < _HEAT_EXCHANGE_P_RATIO and not _shares(
+        start.h_J_per_kg, end.h_J_per_kg, scale=1.0e3
+    ):
+        try:
+            return "isobaric", _friction_coords(spec, start, end)
         except Exception:
             pass
     return "straight", _straight_coords(start, end)

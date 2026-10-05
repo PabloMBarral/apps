@@ -345,3 +345,18 @@ def test_cengel_10_2_solves_without_warnings() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         solve_rankine(_cengel_10_2())
+
+
+def test_heat_exchangers_with_friction_are_drawn_almost_on_the_isobar() -> None:
+    from core.diagrams import DiagramSpec, build_diagram, segment_between
+
+    r = solve_rankine(_cengel_10_2())
+    spec = DiagramSpec(fluid="Water", system="Técnico")
+    diagram = build_diagram(spec)
+    pts = [s.to_state_point() for s in r.states]
+    kind, coords = segment_between(diagram, spec, pts[2], pts[3])  # caldera, 3 → 4
+    assert kind == "isobaric"
+    assert coords["p"][0] == pytest.approx(15.9e6) and coords["p"][-1] == pytest.approx(15.2e6)
+    assert all(b > a for a, b in zip(coords["h"][:-1], coords["h"][1:], strict=True))
+    assert segment_between(diagram, spec, pts[5], pts[0])[0] == "isobaric"  # condensador
+    assert segment_between(diagram, spec, pts[4], pts[5])[0] == "straight"  # turbina real
