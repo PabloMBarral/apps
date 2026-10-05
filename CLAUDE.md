@@ -46,7 +46,8 @@ apps/
 │   ├── 2_Interpolacion.py     # ✅ Fase 1.1 (+ teoría y export, Fase 1.7)
 │   ├── 3_Isoentropicos.py     # ✅ Fase 1.3 + 1.5a (diagrama del proceso) +
 │   │                          # 1.5b y validaciones / defaults por fluido (1.7)
-│   ├── 5_Rankine.py
+│   ├── 5_Rankine.py           # ✅ Fase 3.1a — Rankine simple / con
+│   │                          # recalentamiento (TESPy), Carnot, barridos de η.
 │   ├── 6_Refrigeracion.py
 │   ├── 7_Psicrometria.py
 │   ├── 8_Combustion.py
@@ -62,6 +63,7 @@ apps/
 │   │                          # Tabla (kind, system) → (factor, offset, label),
 │   │                          # API format_quantity / convert_*_si / unit_label.
 │   │                          # Fase 1.6: + ΔT, ρ, velocidad, μ, k, difusividad.
+│   │                          # Fase 3.1a: + caudal másico y potencia.
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
@@ -96,7 +98,11 @@ apps/
 │   │                          # Normalization matrix: pendiente, requiere
 │   │                          # ISO 14912:2003 Formula (69) — deferido.
 │   ├── cycles/
-│   │   ├── rankine.py
+│   │   ├── tespy_utils.py     # ✅ Fase 3.1a — new_network() en SI y
+│   │   │                      # solve() (status de TESPy → ValueError en castellano).
+│   │   ├── rankine.py         # ✅ Fase 3.1a — RankineInputs / solve_rankine /
+│   │   │                      # RankineResult, validaciones, rankine_steps (LaTeX
+│   │   │                      # por sistema), barridos y rankine_to_dict.
 │   │   ├── refrigeration.py
 │   │   ├── brayton.py
 │   │   └── combined.py
@@ -218,6 +224,30 @@ Notas de la Fase 1.7:
   flash de CoolProp falla cerca de la línea de burbuja); T-x con
   0 < x < 1 no está definido. En los procedimientos, T_f ≤ T ≤ T_g en vez
   de T = T_sat.
+
+Notas de la Fase 3.1a (TESPy 0.11):
+
+- Armar la red como el tutorial oficial (`tutorial/basics/rankine.py`:
+  `CycleCloser` + `SimpleHeatExchanger` + `Turbine` + `Pump`) con
+  `core.cycles.tespy_utils.new_network()`, que fija unidades SI (incluida
+  `pressure_difference`: si falta, TESPy 0.11 avisa con un FutureWarning).
+- Resolver con `tespy_utils.solve(network, what=...)`: exige
+  `network.status == 0` (1 = convergió con parámetros fuera de rango, p. ej.
+  una turbina que comprime; 2 = no convergió; 3 = singular; 99 = error) y
+  explica el problema en castellano.
+- TESPy acepta datos imposibles sin quejarse (entrada a la turbina por
+  debajo de la saturación, un "recalentamiento" que enfría): validar en
+  `core` antes de resolver y revisar el resultado después.
+- De TESPy leer solo p y h (`.val_SI`) y reconstruir cada estado con
+  `core.fluids.fluid_state_from_pair` (p, h): región, título y saturación
+  salen con la convención del proyecto (no usar el x de TESPy).
+- Cachear el resultado (dataclasses picklables) con `st.cache_data`, nunca
+  la `Network`. `import tespy` tarda ~3,6 s en frío: queda dentro de
+  `core/cycles/`. Un Rankine se resuelve en ~60 ms; un barrido, una red por
+  punto.
+- Ecuaciones: el factor de unidades de v·Δp y los términos con ×10ⁿ (SI)
+  van en un renglón de continuación (`\\ &\quad`); la regla de la palanca
+  usa h_fg y s_fg, como Cengel.
 
 ### Citas y licencias
 

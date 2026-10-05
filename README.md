@@ -93,6 +93,28 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   ``(fluido, sistema de unidades)`` cacheado con `@st.cache_resource`
   para amortizar el cálculo de isolíneas, con isotermas e isobaras
   redondas en las unidades de cada sistema. _Fase 1.5a cerrada._
+- ✅ **Ciclo de Rankine** (agua) resuelto con
+  [TESPy](https://tespy.readthedocs.io) como una red de componentes
+  (bomba, caldera, turbina, condensador): simple o **con
+  recalentamiento**, ideal o real (rendimientos isoentrópicos de turbina y
+  bomba), con entrada a la turbina sobrecalentada o como vapor saturado
+  seco, y caudal másico o potencia neta como dato. Muestra η térmico,
+  trabajo neto, título a la salida de la turbina (aviso si baja de 0,88),
+  relación de trabajo de retroceso, comparación con Carnot y con la
+  temperatura media de aporte de calor, potencias, la tabla de estados
+  (numeración de Cengel) y el ciclo sobre el diagrama T–s (u otro). El
+  **procedimiento** lo resuelve estado por estado como con las tablas
+  (bomba con v·Δp, regla de la palanca con h_fg y s_fg, balances), en
+  LaTeX y en el sistema de unidades activo; un expansor muestra cómo lo
+  arma TESPy (red y balances por componente) y otro, **cómo aumentar el
+  rendimiento**: barridos de η y del título vs. presión de caldera,
+  temperatura de entrada a la turbina y presión del condensador
+  (Cengel §10-6). Ejemplos precargados de Cengel (10-1, 10-3 a/b/c, 10-4
+  y uno basado en 10-2), verificados contra el libro. Validación con
+  mensajes en castellano (vapor que entraría líquido a la turbina,
+  condensador por encima de la caldera, recalentamiento que enfriaría…).
+  Fórmulas del vademecum (§3.3, §9.2, §10.1, §10.4, §12, §13) y descarga
+  CSV/JSON. _Fase 3.1a cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -100,7 +122,8 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
 
 ### En desarrollo (roadmap)
 - **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
-  Rankine (simple, con recalentamiento, con regeneración),
+  Rankine con regeneración (calentadores abierto y cerrado), condensador
+  con agua de enfriamiento y pérdidas de carga, ORC con otros fluidos;
   refrigeración por compresión de vapor (simple, con economizador, cascada),
   Brayton (simple, con regeneración, intercooling, recalentamiento),
   ciclo combinado, cogeneración.
@@ -157,6 +180,8 @@ apps/
 │   │   ├── heating_value.py
 │   │   └── iso6976.py
 │   ├── cycles/
+│   │   ├── tespy_utils.py # red de TESPy en SI y errores en castellano
+│   │   └── rankine.py     # Rankine simple / con recalentamiento (TESPy)
 │   └── plots.py
 ├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
@@ -174,7 +199,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.9.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.11.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -252,6 +277,9 @@ Organization for Standardization, 2016.
   página muestra "—" (en la API de bajo nivel, `StatePoint.x = -1`).
 - Las propiedades del agua salen de CoolProp con la formulación
   IAPWS-95; pueden diferir en el último decimal de las tablas impresas.
+- Los ciclos usan la numeración de estados de Çengel & Boles,
+  *Termodinámica* (cap. 10), y sus ejemplos precargados se verificaron
+  contra los resultados del libro.
 - La precisión de los resultados depende de las librerías subyacentes.
   Usar bajo propia responsabilidad. **Esta es una herramienta didáctica**,
   no apta para diseño de equipos sin verificación independiente.

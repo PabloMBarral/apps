@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.10.0` — Fase 1.7 cerrada (2026-10-03).
+> **Versión actual**: `0.11.0` — Fase 3.1a cerrada (2026-10-05).
 
 ---
 
@@ -201,6 +201,56 @@
   estricto y se midió su ancho renderizado en Chromium.
 - Sin dependencias nuevas.
 
+### Fase 3.1a — Ciclo de Rankine con TESPy
+- **Versión**: `0.11.0` (2026-10-05). Rama `claude/water-state-analyzer-f4fiev`.
+- **Commits**: `c2bda6c` (feat: caudal másico y potencia en
+  `units_system`), `549f2a3` (feat: `core/cycles` con TESPy — Rankine
+  simple y con recalentamiento), `175ac5d` (feat: página `/Rankine`) y el
+  commit de docs que cierra la fase.
+- **Scope**: `core/cycles/tespy_utils.py` (red de TESPy en SI y `solve`,
+  que exige `status == 0` y explica en castellano por qué no convergió) y
+  `core/cycles/rankine.py`: Rankine de agua simple o con recalentamiento
+  (una etapa), ideal o real (η_T y η_B), con entrada a la turbina
+  sobrecalentada o como vapor saturado seco, y caudal másico o potencia
+  neta como dato. La red se arma como el tutorial oficial de TESPy 0.11
+  (`CycleCloser` + `SimpleHeatExchanger` + `Turbine` + `Pump`) y cada
+  estado se reconstruye con `fluid_state_from_pair` (p, h). Resultados:
+  q_H, q_C, w_T, w_B, w_neto, η, BWR, título a la salida de la turbina
+  (aviso por debajo de 0,88), η de Carnot y temperatura media de aporte de
+  calor, potencias. Procedimiento "como con las tablas" en LaTeX y en el
+  sistema activo (bomba con v·Δp, regla de la palanca con h_fg y s_fg,
+  balances); barridos de η y del título vs. presión de caldera,
+  temperatura de entrada a la turbina y presión del condensador (Cengel
+  §10-6); export CSV/JSON. `units_system`: caudal másico y potencia.
+  Página `5_Rankine.py` (`/Rankine`) con el checklist de CLAUDE.md:
+  ejemplos de Cengel (10-1, 10-3 a/b/c, 10-4 y uno basado en 10-2),
+  diagrama del ciclo (T–s por defecto) con la expansión isoentrópica de
+  referencia cuando η_T < 1, expansor "Cómo lo resuelve TESPy" (red y
+  balances por componente) y fórmulas del vademecum (§3.3, §9.2, §10.1,
+  §10.4, §12, §13).
+- **Validación**: Cengel 10-1 (η = 26,0 %, x₄ = 0,886), 10-3 a/b/c
+  (33,4 / 37,3 / 43,0 %) y 10-4 (45,0 %, x₆ = 0,896); TESPy contra el
+  cálculo a mano con CoolProp, estado por estado, en 6 casos (ideal, real,
+  recalentamiento, vapor saturado seco, supercrítico).
+- **Mensajes al alumno**: entrada a la turbina que sería líquida o justo
+  saturada, condensador por encima de la caldera o por debajo del punto
+  triple, recalentamiento fuera de rango o que enfriaría el vapor,
+  rendimientos fuera de (0, 1], falta el caudal o la potencia; TESPy acepta
+  algunos de estos datos sin quejarse, por eso se validan antes y después.
+- **Tests**: de 952 a 1070 (+118): `tests/test_rankine.py` (74: Cengel
+  10-1, 10-3 a/b/c y 10-4, TESPy contra CoolProp en 6 casos, balances,
+  η = 1 − T_C/T̄_H, validaciones, barridos, pasos en los tres sistemas,
+  export), `tests/test_page_rankine.py` (AppTest, 18: ejemplos,
+  recalentamiento, rótulos, vapor saturado seco, potencia neta, errores,
+  unidades, diagrama, barridos), caudal y potencia en `units_system` (+25)
+  y la navegación a `/Rankine`. Sin warnings de pytest. El LaTeX de Rankine (604
+  expresiones distintas: 6 ejemplos y 4 casos borde × 3 sistemas) valida
+  con KaTeX; en Técnico e Inglés ninguna supera el ancho de un celular
+  (máx. 272 y 296 px); en SI quedan 2 (h de la turbina real, ≤ 347 px).
+  Smoke test en Chromium por link directo a 1280 y 390 px.
+- **Dependencias**: `tespy>=0.11.2,<0.12` (ya estaba; se acota a la API
+  de unidades de la 0.11).
+
 ---
 
 ## Pendientes / próximas fases
@@ -208,9 +258,10 @@
 - **Detectado en Fase 1.7, sin resolver**:
   - En sistema SI (J/kg con ×10ⁿ) algunas sustituciones siguen siendo más
     anchas que el celular (regla de la palanca, h₂ de Isoentrópicos: hasta
-    475 px) y se deslizan; en Inglés, 5 apenas pasadas (≤ 339 px). Se
-    resolvería mostrando las energías en kJ/kg dentro del SI o con otro
-    formato de número (decisión del autor: hoy el SI es J/kg).
+    475 px; en Rankine, la h de la turbina real: ≤ 347 px) y se deslizan;
+    en Inglés, 5 apenas pasadas (≤ 339 px). Se resolvería mostrando las
+    energías en kJ/kg dentro del SI o con otro formato de número (decisión
+    del autor: hoy el SI es J/kg).
   - Pseudo-puros con T y (s o v): dentro de la campana CoolProp los
     resuelve a una sola presión entre la de burbuja y la de rocío (es su
     modelo; el título no coincide con la palanca a T constante), y justo
@@ -218,10 +269,13 @@
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
-- **Fase 3.1** — Ciclos termodinámicos con TESPy: Rankine simple,
-  recalentamiento, regeneración; refrigeración por compresión de
-  vapor; Brayton; ciclo combinado. Integración nativa con
-  `core.diagrams` vía `tespy.tools.get_plotting_data`.
+- **Fase 3.1b** — Rankine regenerativo (calentadores abierto y
+  cerrado), condensador con agua de enfriamiento, pérdidas de carga en
+  caldera y condensador, ORC con otros fluidos (R134a, R1234yf…).
+- **Fase 3.1 (continuación)** — Refrigeración por compresión de vapor;
+  Brayton; ciclo combinado; exergía de los ciclos. Evaluar
+  `tespy.tools.get_plotting_data` para los diagramas (hoy el ciclo se
+  dibuja con `core.diagrams.cycle_overlays`).
 - **Fase 4** — Psicrometría (carta interactiva, procesos HVAC).
 - **Fase 5** — Combustión: estequiometría, exceso de aire, productos
   de combustión, temperatura adiabática de llama.
