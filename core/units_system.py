@@ -69,6 +69,8 @@ QuantityKind = Literal[
     "dynamic_viscosity",
     "thermal_conductivity",
     "diffusivity",
+    "mass_flow",
+    "power",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -164,6 +166,19 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "m²/s"),
         "Técnico": (1.0, 0.0, "m²/s"),
         "Inglés": (1.0 / _FT_PER_M**2, 0.0, "ft²/s"),
+    },
+    # Fase 3.1 (ciclos). Coherentes con la energía específica de cada sistema,
+    # así potencia = caudal · trabajo específico sin factores de conversión:
+    # kg/s · kJ/kg = kW y lb/s · Btu/lb = Btu/s (0.45359237 · 2326 = 1055.0559 W).
+    "mass_flow": {
+        "SI": (1.0, 0.0, "kg/s"),
+        "Técnico": (1.0, 0.0, "kg/s"),
+        "Inglés": (1.0 / _LB_PER_KG, 0.0, "lb/s"),
+    },
+    "power": {
+        "SI": (1.0, 0.0, "W"),
+        "Técnico": (1.0e-3, 0.0, "kW"),
+        "Inglés": (1.0 / _BTU_IT_J, 0.0, "Btu/s"),
     },
 }
 
