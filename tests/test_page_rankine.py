@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from core.cycles.rankine import RANKINE_EXAMPLES
+from core.cycles.rankine import RANKINE_EXAMPLES, solve_rankine
 
 PAGE = str(Path(__file__).resolve().parents[1] / "app_pages" / "5_Rankine.py")
 EXAMPLES = list(RANKINE_EXAMPLES)
@@ -48,8 +48,7 @@ def test_every_example_computes(example: str) -> None:
     at = _new_app()
     at.selectbox(key="rk_example").set_value(example).run()
     _no_problems(at)
-    expected_states = 6 if RANKINE_EXAMPLES[example].reheat else 4
-    assert len(_states(at)) == expected_states
+    assert len(_states(at)) == len(solve_rankine(RANKINE_EXAMPLES[example]).states)
 
 
 def test_reheat_checkbox_adds_two_states() -> None:
@@ -73,7 +72,7 @@ def test_condenser_label_follows_the_state_numbering() -> None:
 
 def test_saturated_inlet_hides_the_temperature() -> None:
     at = _new_app()
-    at.radio(key="rk_inlet_0").set_value("Vapor saturado seco (x₃ = 1)").run()
+    at.radio(key="rk_inlet_0").set_value("Vapor saturado seco (x = 1)").run()
     assert not any(n.key == "rk_T_in_0@Técnico" for n in at.number_input)
     at.button(key="rk_btn").click().run()
     _no_problems(at)
@@ -135,3 +134,94 @@ def test_sweep_draws_the_charts() -> None:
     at.button(key="rk_sweep_btn").click().run()
     _no_problems(at)
     assert len(at.get("plotly_chart")) >= 3  # diagrama + η + título
+
+
+# ---------------------------------------------------------------------
+# Regeneración (Fase 3.1b)
+# ---------------------------------------------------------------------
+
+_I_10_5 = next(i for i, k in enumerate(EXAMPLES) if k.startswith("Cengel 10-5"))
+_I_10_6 = next(i for i, k in enumerate(EXAMPLES) if k.startswith("Cengel 10-6"))
+
+
+def _example(at: AppTest, index: int) -> AppTest:
+    return at.selectbox(key="rk_example").set_value(EXAMPLES[index]).run()
+
+
+def _labels(at: AppTest) -> list[str]:
+    return [n.label for n in at.number_input]
+
+
+def test_cengel_10_5_labels_follow_the_book_numbering() -> None:
+    at = _example(_new_app(), _I_10_5)
+    _no_problems(at)
+    labels = _labels(at)
+    assert any(lab.startswith("Presión de la caldera p₅") for lab in labels)
+    assert any(lab.startswith("Presión del condensador p₇") for lab in labels)
+    assert any(lab.startswith("Presión de extracción p₆") for lab in labels)
+    assert float(_metric(at, "η térmico [%]")) == pytest.approx(46.31, abs=0.02)
+    table = next(df.value for df in at.dataframe if "Calentador" in df.value.columns)
+    assert list(table["Calentador"]) == ["calentador abierto"]
+
+
+def test_cengel_10_6_shows_the_book_note_and_the_mixing_chamber() -> None:
+    at = _example(_new_app(), _I_10_6)
+    _no_problems(at)
+    assert len(_states(at)) == 13
+    assert any("643,9" in c.value for c in at.caption)  # errata del libro
+    procedure = next(e for e in at.expander if "Procedimiento" in e.label)
+    titles = " ".join(md.value for md in procedure.markdown)
+    assert "cámara de mezcla" in titles and "fracción de extracción" in titles
+    assert at.checkbox(key=f"rk_fwd_{_I_10_6}_2").value is True
+
+
+@pytest.mark.parametrize("n", [1, 2, 3])
+def test_regeneration_with_one_two_or_three_heaters(n: int) -> None:
+    at = _new_app()
+    at.checkbox(key="rk_regen_0").check().run()
+    at.radio(key="rk_nheat_0").set_value(n).run()
+    at.button(key="rk_btn").click().run()
+    _no_problems(at)
+    table = next(df.value for df in at.dataframe if "Calentador" in df.value.columns)
+    assert len(table) == n
+    assert all(0 < float(y) < 1 for y in table["y = ṁext/ṁ"])
+
+
+def test_closed_top_heater_offers_the_forward_drain() -> None:
+    at = _new_app()
+    at.checkbox(key="rk_regen_0").check().run()
+    at.radio(key="rk_nheat_0").set_value(2).run()
+    assert not any(c.key == "rk_fwd_0_2" for c in at.checkbox)
+    at.radio(key="rk_h1_kind_0_2").set_value("Cerrado").run()
+    at.checkbox(key="rk_fwd_0_2").check().run()
+    at.button(key="rk_btn").click().run()
+    _no_problems(at)
+    assert any("cámara de mezcla" in label for label in _states(at))
+
+
+def test_invalid_extraction_pressure_is_explained() -> None:
+    at = _new_app()
+    at.checkbox(key="rk_regen_0").check().run()
+    at.number_input(key="rk_h0_p_0_1@Técnico").set_value(50.0)  # más que la caldera (30 bar)
+    at.button(key="rk_btn").click().run()
+    assert at.error and "presión de extracción" in at.error[0].value
+
+
+def test_cooling_water() -> None:
+    at = _new_app()
+    at.checkbox(key="rk_cw_0").check().run()
+    _no_problems(at)
+    flow = float(_metric(at, "ṁ agua de enfriamiento [kg/s]"))
+    assert flow == pytest.approx(2018.6 / (4.18 * 10), rel=5e-3)  # q_C/(c_p·ΔT), 10-1
+    at.number_input(key="rk_cw_out_0@Técnico").set_value(95.0).run()  # T_sat(75 kPa) = 91,8 °C
+    assert any("no puede salir más caliente" in w.value for w in at.warning)
+
+
+def test_extraction_sweep_draws_the_charts() -> None:
+    at = _example(_new_app(), _I_10_5)
+    at.selectbox(key="rk_sweep_param").set_value(
+        "Presión de extracción del calentador abierto"
+    ).run()
+    at.button(key="rk_sweep_btn").click().run()
+    _no_problems(at)
+    assert len(at.get("plotly_chart")) >= 3  # diagrama + η + y

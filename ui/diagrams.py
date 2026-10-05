@@ -233,6 +233,7 @@ def render_diagram_plotly(
     overlays: Sequence[ProcessOverlay] | None = None,
     height: int = 520,
     chart_key: str | None = None,
+    point_legend: dict[str, str] | None = None,
 ) -> None:
     """Dibuja el diagrama con isolíneas + puntos + overlays.
 
@@ -249,6 +250,10 @@ def render_diagram_plotly(
     chart_key : str, opcional
         Key para ``st.plotly_chart`` (necesario si se renderizan varios
         diagramas en una sola página).
+    point_legend : dict, opcional
+        ``{color: nombre}``: los puntos de ese color van en una sola entrada
+        de la leyenda (un ciclo con muchos estados ya los rotula sobre el
+        diagrama; una entrada por punto llenaría la pantalla del celular).
     """
     diagram = get_diagram(fluid, system)
     x_min, x_max, y_min, y_max = _axis_window_in_user_units(
@@ -280,14 +285,21 @@ def render_diagram_plotly(
 
     # Markers (puntos de estado)
     if points:
+        grouped: set[str] = set()
         for pt in points:
             x, y = state_to_diagram_coords(pt.state, diagram_type, system)
+            group = (point_legend or {}).get(pt.color)
+            legend: dict[str, object] = {}
+            if group is not None:
+                legend = {"legendgroup": group, "showlegend": group not in grouped}
+                grouped.add(group)
             fig.add_trace(
                 go.Scatter(
                     x=[x],
                     y=[y],
                     mode="markers+text",
-                    name=pt.label,
+                    name=pt.label if group is None else group,
+                    **legend,
                     text=[pt.label],
                     textposition="top center",
                     textfont=dict(size=13, color=pt.color),

@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.11.0"
+PAGE_VERSION = "0.12.0"
 
 
 def _home_page() -> None:
@@ -71,11 +71,13 @@ def _home_page() -> None:
           ejemplos del Annex D precargados (matriz identidad; matriz
           de normalización deferida a fase futura por requerir
           ISO 14912:2003).
-        - ♨️ **Rankine** — ciclo de potencia de vapor simple o con
-          recalentamiento, ideal o real, resuelto con
-          [TESPy](https://tespy.readthedocs.io): estados, ciclo sobre el
-          diagrama, procedimiento con las tablas y barridos para ver cómo
-          mejora el rendimiento (ejemplos de Cengel cap. 10).
+        - ♨️ **Rankine** — ciclo de potencia de vapor simple, con
+          recalentamiento o con regeneración (calentadores abiertos y
+          cerrados), ideal o real, resuelto con
+          [TESPy](https://tespy.readthedocs.io): estados, fracciones de
+          extracción, ciclo sobre el diagrama, procedimiento con las tablas,
+          agua de enfriamiento y barridos para ver cómo mejora el
+          rendimiento (ejemplos de Cengel cap. 10).
         - 📈 **Diagramas** — Propiedades, Isoentrópicos y Rankine incluyen
           gráficos interactivos con isolíneas (log p–h, T–s, h–s,
           p–log v) y overlay del estado / proceso calculado, vía
@@ -88,8 +90,8 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Rankine con regeneración, ciclos de refrigeración, Brayton y
-        combinado, psicrometría, combustión, exergía. Ver el
+        Rankine con pérdidas de carga y ORC, ciclos de refrigeración,
+        Brayton y combinado, psicrometría, combustión, exergía. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
