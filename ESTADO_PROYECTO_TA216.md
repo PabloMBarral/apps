@@ -211,9 +211,11 @@
     475 px) y se deslizan; en Inglés, 5 apenas pasadas (≤ 339 px). Se
     resolvería mostrando las energías en kJ/kg dentro del SI o con otro
     formato de número (decisión del autor: hoy el SI es J/kg).
-  - Pseudo-puros con T y (s o v) dentro de la campana: no se revisó si
-    CoolProp los resuelve bien cerca de los bordes (con p ya está
-    resuelto).
+  - Pseudo-puros con T y (s o v): dentro de la campana CoolProp los
+    resuelve a una sola presión entre la de burbuja y la de rocío (es su
+    modelo; el título no coincide con la palanca a T constante), y justo
+    en el borde los clasifica como líquido comprimido / vapor
+    sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
 - **Fase 3.1** — Ciclos termodinámicos con TESPy: Rankine simple,
