@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.8.0` — Fase 1.5a cerrada (2026-05-23).
+> **Versión actual**: `0.10.0` — Fase 1.7 cerrada (2026-10-03).
 
 ---
 
@@ -94,14 +94,128 @@
 - **Dependencias**: `fluprodia>=4.2`, `plotly>=5.0` agregadas a
   `requirements.txt` y `CITATION.cff`.
 
+### Fase 1.6 — Calculador de estado del agua para los alumnos
+- **Versión**: `0.9.0` (2026-10-03). Rama `claude/water-state-analyzer-f4fiev`.
+- **Commits**: `e38e9d3` (chore: `use_container_width` → `width="stretch"`,
+  Streamlit ≥ 1.51), `9dd6579` (fix: p–log v, título x = 10000 con h-s,
+  ventana de ejes por fluido), `3d13be8` (feat: magnitudes nuevas en
+  `units_system`), `ed948f2` (feat: `FluidState` en `core/fluids.py`),
+  `d5716d8` (feat: `core/state_report.py`), `e149e55` (fix: valor físico
+  de los inputs al cambiar de sistema), `872ac7b` (feat: reescritura de la
+  página), `e3d356b` (feat: tabla de estados y ciclos en el diagrama), y
+  el commit de docs que cierra la fase.
+- **Bugs corregidos** (todos reproducidos antes de arreglarlos):
+  - El primer cálculo que veía el alumno fallaba: "t y p" con 0 °C y 1 bar
+    está debajo del punto triple del agua (CoolProp: "below Tmelt"). Los
+    defaults de p-h y h-s (h = 0, s = 0) tampoco existían.
+  - Los resultados de Propiedades desaparecían al cambiar el tipo de
+    diagrama (se mostraban solo dentro de `if submit:`), y el selector
+    volvía a log p–h: en la práctica solo se podía ver un diagrama.
+  - p–log v lanzaba `ValueError` en Propiedades e Isoentrópicos
+    (`StatePoint` no tenía volumen); además `AXIS_MAP` declaraba log el
+    eje p, que fluprodia dibuja lineal.
+  - Con el par h-s, CoolProp devuelve x = 10000 fuera de la campana y la
+    página lo mostraba.
+  - Pares como T-s "resolvían" estados absurdos sin aviso (R134a a
+    44 549 bar).
+  - Al cambiar el sistema de unidades, `number_input_si` conservaba el
+    número con la unidad nueva (400 °C pasaba a 400 K) — afectaba también
+    a Isoentrópicos.
+  - La ventana fija de los diagramas dejaba fuera el vapor de agua a baja
+    presión en p–log v y achicaba la campana de los refrigerantes.
+- **Scope**: estado completo (`FluidState`): región, u, ρ, cp, cv, γ, w,
+  μ, k, ν, α, Pr, Z, sobrecalentamiento/subenfriamiento y saturación a p
+  y a T; pares nuevos T-v, p-v, p-u; validación con mensajes en
+  castellano; procedimiento "como con las tablas" en LaTeX en el sistema
+  activo; tablas pensadas para el celular; tabla de estados para armar
+  ciclos con isobáricas e isoentrópicas reales sobre el diagrama;
+  exportación CSV/JSON; expansor de fórmulas con link al vademecum
+  (§3.2, §7.3, §12, §13).
+- **Tests**: de 381 a 791 (+410). Valores contra Cengel A-4, A-5, A-6,
+  A-7 y Cengel & Ghajar A-9; AppTest de la página (defaults de los 10
+  pares, persistencia, errores, ciclo Rankine armado por la UI). El LaTeX
+  generado se validó con KaTeX (3192 expresiones, 0 errores). Revisado en
+  Chromium a 1280 px y 390 px de ancho.
+- **Referencias**: IAPWS-95 (Wagner & Pruß, 2002) agregada a
+  `CITATION.cff` y al README. Sin dependencias nuevas.
+
+### Fase 1.7 — Isoentrópicos, fórmulas y export en todas las páginas, celular
+- **Versión**: `0.10.0` (2026-10-03). Rama `claude/water-state-analyzer-f4fiev`.
+- **Commits**: `3df17ae` (fix: `pages/` → `app_pages/`), `704bd1b` (feat:
+  Isoentrópicos con validaciones, defaults por fluido, pasos por sistema
+  — Fase 1.5b — y export), `dd05941` (feat: fórmulas teóricas y export en
+  Interpolación e ISO 6976), `5ad2890` (fix: isolíneas de los diagramas en
+  SI e Inglés), `2ef9cfe` (fix: ecuaciones que entran en un celular),
+  `d829767` (docs), `205ed6f` (fix: pseudo-puros dentro de la campana y
+  ruido del estado de referencia) y el commit de docs que lo registra.
+- **Bugs corregidos** (todos reproducidos antes de arreglarlos):
+  - Links directos (`/Propiedades`) después de un reinicio mostraban el
+    menú automático con nombres de archivo: la carpeta `pages/` activa el
+    modo multipágina viejo con una bandera global del proceso.
+  - Isoentrópicos: con R410A y CO₂ la bomba fallaba con los valores
+    iniciales (errores en inglés); con R134a la turbina "calculaba" a
+    400 °C, por encima del máximo de su ecuación de estado (182 °C), sin
+    aviso; al cambiar de fluido seguía el resultado del anterior (y el
+    diagrama mezclaba isolíneas de un fluido con estados de otro); la
+    tabla mostraba x = −1 fuera de la campana.
+  - Diagramas en SI: las isolíneas se generaban en °C/bar pero fluprodia
+    las leía en K/Pa (isobaras de 0,01–1000 Pa, isotermas de 0–600 K); con
+    aire, CoolProp fallaba y la página de Isoentrópicos se caía. En
+    Inglés el diagrama del agua quedaba recortado a 315 °C y 69 bar.
+  - Ecuaciones más anchas que la pantalla del celular: en Técnico, 148 de
+    289 superaban los ~324 px útiles a 390 px de ancho (hasta 684 px) y
+    KaTeX las cortaba con un scroll horizontal que no se ve.
+  - Restas con negativos sin paréntesis (`a − −3`) en interpolación (tablas
+    en °C bajo cero) e Isoentrópicos (aire), y la bomba de aire líquido
+    arrancaba en el estado de referencia de CoolProp (h₁ = −1,2×10⁻⁵ kJ/kg,
+    "líquido comprimido" para un líquido saturado).
+  - Aire y R410A (pseudo-puros): cerca de la línea de burbuja, p con h, s,
+    v o u daba "líquido comprimido" en el borde y, apenas adentro
+    (x ≈ 1e-4 … 1e-2), un error que decía que el estado no existía. Ahora el
+    título sale de la regla de la palanca (lineal en el modelo de CoolProp)
+    y se calcula con (p, x); p-x con 0 < x < 1 se acepta (T-x no: a T fija
+    la presión cambia con el título). El procedimiento muestra
+    T_f ≤ T ≤ T_g en vez de "T = T_sat".
+  - Ruido en el estado de referencia: el agua en el punto triple mostraba
+    u_f = −6,6048×10⁻¹¹ kJ/kg (Cengel A-4: 0,000) y el aire líquido a 1 atm
+    h_f = −1,2×10⁻⁵ kJ/kg; ahora valen 0.
+- **Scope**: Isoentrópicos con las validaciones de `fluid_state_from_pair`
+  (mensajes en castellano: entrada líquida a un compresor, vapor en la
+  bomba, interenfriador que condensaría), valores iniciales calculables
+  para los 7 fluidos (`suggested_device_inputs`), tabla de estados con la
+  región, pasos LaTeX en el sistema activo (Fase 1.5b, con
+  `core/latex.py`) y comparación de la bomba con el modelo incompresible.
+  Las cuatro páginas cumplen el mínimo de CLAUDE.md: expansor `📖
+  Fórmulas teóricas` con la sección del vademecum (§2.1/§2.2, §10.4,
+  §3.3, §6.3, §16.9) y descarga CSV/JSON (`core/export.py`). Ecuaciones
+  en renglones cortos (`latex_chain`): en Técnico ya no hay ninguna más
+  ancha que el celular.
+- **Tests**: de 791 a 952 (+161): AppTest de Isoentrópicos (7 fluidos ×
+  4 dispositivos, modo inverso, errores, unidades, aire en SI e Inglés),
+  de Interpolación y de ISO 6976; navegación por las cuatro páginas;
+  isolíneas por sistema (7 fluidos × 3 sistemas); export y helpers de
+  LaTeX; pseudo-puros a lo largo de la campana; ruido de referencia. Sin
+  warnings de pytest (fixtures de clase con `@classmethod`). Las 1013
+  ecuaciones distintas de las páginas 1–4 (28 estados de Propiedades,
+  7 fluidos × 4 dispositivos, 3 sistemas) validan con KaTeX en modo
+  estricto y se midió su ancho renderizado en Chromium.
+- Sin dependencias nuevas.
+
 ---
 
 ## Pendientes / próximas fases
 
-- **Fase 1.5b** — Conversión al sistema activo de los pasos didácticos
-  LaTeX de Isoentrópicos (hoy hardcoded en Técnico para consistencia
-  con Cengel). Implica reescribir los formatters de
-  `core/isentropic.py` para emitir LaTeX por sistema.
+- **Detectado en Fase 1.7, sin resolver**:
+  - En sistema SI (J/kg con ×10ⁿ) algunas sustituciones siguen siendo más
+    anchas que el celular (regla de la palanca, h₂ de Isoentrópicos: hasta
+    475 px) y se deslizan; en Inglés, 5 apenas pasadas (≤ 339 px). Se
+    resolvería mostrando las energías en kJ/kg dentro del SI o con otro
+    formato de número (decisión del autor: hoy el SI es J/kg).
+  - Pseudo-puros con T y (s o v): dentro de la campana CoolProp los
+    resuelve a una sola presión entre la de burbuja y la de rocío (es su
+    modelo; el título no coincide con la palanca a T constante), y justo
+    en el borde los clasifica como líquido comprimido / vapor
+    sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
 - **Fase 3.1** — Ciclos termodinámicos con TESPy: Rankine simple,
@@ -124,7 +238,7 @@
 
 - **Versionado**: bump al cierre de cada fase. Sincronizar
   `CITATION.cff`, `streamlit_app.py:PAGE_VERSION` y la version label
-  de cada `pages/N_*.py` afectada.
+  de cada `app_pages/N_*.py` afectada.
 - **Checklist de cierre de fase** (todas obligatorias):
   1. `ruff check .` + `ruff format .` limpios.
   2. `pytest -v` en verde, incluyendo tests nuevos del módulo.

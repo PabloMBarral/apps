@@ -884,3 +884,57 @@ def _build_steps(inputs: ISO6976Inputs, values: dict[str, float], n: int) -> ISO
 # identity da una sobre-estimación segura ("safe overestimate") de la
 # incertidumbre, así que usarlo no es un error técnico — solo es
 # conservador.
+
+
+# ---------------------------------------------------------------------
+# Exportación (Fase 1.7)
+# ---------------------------------------------------------------------
+
+# (atributo del resultado, símbolo, unidad) — mismas unidades que la página.
+_EXPORT_INTERMEDIATES: tuple[tuple[str, str, str], ...] = (
+    ("molar_mass_kg_per_kmol", "M (masa molar)", "kg/kmol"),
+    ("summation_factor", "s (factor de sumación)", "-"),
+    ("compression_factor", "Z (compresibilidad)", "-"),
+    ("molar_volume_m3_per_mol", "V_m (volumen molar)", "m³/mol"),
+)
+_EXPORT_RESULTS: tuple[tuple[str, str, str], ...] = (
+    ("Hc_G_molar_kJ_per_mol", "H_c,G (bruto, molar)", "kJ/mol"),
+    ("Hc_N_molar_kJ_per_mol", "H_c,N (neto, molar)", "kJ/mol"),
+    ("Hm_G_mass_MJ_per_kg", "H_m,G (bruto, másico)", "MJ/kg"),
+    ("Hm_N_mass_MJ_per_kg", "H_m,N (neto, másico)", "MJ/kg"),
+    ("Hv_G_volume_MJ_per_m3", "H_v,G (bruto, volumétrico)", "MJ/m³"),
+    ("Hv_N_volume_MJ_per_m3", "H_v,N (neto, volumétrico)", "MJ/m³"),
+    ("density_kg_per_m3", "ρ (densidad)", "kg/m³"),
+    ("relative_density", "d (densidad relativa al aire)", "-"),
+    ("Wobbe_gross_MJ_per_m3", "W_G (Wobbe bruto)", "MJ/m³"),
+    ("Wobbe_net_MJ_per_m3", "W_N (Wobbe neto)", "MJ/m³"),
+)
+
+
+def iso6976_to_dict(result: ISO6976Result) -> dict[str, Any]:
+    """Resultado de ISO 6976:2016 serializable a JSON (unidades de la norma).
+
+    Cada magnitud lleva su valor, la incertidumbre estándar ``u`` (k = 1)
+    y la expandida ``U`` (k = 2).
+    """
+
+    def quantity(attr: str, symbol: str, unit: str) -> dict[str, Any]:
+        q: Quantity = getattr(result, attr)
+        return {"magnitud": symbol, "valor": q.value, "u_k1": q.u, "U_k2": q.U_k2, "unidad": unit}
+
+    inp = result.inputs
+    return {
+        "norma": "ISO 6976:2016",
+        "composicion": [{"componente": c.name, "x": c.x, "u_x": c.u_x} for c in inp.composition],
+        "referencia_combustion": {
+            "T_C": inp.combustion_reference.T_celsius,
+            "P_kPa": inp.combustion_reference.P_kPa,
+        },
+        "referencia_medicion": {
+            "T_C": inp.metering_reference.T_celsius,
+            "P_kPa": inp.metering_reference.P_kPa,
+        },
+        "matriz_de_correlacion": inp.correlation_matrix,
+        "intermedios": [quantity(*spec) for spec in _EXPORT_INTERMEDIATES],
+        "resultados": [quantity(*spec) for spec in _EXPORT_RESULTS],
+    }

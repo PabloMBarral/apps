@@ -9,16 +9,26 @@ operando en SI internamente; este módulo solo vive en el borde UI.
 Magnitudes soportadas (``QuantityKind``)
 ----------------------------------------
 
-============ =========== ============== ============================
-kind         SI          Técnico        Inglés
-============ =========== ============== ============================
-temperature  K           °C             °F
-pressure     Pa          bar            psia
-specific_enthalpy  J/kg  kJ/kg          Btu/lb
-specific_entropy   J/(kg·K)  kJ/(kg·K)  Btu/(lb·°R)
-specific_volume    m³/kg     m³/kg      ft³/lb
-specific_heat      J/(kg·K)  kJ/(kg·K)  Btu/(lb·°R)
-============ =========== ============== ============================
+====================== =========== ============== ============================
+kind                   SI          Técnico        Inglés
+====================== =========== ============== ============================
+temperature            K           °C             °F
+temperature_difference K           °C             °F  (sin offset: ΔT)
+pressure               Pa          bar            psia
+specific_enthalpy      J/kg        kJ/kg          Btu/lb
+specific_entropy       J/(kg·K)    kJ/(kg·K)      Btu/(lb·°R)
+specific_volume        m³/kg       m³/kg          ft³/lb
+specific_heat          J/(kg·K)    kJ/(kg·K)      Btu/(lb·°R)
+density                kg/m³       kg/m³          lb/ft³
+speed                  m/s         m/s            ft/s
+dynamic_viscosity      Pa·s        Pa·s           lb/(ft·s)
+thermal_conductivity   W/(m·K)     W/(m·K)        Btu/(h·ft·°F)
+diffusivity            m²/s        m²/s           ft²/s
+====================== =========== ============== ============================
+
+``specific_enthalpy`` también se usa para energía interna, calor latente
+y trabajo específicos (misma unidad). ``diffusivity`` cubre la
+viscosidad cinemática ν y la difusividad térmica α.
 
 Constantes NIST (exactas)
 -------------------------
@@ -29,9 +39,13 @@ Constantes NIST (exactas)
 - 1 psi = 6894.757293168361 Pa  (= lbf/in²).
 - 1 Btu_IT/lb = 2326 J/kg  (definición exacta de la tabla internacional).
 - 1 Btu_IT/(lb·°R) = 4186.8 J/(kg·K)  (consistente con ΔT_R = ΔT_K · 5/9).
+- 1 Btu_IT = 1055.05585262 J, 1 h = 3600 s →
+  1 Btu/(h·ft·°F) = 1055.05585262 / 609.6 W/(m·K) ≈ 1.730735 W/(m·K).
 - T conversions:
     K → °C: subtraer 273.15;
     K → °F: multiplicar por 9/5 y subtraer 459.67.
+- Diferencias de temperatura (vademecum-termo §1.3): Δt[°C] = ΔT[K] y
+  Δt[°F] = ΔT[°R] = 9/5 · ΔT[K] — sin offset.
 
 Las conversiones son siempre por factores fijos NIST (no se usa CoolProp
 para unidades; CoolProp solo aparece para propiedades termofísicas).
@@ -49,6 +63,12 @@ QuantityKind = Literal[
     "specific_entropy",
     "specific_volume",
     "specific_heat",
+    "temperature_difference",
+    "density",
+    "speed",
+    "dynamic_viscosity",
+    "thermal_conductivity",
+    "diffusivity",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -65,6 +85,11 @@ _BTU_PER_LB_J_PER_KG: float = 2326.0  # 1 Btu_IT/lb = 2326 J/kg, exacto
 _BTU_PER_LB_R_J_PER_KG_K: float = 4186.8  # 1 Btu_IT/(lb·°R) = 4186.8 J/(kg·K)
 _FT3_PER_LB_TO_M3_PER_KG: float = (_FT_PER_M**3) / _LB_PER_KG
 # ≈ 0.062427960576145 m³/kg por ft³/lb (inverso: 16.0184633739537 ft³/lb por m³/kg)
+# Por la misma cuenta, 1 kg/m³ = 0.062427960576145 lb/ft³.
+_LB_PER_FT_S_TO_PA_S: float = _LB_PER_KG / _FT_PER_M  # 1 lb/(ft·s) ≈ 1.488164 Pa·s
+_BTU_IT_J: float = 1055.05585262  # exacto (Btu de la tabla internacional)
+_BTU_PER_H_FT_F_TO_W_PER_M_K: float = _BTU_IT_J / (3600.0 * _FT_PER_M * 5.0 / 9.0)
+# ≈ 1.730734666 W/(m·K) por Btu/(h·ft·°F)
 
 # ---------------------------------------------------------------------
 # Tabla central (kind, system) → (factor, offset, label)
@@ -109,6 +134,36 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "J/(kg·K)"),
         "Técnico": (1.0e-3, 0.0, "kJ/(kg·K)"),
         "Inglés": (1.0 / _BTU_PER_LB_R_J_PER_KG_K, 0.0, "Btu/(lb·°R)"),
+    },
+    "temperature_difference": {
+        "SI": (1.0, 0.0, "K"),
+        "Técnico": (1.0, 0.0, "°C"),
+        "Inglés": (9.0 / 5.0, 0.0, "°F"),
+    },
+    "density": {
+        "SI": (1.0, 0.0, "kg/m³"),
+        "Técnico": (1.0, 0.0, "kg/m³"),
+        "Inglés": (_FT3_PER_LB_TO_M3_PER_KG, 0.0, "lb/ft³"),
+    },
+    "speed": {
+        "SI": (1.0, 0.0, "m/s"),
+        "Técnico": (1.0, 0.0, "m/s"),
+        "Inglés": (1.0 / _FT_PER_M, 0.0, "ft/s"),
+    },
+    "dynamic_viscosity": {
+        "SI": (1.0, 0.0, "Pa·s"),
+        "Técnico": (1.0, 0.0, "Pa·s"),
+        "Inglés": (1.0 / _LB_PER_FT_S_TO_PA_S, 0.0, "lb/(ft·s)"),
+    },
+    "thermal_conductivity": {
+        "SI": (1.0, 0.0, "W/(m·K)"),
+        "Técnico": (1.0, 0.0, "W/(m·K)"),
+        "Inglés": (1.0 / _BTU_PER_H_FT_F_TO_W_PER_M_K, 0.0, "Btu/(h·ft·°F)"),
+    },
+    "diffusivity": {
+        "SI": (1.0, 0.0, "m²/s"),
+        "Técnico": (1.0, 0.0, "m²/s"),
+        "Inglés": (1.0 / _FT_PER_M**2, 0.0, "ft²/s"),
     },
 }
 

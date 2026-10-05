@@ -1,8 +1,17 @@
 """Entry point — TA216 Apps.
 
 Define la navegación explícita con :func:`st.navigation` y :class:`st.Page`
-(API introducida en Streamlit 1.36). Los archivos físicos en ``pages/``
-no se renombran: se referencian por path con un label e ícono custom.
+(API introducida en Streamlit 1.36). Las páginas viven en ``app_pages/`` y
+se referencian por path con un label e ícono custom.
+
+La carpeta **no** se llama ``pages/`` a propósito: si existe una carpeta
+``pages/`` junto a este script, Streamlit arranca en el modo multipágina
+viejo (una bandera global del proceso) hasta que este script llama a
+``st.navigation``. Así, si el primer visitante después de un reinicio
+entraba por un link directo (p. ej. ``/Propiedades``), la página corría
+sin pasar por acá y el menú mostraba los nombres de archivo
+("streamlit app", "Interpolacion" sin tilde) hasta que alguien entrara
+por la raíz.
 """
 
 from __future__ import annotations
@@ -12,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.8.0"
+PAGE_VERSION = "0.10.0"
 
 
 def _home_page() -> None:
@@ -42,9 +51,13 @@ def _home_page() -> None:
 
         ### Módulos disponibles
 
-        - 💧 **Propiedades** — agua y otros fluidos puros (R134a, R410A,
-          R1234yf, amoníaco, CO₂, aire) a partir de cualquier par de
-          variables independientes (T-p, p-h, h-s, p-x, T-x, p-s, T-s).
+        - 💧 **Propiedades** — estado termodinámico del agua y otros
+          fluidos puros (R134a, R410A, R1234yf, amoníaco, CO₂, aire) a
+          partir de cualquier par de propiedades independientes (T-p, p-x,
+          T-x, p-h, p-s, T-s, h-s, T-v, p-v, p-u). Región, todas las
+          propiedades (incluidas las de transporte), tablas de saturación,
+          el procedimiento para resolverlo con las tablas y una tabla de
+          estados para armar ciclos sobre el diagrama.
         - 📐 **Interpolación** — lineal simple y doble entrada (bilineal)
           sobre tablas, con procedimiento didáctico paso a paso y
           comparación opcional contra CoolProp.
@@ -63,6 +76,11 @@ def _home_page() -> None:
           p–log v) y overlay del estado / proceso calculado, vía
           [fluprodia](https://github.com/fwitte/fluprodia).
 
+        Cada página trae las fórmulas del vademecum (📖 *Fórmulas
+        teóricas*), el procedimiento con los valores reemplazados
+        (🔬 *Procedimiento*) y la descarga de resultados en CSV / JSON.
+        Está pensada para usarse también desde el celular.
+
         ### En desarrollo
 
         Ciclos Rankine / refrigeración / Brayton / combinado,
@@ -74,7 +92,8 @@ def _home_page() -> None:
 
         ### Sistema de unidades
 
-        En el sidebar (después de los créditos) podés elegir entre **SI**
+        En el sidebar (después de los créditos; en el celular se abre con
+        la flecha **»** de arriba a la izquierda) podés elegir entre **SI**
         (K, Pa, J/kg, J/(kg·K)), **Técnico** (°C, bar, kJ/kg, kJ/(kg·K))
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
@@ -89,10 +108,10 @@ def _home_page() -> None:
 
 pages = [
     st.Page(_home_page, title="Home", icon="🏠", default=True),
-    st.Page("pages/1_Propiedades.py", title="Propiedades", icon="💧"),
-    st.Page("pages/2_Interpolacion.py", title="Interpolación", icon="📐"),
-    st.Page("pages/3_Isoentropicos.py", title="Isoentrópicos", icon="⚙️"),
-    st.Page("pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
+    st.Page("app_pages/1_Propiedades.py", title="Propiedades", icon="💧"),
+    st.Page("app_pages/2_Interpolacion.py", title="Interpolación", icon="📐"),
+    st.Page("app_pages/3_Isoentropicos.py", title="Isoentrópicos", icon="⚙️"),
+    st.Page("app_pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
 ]
 pg = st.navigation(pages)
 pg.run()

@@ -19,23 +19,48 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
 ## Módulos
 
 ### Estables
-- ✅ **Propiedades del agua/vapor** a partir de cualquier par de variables
-  independientes (T-p, p-h, h-s, p-x, T-x, p-s, T-s).
+- ✅ **Estado termodinámico del agua** (y de los otros fluidos del
+  proyecto) a partir de cualquier par de propiedades independientes: T-p,
+  p-x, T-x, p-h, p-s, T-s, h-s, **T-v, p-v** (tanques rígidos) y **p-u**
+  (sistemas cerrados). Muestra la **región** (líquido comprimido, vapor
+  húmedo, vapor sobrecalentado, supercrítico) con su sobrecalentamiento,
+  subenfriamiento o título; todas las propiedades (v, ρ, u, h, s, cp, cv,
+  γ, velocidad del sonido, μ, k, ν, α, Pr y factor de compresibilidad Z);
+  la fila de las tablas de saturación a la p y a la T del estado (como en
+  Cengel A-4/A-5); advertencias didácticas (por ejemplo, T-p sobre la
+  curva de saturación); el **procedimiento para resolverlo con las
+  tablas**, en LaTeX y en el sistema de unidades activo (saturación,
+  comparación con f y g, regla de la palanca, aproximación de líquido
+  incompresible, comparación con gas ideal, verificación h = u + p·v); el
+  punto sobre el diagrama y exportación CSV/JSON. Una **tabla de estados**
+  permite armar un ciclo estado por estado y verlo sobre el diagrama, con
+  las isobáricas e isoentrópicas reales entre estados consecutivos.
+  Validación con mensajes en castellano (punto triple, título fuera de la
+  campana, estados fuera del rango de la ecuación de estado). _Fase 1.6
+  cerrada._
 - ✅ **Interpolación lineal y doble entrada** sobre tablas, con procedimiento
   paso a paso (LaTeX + explicación en español) y comparación contra el valor
   exacto de CoolProp cuando la tabla es reconocida como saturación o vapor
   sobrecalentado. Tabla editable in-place (`st.data_editor`), comparación
   CoolProp como opt-in con selector de fluido (Water, R134a, R410A, R1234yf,
   NH₃, CO₂, Air), normalizador de unidades tolerante a notación variada
-  (`kJ/(kg·K)`, `kJ/kg-K`, `kJ kg^-1 K^-1`, etc.). _Fase 1.2 cerrada._
+  (`kJ/(kg·K)`, `kJ/kg-K`, `kJ kg^-1 K^-1`, etc.). Expansor con las
+  fórmulas del vademecum (§2.1 y §2.2) y descarga del resultado en
+  CSV/JSON (nodos o vértices, intermedios y procedimiento). _Fase 1.2
+  cerrada; teoría y export en la 1.7._
 - ✅ **Rendimientos isoentrópicos** de turbinas, compresores y bombas:
   modo directo (calcular el estado real dado η_s) e inverso (recuperar η_s
   a partir de los dos estados). Compresor multietapa con η_s por etapa,
   intercooler opcional entre etapas, y benchmark built-in contra una sola
-  etapa equivalente. Validación de fase líquida del inlet de bomba vía
-  `CoolProp.PhaseSI`. Procedimiento paso a paso con LaTeX y narrativa en
-  español. Comparación opt-in en bomba contra el modelo de líquido
-  incompresible `w_p ≈ v_1·Δp/η_s`. _Fase 1.3 cerrada._
+  etapa equivalente. Valores iniciales calculables para los 7 fluidos y
+  validaciones con mensajes en castellano (entrada líquida a un compresor,
+  vapor en la bomba, interenfriador que condensaría, estados fuera del
+  rango de la ecuación de estado). Tabla de estados con la región de cada
+  uno, procedimiento paso a paso en LaTeX **en el sistema de unidades
+  activo**, expansor con las fórmulas del vademecum (§10.4, §3.3, §6.3) y
+  descarga CSV/JSON. Comparación opt-in en bomba contra el modelo de
+  líquido incompresible `w_p ≈ v_1·Δp/η_s`. _Fase 1.3 cerrada; 1.5b y
+  validaciones en la 1.7._
 - ✅ **Multifluido + selector global de unidades**: la página de
   Propiedades trabaja con cualquier fluido de `core.fluids.SUPPORTED_FLUIDS`
   (Water, R134a, R410A, R1234yf, NH₃, CO₂, Air). Selector global en
@@ -43,10 +68,9 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   kJ/kg, kJ/(kg·K)) — default — e **Inglés** (°F, psia, Btu/lb,
   Btu/(lb·°R)). El sistema se persiste vía `st.session_state` y aplica
   a Propiedades e Isoentrópicos. Interpolación respeta las unidades del
-  CSV original; ISO 6976 usa las unidades de la norma. Los pasos
-  didácticos isoentrópicos (LaTeX) quedan en Técnico hardcoded para
-  consistencia con Cengel — su conversión al sistema activo entra en
-  Fase 1.5. _Fase 1.4 cerrada._
+  CSV original; ISO 6976 usa las unidades de la norma. Los procedimientos
+  en LaTeX de Propiedades e Isoentrópicos siguen el sistema activo.
+  _Fase 1.4 cerrada._
 - ✅ **ISO 6976:2016 — Poder calorífico de gases combustibles**:
   poder calorífico bruto y neto (molar, másico, volumétrico), densidad,
   densidad relativa al aire e índices de Wobbe G y N, con propagación
@@ -54,7 +78,10 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   queda deferida a fase futura por requerir ISO 14912:2003). Composición
   editable in-place con autocompletado de los 60 componentes de la norma.
   Ejemplos del Annex D (D.2, D.3, D.4) precargados y verificados contra
-  los valores tabulados de la norma. _Fase 2.3 cerrada._
+  los valores tabulados de la norma. Expansor con la relación PCS − PCI
+  del vademecum (§16.9) y las fórmulas de la norma; descarga CSV/JSON con
+  u (k = 1) y U (k = 2) de cada magnitud. _Fase 2.3 cerrada; teoría y
+  export en la 1.7._
 - ✅ **Diagramas de propiedades** (log p–h, T–s, h–s, p–log v) con
   [fluprodia](https://github.com/fwitte/fluprodia) + plotly. La página de
   **Propiedades** dibuja el estado calculado sobre el diagrama elegido
@@ -64,7 +91,12 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   representa la trayectoria termodinámica real), y para el compresor
   multietapa cada etapa con su intercooler isobárico. Diagrama por
   ``(fluido, sistema de unidades)`` cacheado con `@st.cache_resource`
-  para amortizar el cálculo de isolíneas. _Fase 1.5a cerrada._
+  para amortizar el cálculo de isolíneas, con isotermas e isobaras
+  redondas en las unidades de cada sistema. _Fase 1.5a cerrada._
+
+Todas las páginas están pensadas para usarse **desde el celular**: las
+ecuaciones del procedimiento se escriben en renglones cortos (una
+igualdad por renglón) para que entren en el ancho de la pantalla.
 
 ### En desarrollo (roadmap)
 - **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
@@ -109,9 +141,14 @@ streamlit run streamlit_app.py
 ```
 apps/
 ├── streamlit_app.py       # Home / landing
-├── pages/                 # Una página Streamlit por módulo
+├── app_pages/             # Una página Streamlit por módulo (no se llama pages/: ver CLAUDE.md)
 ├── core/                  # Lógica de cálculo, sin dependencia de Streamlit
-│   ├── fluids.py
+│   ├── fluids.py          # estado completo, saturación, región (CoolProp)
+│   ├── state_report.py    # tablas, procedimiento didáctico y export del estado
+│   ├── units_system.py    # sistemas SI / Técnico / Inglés
+│   ├── latex.py           # cantidades y cadenas de igualdades en LaTeX
+│   ├── export.py          # dict → CSV (campo, valor) para las descargas
+│   ├── diagrams.py        # diagramas de propiedades (fluprodia)
 │   ├── interpolation.py
 │   ├── isentropic.py
 │   ├── exergy.py
@@ -121,7 +158,8 @@ apps/
 │   │   └── iso6976.py
 │   ├── cycles/
 │   └── plots.py
-├── tests/                 # pytest
+├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, créditos
+├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── requirements.txt
 ├── CITATION.cff
 ├── LICENSE
@@ -136,7 +174,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.2.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.9.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -178,6 +216,22 @@ las fuentes correspondientes:
 }
 ```
 
+**IAPWS-95** — formulación de las propiedades del agua que usa CoolProp:
+
+```bibtex
+@article{wagner2002iapws95,
+  author  = {Wagner, Wolfgang and Pru{\ss}, Andreas},
+  title   = {The {IAPWS} Formulation 1995 for the Thermodynamic Properties of
+             Ordinary Water Substance for General and Scientific Use},
+  journal = {Journal of Physical and Chemical Reference Data},
+  volume  = {31},
+  number  = {2},
+  pages   = {387--535},
+  year    = {2002},
+  doi     = {10.1063/1.1461829}
+}
+```
+
 **fluprodia** — diagramas de propiedades de fluidos. Witte, F.
 <https://github.com/fwitte/fluprodia>
 
@@ -194,8 +248,10 @@ Organization for Standardization, 2016.
 
 - Las unidades por defecto son: presión en bar(a), temperatura en °C,
   entalpía en kJ/kg, entropía en kJ/(kg·K), título adimensional.
-- `x = -1` en propiedades de agua/vapor indica que el estado no se
-  encuentra dentro de la campana ni en su frontera.
+- El título x solo se informa dentro de la campana; fuera de ella la
+  página muestra "—" (en la API de bajo nivel, `StatePoint.x = -1`).
+- Las propiedades del agua salen de CoolProp con la formulación
+  IAPWS-95; pueden diferir en el último decimal de las tablas impresas.
 - La precisión de los resultados depende de las librerías subyacentes.
   Usar bajo propia responsabilidad. **Esta es una herramienta didáctica**,
   no apta para diseño de equipos sin verificación independiente.

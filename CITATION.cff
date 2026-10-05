@@ -32,8 +32,8 @@ keywords:
   - fluprodia
   - iso-6976
 license: MIT
-version: "0.8.0"
-date-released: "2026-05-23"
+version: "0.10.0"
+date-released: "2026-10-03"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"
@@ -56,6 +56,23 @@ references:
     start: 2498
     end: 2508
     doi: "10.1021/ie4033999"
+  - type: article
+    scope: "Propiedades termodinámicas del agua (formulación usada por CoolProp)"
+    authors:
+      - family-names: "Wagner"
+        given-names: "Wolfgang"
+      - family-names: "Pruß"
+        given-names: "Andreas"
+    title: >-
+      The IAPWS Formulation 1995 for the Thermodynamic Properties of
+      Ordinary Water Substance for General and Scientific Use
+    journal: "Journal of Physical and Chemical Reference Data"
+    year: 2002
+    volume: 31
+    issue: 2
+    start: 387
+    end: 535
+    doi: "10.1063/1.1461829"
   - type: article
     scope: "Simulación de ciclos termodinámicos (TESPy)"
     authors:

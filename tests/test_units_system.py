@@ -30,6 +30,12 @@ _KINDS = (
     "specific_entropy",
     "specific_volume",
     "specific_heat",
+    "temperature_difference",
+    "density",
+    "speed",
+    "dynamic_viscosity",
+    "thermal_conductivity",
+    "diffusivity",
 )
 
 
@@ -63,6 +69,24 @@ class TestUnitLabels:
             ("specific_heat", "SI", "J/(kg·K)"),
             ("specific_heat", "Técnico", "kJ/(kg·K)"),
             ("specific_heat", "Inglés", "Btu/(lb·°R)"),
+            ("temperature_difference", "SI", "K"),
+            ("temperature_difference", "Técnico", "°C"),
+            ("temperature_difference", "Inglés", "°F"),
+            ("density", "SI", "kg/m³"),
+            ("density", "Técnico", "kg/m³"),
+            ("density", "Inglés", "lb/ft³"),
+            ("speed", "SI", "m/s"),
+            ("speed", "Técnico", "m/s"),
+            ("speed", "Inglés", "ft/s"),
+            ("dynamic_viscosity", "SI", "Pa·s"),
+            ("dynamic_viscosity", "Técnico", "Pa·s"),
+            ("dynamic_viscosity", "Inglés", "lb/(ft·s)"),
+            ("thermal_conductivity", "SI", "W/(m·K)"),
+            ("thermal_conductivity", "Técnico", "W/(m·K)"),
+            ("thermal_conductivity", "Inglés", "Btu/(h·ft·°F)"),
+            ("diffusivity", "SI", "m²/s"),
+            ("diffusivity", "Técnico", "m²/s"),
+            ("diffusivity", "Inglés", "ft²/s"),
         ],
     )
     def test_label(self, kind: str, system: str, expected: str) -> None:
@@ -80,6 +104,12 @@ class TestRoundTrip:
         "specific_entropy": (0.0, 100.0, 1000.0, 7000.0, 1.0e5),
         "specific_volume": (1.0e-4, 1.0e-3, 1.0, 100.0),
         "specific_heat": (0.0, 100.0, 1000.0, 4186.8, 1.0e5),
+        "temperature_difference": (-50.0, 0.0, 1.0, 20.0, 300.0),
+        "density": (0.01, 1.0, 1.2, 997.0, 1.0e4),
+        "speed": (0.0, 1.0, 340.0, 1500.0),
+        "dynamic_viscosity": (1.0e-6, 1.8e-5, 8.9e-4, 1.0),
+        "thermal_conductivity": (0.01, 0.026, 0.6, 400.0),
+        "diffusivity": (1.0e-8, 1.4e-7, 1.5e-5, 1.0e-3),
     }
 
     @pytest.mark.parametrize("kind", _KINDS)
@@ -185,6 +215,42 @@ class TestKnownConversionPoints:
     def test_ft3_per_lb_inverse(self) -> None:
         v_si = convert_to_si(1.0, "specific_volume", "Inglés")
         assert v_si == pytest.approx(0.0624279605761459, rel=1e-12)
+
+    # --- Diferencia de temperatura (vademecum §1.3: sin offset) ---
+
+    def test_delta_t_celsius_equals_kelvin(self) -> None:
+        assert convert_from_si(10.0, "temperature_difference", "Técnico") == pytest.approx(10.0)
+
+    def test_delta_t_fahrenheit_has_no_offset(self) -> None:
+        # ΔT = 10 K → Δt = 18 °F (no 50 °F: una diferencia no lleva el +32).
+        assert convert_from_si(10.0, "temperature_difference", "Inglés") == pytest.approx(18.0)
+
+    # --- Densidad ---
+
+    def test_water_density_in_lb_per_ft3(self) -> None:
+        # 1000 kg/m³ ≈ 62.428 lb/ft³ (densidad del agua en tablas inglesas).
+        rho = convert_from_si(1000.0, "density", "Inglés")
+        assert rho == pytest.approx(62.42796, rel=1e-6)
+
+    # --- Velocidad ---
+
+    def test_one_ft_per_s(self) -> None:
+        assert convert_to_si(1.0, "speed", "Inglés") == pytest.approx(0.3048, rel=1e-12)
+
+    # --- Transporte ---
+
+    def test_one_lb_per_ft_s_in_pa_s(self) -> None:
+        # 1 lb/(ft·s) = 0.45359237 kg / 0.3048 m / s = 1.488164 Pa·s.
+        mu_si = convert_to_si(1.0, "dynamic_viscosity", "Inglés")
+        assert mu_si == pytest.approx(1.4881639435695, rel=1e-12)
+
+    def test_one_btu_per_h_ft_f_in_w_per_m_k(self) -> None:
+        # 1 Btu_IT/(h·ft·°F) = 1.730735 W/(m·K) (Incropera, tabla de conversión).
+        k_si = convert_to_si(1.0, "thermal_conductivity", "Inglés")
+        assert k_si == pytest.approx(1.730734666, rel=1e-9)
+
+    def test_one_ft2_per_s_in_m2_per_s(self) -> None:
+        assert convert_to_si(1.0, "diffusivity", "Inglés") == pytest.approx(0.09290304, rel=1e-12)
 
 
 class TestFormatQuantity:

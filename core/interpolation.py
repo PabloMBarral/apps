@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -143,11 +143,21 @@ def linear(
     frac = (x_f - x0_f) / (x1_f - x0_f)
     y = y0_f + slope * (x_f - x0_f)
 
-    formula = r"y = y_0 + (y_1 - y_0) \cdot \frac{x - x_0}{x_1 - x_0}"
+    # t: fracción del intervalo que se avanza. Primero t y después la
+    # sustitución, en renglones cortos: en una sola línea no entra en el
+    # ancho de un celular.
+    formula = (
+        r"\begin{aligned}"
+        r"t &= \frac{x - x_0}{x_1 - x_0} \\"
+        r"y &= y_0 + (y_1 - y_0) \cdot t"
+        r"\end{aligned}"
+    )
     substituted = (
-        rf"y = {y0_f:.6g} + ({y1_f:.6g} - {y0_f:.6g}) \cdot "
-        rf"\frac{{{x_f:.6g} - {x0_f:.6g}}}{{{x1_f:.6g} - {x0_f:.6g}}}"
-        rf" = {y:.6g}"
+        r"\begin{aligned}"
+        rf"t &= \frac{{{_g(x_f)} - {_p(x0_f)}}}{{{_g(x1_f)} - {_p(x0_f)}}} = {_g(frac, 4)} \\"
+        rf"y &= {_g(y0_f)} + ({_g(y1_f)} - {_p(y0_f)}) \cdot {_p(frac, 4)} \\"
+        rf"&= {_g(y)}"
+        r"\end{aligned}"
     )
     narrative = (
         f"Interpolación lineal entre los nodos (x₀, y₀) = "
@@ -363,25 +373,31 @@ def bilinear(
     z_query_y1 = z01_f + (z11_f - z01_f) * frac_x
     z = z_query_y0 + (z_query_y1 - z_query_y0) * frac_y
 
+    # t_x y t_y: fracción de cada intervalo. Renglones cortos para que
+    # el procedimiento entre en el ancho de un celular.
     formula = (
         r"\begin{aligned}"
-        r"z(x, y_0) &= z_{00} + (z_{10} - z_{00}) \cdot \tfrac{x - x_0}{x_1 - x_0} \\"
-        r"z(x, y_1) &= z_{01} + (z_{11} - z_{01}) \cdot \tfrac{x - x_0}{x_1 - x_0} \\"
-        r"z(x, y)   &= z(x, y_0) + \bigl[z(x, y_1) - z(x, y_0)\bigr] \cdot "
-        r"\tfrac{y - y_0}{y_1 - y_0}"
+        r"t_x &= \frac{x - x_0}{x_1 - x_0} \\"
+        r"z(x, y_0) &= z_{00} + (z_{10} - z_{00})\,t_x \\"
+        r"z(x, y_1) &= z_{01} + (z_{11} - z_{01})\,t_x \\"
+        r"t_y &= \frac{y - y_0}{y_1 - y_0} \\"
+        r"z(x, y) &= z(x, y_0) \\"
+        r"&\quad + \bigl[z(x, y_1) - z(x, y_0)\bigr]\,t_y"
         r"\end{aligned}"
     )
     substituted = (
         r"\begin{aligned}"
-        rf"z(x, y_0) &= {z00_f:.6g} + ({z10_f:.6g} - {z00_f:.6g}) \cdot "
-        rf"\tfrac{{{x_f:.6g} - {x0_f:.6g}}}{{{x1_f:.6g} - {x0_f:.6g}}}"
-        rf" = {z_query_y0:.6g} \\"
-        rf"z(x, y_1) &= {z01_f:.6g} + ({z11_f:.6g} - {z01_f:.6g}) \cdot "
-        rf"\tfrac{{{x_f:.6g} - {x0_f:.6g}}}{{{x1_f:.6g} - {x0_f:.6g}}}"
-        rf" = {z_query_y1:.6g} \\"
-        rf"z(x, y)   &= {z_query_y0:.6g} + ({z_query_y1:.6g} - {z_query_y0:.6g}) "
-        rf"\cdot \tfrac{{{y_f:.6g} - {y0_f:.6g}}}{{{y1_f:.6g} - {y0_f:.6g}}}"
-        rf" = {z:.6g}"
+        rf"t_x &= \frac{{{_g(x_f)} - {_p(x0_f)}}}{{{_g(x1_f)} - {_p(x0_f)}}} = {_g(frac_x, 4)} \\"
+        rf"z(x, y_0) &= {_g(z00_f)} \\"
+        rf"&\quad + ({_g(z10_f)} - {_p(z00_f)}) \cdot {_p(frac_x, 4)} \\"
+        rf"&= {_g(z_query_y0)} \\"
+        rf"z(x, y_1) &= {_g(z01_f)} \\"
+        rf"&\quad + ({_g(z11_f)} - {_p(z01_f)}) \cdot {_p(frac_x, 4)} \\"
+        rf"&= {_g(z_query_y1)} \\"
+        rf"t_y &= \frac{{{_g(y_f)} - {_p(y0_f)}}}{{{_g(y1_f)} - {_p(y0_f)}}} = {_g(frac_y, 4)} \\"
+        rf"z(x, y) &= {_g(z_query_y0)} \\"
+        rf"&\quad + ({_g(z_query_y1)} - {_p(z_query_y0)}) \cdot {_p(frac_y, 4)} \\"
+        rf"&= {_g(z)}"
         r"\end{aligned}"
     )
     narrative = (
@@ -532,6 +548,16 @@ def _validate_strictly_increasing(arr: np.ndarray, *, name: str) -> None:
     )
 
 
+def _g(value: float, sig: int = 6) -> str:
+    """Número con ``sig`` cifras significativas para el LaTeX del procedimiento."""
+    return f"{value:.{sig}g}"
+
+
+def _p(value: float, sig: int = 6) -> str:
+    """Como :func:`_g`, entre paréntesis si es negativo (``a - (-3)``)."""
+    return f"({value:.{sig}g})" if value < 0 else f"{value:.{sig}g}"
+
+
 def _bracket_indices(xs_arr: np.ndarray, x: float) -> tuple[int, int]:
     """Devuelve ``(i0, i1)`` tal que ``xs[i0] ≤ x ≤ xs[i1]`` cuando ``x``
     está en el rango. Si ``x`` está fuera, devuelve los dos índices del
@@ -544,3 +570,51 @@ def _bracket_indices(xs_arr: np.ndarray, x: float) -> tuple[int, int]:
     if idx >= n:
         return n - 2, n - 1
     return idx - 1, idx
+
+
+# ---------------------------------------------------------------------
+# Exportación (Fase 1.7)
+# ---------------------------------------------------------------------
+
+
+def interpolation_to_dict(
+    result: InterpolationResult,
+    *,
+    x_label: str = "x",
+    y_label: str = "y",
+    z_label: str = "z",
+) -> dict[str, Any]:
+    """Resultado de una interpolación, serializable a JSON.
+
+    Incluye la consulta, los nodos (lineal) o los vértices e intermedios
+    (doble entrada, convención ``z01 = z(x0, y1)``), el resultado y el
+    procedimiento. ``*_label`` son los encabezados de la tabla (p. ej.
+    ``"T [°C]"``) para que el archivo se entienda solo.
+    """
+    s = result.steps
+
+    def pick(**fields: float | None) -> dict[str, float]:
+        return {k: v for k, v in fields.items() if v is not None}
+
+    data: dict[str, Any] = {
+        "tipo": "lineal" if s.kind == "linear" else "doble entrada (bilineal)",
+        "nodo_exacto": s.exact_node,
+    }
+    if s.kind == "linear":
+        data["variables"] = {"x": x_label, "y": y_label}
+        data["consulta"] = pick(x=s.x_query)
+        data["nodos"] = pick(x0=s.x0, y0=s.f0, x1=s.x1, y1=s.f1)
+    else:
+        data["variables"] = {"x": x_label, "y": y_label, "z": z_label}
+        data["consulta"] = pick(x=s.x_query, y=s.y_query)
+        data["vertices"] = pick(
+            x0=s.x0, x1=s.x1, y0=s.y0, y1=s.y1, z00=s.z00, z01=s.z01, z10=s.z10, z11=s.z11
+        )
+        data["intermedios"] = pick(z_en_y0=s.z_query_y0, z_en_y1=s.z_query_y1)
+    data["resultado"] = result.value
+    data["procedimiento"] = {
+        "formula_latex": s.formula_latex,
+        "sustitucion_latex": s.substituted_latex,
+        "explicacion": s.narrative_es,
+    }
+    return data

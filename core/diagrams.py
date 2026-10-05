@@ -31,9 +31,12 @@ DOI: 10.1021/ie4033999
 
 from __future__ import annotations
 
+import math
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
+import CoolProp.CoolProp as cp
 import numpy as np
 from fluprodia import FluidPropertyDiagram
 
@@ -125,18 +128,103 @@ DEFAULT_RANGES: dict[str, FluidRange] = {
 }
 
 
+# Ventana genérica de respaldo (la que se usaba antes de calcularla por fluido).
+_FALLBACK_WINDOW_SI: dict[str, tuple[float, float]] = {
+    "h": (0.0, 4.0e6),
+    "s": (0.0, 1.0e4),
+    "vol": (1.0e-4, 1.0e1),
+}
+
+
+def axis_window_si(fluid: str) -> dict[str, tuple[float, float]]:
+    """Ventana inicial (en SI) de cada propiedad de eje para ``fluid``.
+
+    ``T`` y ``p`` salen de :data:`DEFAULT_RANGES`. ``h``, ``s`` y ``vol``
+    se calculan con CoolProp en las cuatro esquinas del rectángulo (T, p)
+    del fluido: el mínimo cae en (T_min, p_max) — líquido frío comprimido —
+    y el máximo en (T_max, p_min) — vapor caliente a baja presión. Así la
+    campana de cada fluido ocupa una fracción razonable del gráfico (con
+    los rangos fijos pensados para agua, la campana del R134a quedaba en
+    ~10 % del ancho del log p–h, y en p–log v el vapor de agua a menos de
+    ~0,15 bar quedaba fuera de la ventana).
+
+    Devuelve un dict ``{prop: (min, max)}`` con las keys
+    ``'T', 'p', 'h', 's', 'vol'``.
+    """
+    _validate_fluid(fluid)
+    rng = DEFAULT_RANGES[fluid]
+    # CoolProp no resuelve por debajo de su T mínima (para el agua, el
+    # punto triple 0,01 °C, apenas arriba del T_K_min = 0 °C del rango).
+    t_low = max(rng.T_K_min, float(cp.PropsSI("Tmin", fluid)) + 0.01)
+    values: dict[str, list[float]] = {"h": [], "s": [], "vol": []}
+    for t_K in (t_low, rng.T_K_max):
+        for p_Pa in (rng.p_Pa_min, rng.p_Pa_max):
+            try:
+                h = float(cp.PropsSI("H", "T", t_K, "P", p_Pa, fluid))
+                s = float(cp.PropsSI("S", "T", t_K, "P", p_Pa, fluid))
+                rho = float(cp.PropsSI("D", "T", t_K, "P", p_Pa, fluid))
+            except ValueError:
+                continue
+            values["h"].append(h)
+            values["s"].append(s)
+            values["vol"].append(1.0 / rho)
+
+    window: dict[str, tuple[float, float]] = {
+        "T": (rng.T_K_min, rng.T_K_max),
+        "p": (rng.p_Pa_min, rng.p_Pa_max),
+    }
+    for prop, vals in values.items():
+        if vals:
+            window[prop] = (min(vals), max(vals))
+        else:  # pragma: no cover — ninguna esquina resolvió; ventana genérica
+            window[prop] = _FALLBACK_WINDOW_SI[prop]
+    return window
+
+
+def expand_window(lo: float, hi: float, values: Iterable[float]) -> tuple[float, float]:
+    """Agranda ``(lo, hi)`` para que contenga todos los ``values`` finitos.
+
+    Pensado para que los estados y procesos superpuestos al diagrama
+    nunca queden fuera de la ventana visible.
+    """
+    finite = [float(v) for v in values if v is not None and math.isfinite(float(v))]
+    if not finite:
+        return lo, hi
+    return min(lo, *finite), max(hi, *finite)
+
+
+def pad_window(lo: float, hi: float, *, log: bool, frac: float = 0.05) -> tuple[float, float]:
+    """Agrega un margen ``frac`` a cada lado de la ventana.
+
+    En ejes logarítmicos el margen se aplica sobre ``log10`` (requiere
+    ``lo > 0``). Si la ventana es degenerada (``lo == hi``), abre un
+    margen relativo al valor.
+    """
+    if log:
+        if lo <= 0.0 or hi <= 0.0:
+            raise ValueError(f"Un eje logarítmico requiere límites positivos (recibí {lo}, {hi}).")
+        log_lo, log_hi = math.log10(lo), math.log10(hi)
+        span = (log_hi - log_lo) or 1.0
+        return 10.0 ** (log_lo - frac * span), 10.0 ** (log_hi + frac * span)
+    span = (hi - lo) or (abs(lo) or 1.0)
+    return lo - frac * span, hi + frac * span
+
+
 # ---------------------------------------------------------------------
 # Mapa diagrama → (prop_x, prop_y, x_logscale, y_logscale)
 # ---------------------------------------------------------------------
 #
 # Las keys 'h','T','s','vol','p','Q' coinciden con las que devuelve
 # ``calc_individual_isoline`` y con las que acepta ``draw_isolines_plotly``.
+# Las escalas tienen que coincidir con las que dibuja fluprodia
+# (``FluidPropertyDiagram.supported_diagrams``): en "p–log v" solo v es
+# logarítmico, p es lineal.
 
 AXIS_MAP: dict[DiagramType, tuple[str, str, bool, bool]] = {
     "logph": ("h", "p", False, True),
     "Ts": ("s", "T", False, False),
     "hs": ("s", "h", False, False),
-    "plogv": ("vol", "p", True, True),
+    "plogv": ("vol", "p", True, False),
 }
 
 # Para cada axis-property, qué QuantityKind de units_system aplica.
@@ -181,31 +269,35 @@ def _validate_diagram_type(diagram_type: str) -> None:
 # ---------------------------------------------------------------------
 
 
-def _isoline_grid(fluid: str) -> dict[str, np.ndarray]:
-    """Retorna las isolíneas "limpias" (T, p, Q) para el fluido.
+def _isoline_grid(fluid: str, system: UnitSystem = "Técnico") -> dict[str, np.ndarray]:
+    """Isolíneas "redondas" (T, p, Q) del fluido, en las unidades de ``system``.
 
-    Valores expresados en unidades del sistema **Técnico** porque
-    fluprodia tiene `set_unit_system` configurado y este helper solo
-    se llama después de eso, con system fijo a `Técnico`. Para los
-    otros sistemas, la conversión la hace fluprodia internamente
-    al cambiar la unidad de la magnitud.
+    ``FluidPropertyDiagram.set_isolines`` interpreta los valores en las
+    unidades activas (las de ``set_unit_system``), así que se generan
+    directamente en las del diagrama: °C y bar (Técnico), K y Pa (SI),
+    °F y psia (Inglés). Hasta la versión 0.9.0 se generaban siempre en
+    °C / bar: en SI quedaban isotermas de 0 a 600 K e isobaras de 0,01 a
+    1000 Pa (y con aire, isotermas en kelvin negativos que hacían fallar
+    a CoolProp); en Inglés, isotermas de 0 a 600 °F.
     """
     rng = DEFAULT_RANGES[fluid]
-    # Temperatura en °C: paso 25 o 50 °C según el rango.
-    T_min_C = rng.T_K_min - 273.15
-    T_max_C = rng.T_K_max - 273.15
-    span = T_max_C - T_min_C
-    step_T = 25.0 if span <= 400.0 else 50.0
+    # Temperatura: paso de 25 o 50 grados (°C o K) según el rango; en °F,
+    # el doble (el grado Fahrenheit es 1/1,8 del Celsius).
+    step_T = 25.0 if rng.T_K_max - rng.T_K_min <= 400.0 else 50.0
+    if system == "Inglés":
+        step_T *= 2.0
+    T_min = convert_from_si(rng.T_K_min, "temperature", system)
+    T_max = convert_from_si(rng.T_K_max, "temperature", system)
     T_isolines = np.arange(
-        np.ceil(T_min_C / step_T) * step_T,
-        np.floor(T_max_C / step_T) * step_T + step_T / 2,
+        np.ceil(T_min / step_T) * step_T,
+        np.floor(T_max / step_T) * step_T + step_T / 2,
         step_T,
     )
-    # Presión en bar: una década, decades cubiertas según rango.
-    p_min_bar = rng.p_Pa_min * 1.0e-5
-    p_max_bar = rng.p_Pa_max * 1.0e-5
-    log_min = int(np.floor(np.log10(p_min_bar)))
-    log_max = int(np.ceil(np.log10(p_max_bar)))
+    # Presión: una isobara por década que cubra el rango.
+    p_min = convert_from_si(rng.p_Pa_min, "pressure", system)
+    p_max = convert_from_si(rng.p_Pa_max, "pressure", system)
+    log_min = int(np.floor(np.log10(p_min)))
+    log_max = int(np.ceil(np.log10(p_max)))
     p_isolines = np.array([10.0**k for k in range(log_min, log_max + 1)])
     # Calidad: 11 puntos en [0, 1].
     Q_isolines = np.linspace(0.0, 1.0, 11)
@@ -231,7 +323,8 @@ def build_diagram(spec: DiagramSpec) -> FluidPropertyDiagram:
     diagram = FluidPropertyDiagram(spec.fluid, backend=None)
     diagram.set_unit_system(**FLUPRODIA_UNITS[spec.system])
 
-    isolines = _isoline_grid(spec.fluid)
+    # Después de set_unit_system: los valores se leen en esas unidades.
+    isolines = _isoline_grid(spec.fluid, spec.system)
     diagram.set_isolines(**isolines)
     diagram.calc_isolines()
     return diagram
@@ -328,6 +421,35 @@ def isobaric_process(
     return _process_to_si(raw, spec)
 
 
+def isobaric_process_by_enthalpy(
+    diagram: FluidPropertyDiagram,
+    spec: DiagramSpec,
+    *,
+    p_Pa: float,
+    h_start_J_per_kg: float,
+    h_end_J_per_kg: float,
+) -> dict[str, np.ndarray]:
+    """Proceso isobárico p = cte entre dos entalpías (en SI).
+
+    A diferencia de :func:`isobaric_process` (parametrizada por T), esta
+    versión recorre bien el tramo dentro de la campana, donde la
+    temperatura es constante y la entalpía no: es la que hace falta para
+    dibujar una caldera o un condensador (p. ej. 2→3 en un Rankine).
+    """
+    p_user = convert_from_si(p_Pa, "pressure", spec.system)
+    h_start_user = convert_from_si(h_start_J_per_kg, "specific_enthalpy", spec.system)
+    h_end_user = convert_from_si(h_end_J_per_kg, "specific_enthalpy", spec.system)
+    raw = diagram.calc_individual_isoline(
+        isoline_property="p",
+        isoline_value=float(p_user),
+        starting_point_property="h",
+        starting_point_value=float(h_start_user),
+        ending_point_property="h",
+        ending_point_value=float(h_end_user),
+    )
+    return _process_to_si(raw, spec)
+
+
 def isothermal_process(
     diagram: FluidPropertyDiagram,
     spec: DiagramSpec,
@@ -388,8 +510,23 @@ def process_to_diagram_coords(
     return x, y
 
 
-def _state_property(state: StatePoint, prop: str, system: UnitSystem) -> float:
-    """Devuelve el valor de ``prop`` para ``state`` en unidades del sistema."""
+def state_property_si(state: StatePoint, prop: str) -> float:
+    """Valor en SI de la propiedad de eje ``prop`` (``'T','p','h','s','vol'``).
+
+    Raises
+    ------
+    ValueError
+        Si ``prop`` no es una propiedad de eje, o si se pide ``'vol'`` de
+        un ``StatePoint`` construido a mano sin volumen específico.
+    """
+    if prop == "vol":
+        if state.v_m3_per_kg is None:
+            raise ValueError(
+                "El estado no trae volumen específico (v_m3_per_kg=None), así "
+                "que no se puede ubicar en el diagrama p–log v. Construilo con "
+                "core.fluids.state_from_pair, que siempre calcula v = 1/ρ."
+            )
+        return state.v_m3_per_kg
     si_value = {
         "T": state.T_K,
         "p": state.P_Pa,
@@ -398,12 +535,15 @@ def _state_property(state: StatePoint, prop: str, system: UnitSystem) -> float:
     }.get(prop)
     if si_value is None:
         raise ValueError(
-            f"Propiedad '{prop}' no extraíble de StatePoint (faltaría 'vol'). "
-            f"Para diagramas p–v use process_to_diagram_coords con datos de "
-            f"un proceso, o computá v=1/ρ desde CoolProp aparte."
+            f"Propiedad '{prop}' no es un eje de diagrama. Usá una de: {sorted(_PROP_TO_KIND)}."
         )
+    return si_value
+
+
+def _state_property(state: StatePoint, prop: str, system: UnitSystem) -> float:
+    """Devuelve el valor de ``prop`` para ``state`` en unidades del sistema."""
     kind = _PROP_TO_KIND[prop]
-    return convert_from_si(si_value, kind, system)  # type: ignore[arg-type]
+    return convert_from_si(state_property_si(state, prop), kind, system)  # type: ignore[arg-type]
 
 
 def _process_array_in_system(
@@ -461,7 +601,15 @@ def linear_segment_overlay(
     start: StatePoint,
     end: StatePoint,
 ) -> ProcessOverlay:
-    """Construye un :class:`ProcessOverlay` de 2 puntos (segmento recto)."""
+    """Construye un :class:`ProcessOverlay` de 2 puntos (segmento recto).
+
+    El volumen específico se toma de los estados cuando lo traen; si
+    alguno no lo tiene, ese extremo queda en NaN (plotly no lo dibuja).
+    """
+
+    def _vol(state: StatePoint) -> float:
+        return np.nan if state.v_m3_per_kg is None else state.v_m3_per_kg
+
     return ProcessOverlay(
         name=name,
         color=color,
@@ -471,10 +619,132 @@ def linear_segment_overlay(
             "T": np.array([start.T_K, end.T_K], dtype=float),
             "h": np.array([start.h_J_per_kg, end.h_J_per_kg], dtype=float),
             "s": np.array([start.s_J_per_kg_K, end.s_J_per_kg_K], dtype=float),
-            "vol": np.array([np.nan, np.nan], dtype=float),
+            "vol": np.array([_vol(start), _vol(end)], dtype=float),
             "Q": np.array([start.x, end.x], dtype=float),
         },
     )
+
+
+SegmentKind = Literal["isobaric", "isentropic", "straight"]
+
+# Tolerancia relativa para considerar que dos estados comparten p o s.
+_SAME_PROPERTY_RTOL = 1e-4
+
+
+def _shares(a: float, b: float, scale: float) -> bool:
+    return abs(a - b) <= _SAME_PROPERTY_RTOL * max(abs(a), abs(b), scale)
+
+
+def _straight_coords(start: StatePoint, end: StatePoint) -> dict[str, np.ndarray]:
+    return linear_segment_overlay(name="", color="", dash="", start=start, end=end).coords_si
+
+
+def segment_between(
+    diagram: FluidPropertyDiagram,
+    spec: DiagramSpec,
+    start: StatePoint,
+    end: StatePoint,
+) -> tuple[SegmentKind, dict[str, np.ndarray]]:
+    """Trayectoria para unir dos estados consecutivos de un ciclo (en SI).
+
+    - Misma presión → isobárica real (caldera, condensador, evaporador).
+    - Misma entropía → isoentrópica real (bomba, turbina o compresor
+      ideales).
+    - Si no comparten ninguna, o si fluprodia no puede trazarla → segmento
+      recto, que es **solo una referencia visual** (p. ej. una turbina
+      real o una válvula de expansión no son procesos cuasiestáticos con
+      una trayectoria definida en el diagrama).
+    """
+    if _shares(start.P_Pa, end.P_Pa, scale=1.0) and not _shares(
+        start.h_J_per_kg, end.h_J_per_kg, scale=1.0e3
+    ):
+        try:
+            coords = isobaric_process_by_enthalpy(
+                diagram,
+                spec,
+                p_Pa=start.P_Pa,
+                h_start_J_per_kg=start.h_J_per_kg,
+                h_end_J_per_kg=end.h_J_per_kg,
+            )
+            return "isobaric", coords
+        except Exception:  # fluprodia/CoolProp no pudo: se cae a la recta
+            pass
+    if _shares(start.s_J_per_kg_K, end.s_J_per_kg_K, scale=1.0e3) and not _shares(
+        start.P_Pa, end.P_Pa, scale=1.0
+    ):
+        try:
+            coords = isentropic_process(
+                diagram,
+                spec,
+                s_J_per_kg_K=start.s_J_per_kg_K,
+                p_start_Pa=start.P_Pa,
+                p_end_Pa=end.P_Pa,
+            )
+            return "isentropic", coords
+        except Exception:
+            pass
+    return "straight", _straight_coords(start, end)
+
+
+def _join_with_gaps(chunks: list[dict[str, np.ndarray]]) -> dict[str, np.ndarray]:
+    """Concatena tramos separándolos con NaN (plotly corta la línea ahí)."""
+    keys = ("p", "T", "h", "s", "vol", "Q")
+    out: dict[str, list[float]] = {k: [] for k in keys}
+    for i, chunk in enumerate(chunks):
+        if i:
+            for k in keys:
+                out[k].append(np.nan)
+        n = len(chunk["p"])
+        for k in keys:
+            values = chunk.get(k)
+            out[k].extend(np.full(n, np.nan) if values is None else np.asarray(values, dtype=float))
+    return {k: np.array(v, dtype=float) for k, v in out.items()}
+
+
+def cycle_overlays(
+    diagram: FluidPropertyDiagram,
+    spec: DiagramSpec,
+    states: Sequence[StatePoint],
+    *,
+    close: bool = True,
+) -> list[ProcessOverlay]:
+    """Overlays para unir ``states`` en orden (y cerrar el ciclo si ``close``).
+
+    Devuelve hasta dos curvas: los tramos isobáricos/isoentrópicos reales
+    (línea llena) y las uniones rectas de referencia (punteada). Ver
+    :func:`segment_between`.
+    """
+    seq = list(states)
+    if len(seq) < 2:
+        return []
+    pairs = list(zip(seq[:-1], seq[1:], strict=True))
+    if close and len(seq) > 2:
+        pairs.append((seq[-1], seq[0]))
+    real: list[dict[str, np.ndarray]] = []
+    straight: list[dict[str, np.ndarray]] = []
+    for start, end in pairs:
+        kind, coords = segment_between(diagram, spec, start, end)
+        (straight if kind == "straight" else real).append(coords)
+    overlays: list[ProcessOverlay] = []
+    if real:
+        overlays.append(
+            ProcessOverlay(
+                name="procesos a p o s constante",
+                color="#444444",
+                dash="solid",
+                coords_si=_join_with_gaps(real),
+            )
+        )
+    if straight:
+        overlays.append(
+            ProcessOverlay(
+                name="uniones rectas (referencia)",
+                color="#444444",
+                dash="dot",
+                coords_si=_join_with_gaps(straight),
+            )
+        )
+    return overlays
 
 
 # ---------------------------------------------------------------------

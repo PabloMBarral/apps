@@ -106,16 +106,30 @@ def number_input_si(
     step : float, opcional
         Step del widget, **en unidades del sistema actual** (Streamlit
         no lo escala automáticamente). Si es ``None``, Streamlit elige.
+
+    Notas
+    -----
+    El widget real usa la key ``f"{key}@{sistema}"``. Streamlit identifica
+    a los widgets solo por su key, así que con una key fija el número
+    tipeado sobrevivía al cambio de sistema pero con otra unidad (400 °C
+    pasaba a leerse como 400 K). Con una key por sistema, al cambiar de
+    sistema se crea un widget nuevo cuyo valor inicial es el que el alumno
+    tenía cargado, convertido a las unidades nuevas.
     """
     system = get_current_system()
     full_label = f"{label} [{unit_label(kind, system)}]"
+    widget_key = _system_key(key, system)
     default_user = convert_from_si(default_si, kind, system)
+    if widget_key not in st.session_state:
+        carried = _value_from_other_system(key, kind, system)
+        if carried is not None:
+            default_user = carried
 
     kwargs: dict[str, Any] = {
         "label": full_label,
         "value": float(default_user),
         "format": format,
-        "key": key,
+        "key": widget_key,
     }
     if step is not None:
         kwargs["step"] = step
@@ -128,6 +142,28 @@ def number_input_si(
 
     user_value = st.number_input(**kwargs)
     return convert_to_si(float(user_value), kind, system)
+
+
+def _system_key(key: str, system: UnitSystem) -> str:
+    """Key del widget para un sistema de unidades dado."""
+    return f"{key}@{system}"
+
+
+def _value_from_other_system(key: str, kind: QuantityKind, system: UnitSystem) -> float | None:
+    """Valor que el widget ``key`` tenía en otro sistema, convertido a ``system``.
+
+    Streamlit conserva el estado de los widgets de la corrida anterior
+    hasta el final de la corrida actual, así que al cambiar de sistema el
+    widget viejo todavía está en ``st.session_state``.
+    """
+    for other in SUPPORTED_SYSTEMS:
+        if other == system:
+            continue
+        previous = st.session_state.get(_system_key(key, other))
+        if previous is not None:
+            value_si = convert_to_si(float(previous), kind, other)
+            return convert_from_si(value_si, kind, system)
+    return None
 
 
 # ---------------------------------------------------------------------
