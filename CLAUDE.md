@@ -206,8 +206,18 @@ Notas de la Fase 1.7:
   `try/except` y mostrar `st.warning` (como Propiedades e Isoentrópicos).
 - Los valores por defecto de cada página tienen que ser calculables para
   todos los fluidos (`suggested_inputs`, `suggested_device_inputs`) y
-  hay tests que los recorren; evitar el estado de referencia de CoolProp
-  (h = s = 0), donde el ruido numérico se ve como −1×10⁻⁵.
+  hay tests que los recorren.
+- En el estado de referencia de cada fluido (agua: u = s = 0 en el punto
+  triple; aire: h = s = 0 líquido saturado a 1 atm) CoolProp devuelve
+  ruido (−6.6×10⁻⁸ J/kg); `core.fluids` lo pasa a 0 (`_zero_if_noise`)
+  en `StatePoint`, `FluidState` y la saturación. Si se lee CoolProp
+  directo, aplicar lo mismo.
+- **Pseudo-puros** (aire, R410A; `FluidLimits.is_pure` False): tienen
+  deslizamiento de temperatura en la campana. Con p y (h, s, v o u) el
+  estado se calcula con (p, x), con x de la regla de la palanca (el
+  flash de CoolProp falla cerca de la línea de burbuja); T-x con
+  0 < x < 1 no está definido. En los procedimientos, T_f ≤ T ≤ T_g en vez
+  de T = T_sat.
 
 ### Citas y licencias
 

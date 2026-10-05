@@ -145,8 +145,9 @@
   Isoentrópicos con validaciones, defaults por fluido, pasos por sistema
   — Fase 1.5b — y export), `dd05941` (feat: fórmulas teóricas y export en
   Interpolación e ISO 6976), `5ad2890` (fix: isolíneas de los diagramas en
-  SI e Inglés), `2ef9cfe` (fix: ecuaciones que entran en un celular) y el
-  commit de docs que cierra la fase.
+  SI e Inglés), `2ef9cfe` (fix: ecuaciones que entran en un celular),
+  `d829767` (docs), `205ed6f` (fix: pseudo-puros dentro de la campana y
+  ruido del estado de referencia) y el commit de docs que lo registra.
 - **Bugs corregidos** (todos reproducidos antes de arreglarlos):
   - Links directos (`/Propiedades`) después de un reinicio mostraban el
     menú automático con nombres de archivo: la carpeta `pages/` activa el
@@ -168,6 +169,16 @@
     en °C bajo cero) e Isoentrópicos (aire), y la bomba de aire líquido
     arrancaba en el estado de referencia de CoolProp (h₁ = −1,2×10⁻⁵ kJ/kg,
     "líquido comprimido" para un líquido saturado).
+  - Aire y R410A (pseudo-puros): cerca de la línea de burbuja, p con h, s,
+    v o u daba "líquido comprimido" en el borde y, apenas adentro
+    (x ≈ 1e-4 … 1e-2), un error que decía que el estado no existía. Ahora el
+    título sale de la regla de la palanca (lineal en el modelo de CoolProp)
+    y se calcula con (p, x); p-x con 0 < x < 1 se acepta (T-x no: a T fija
+    la presión cambia con el título). El procedimiento muestra
+    T_f ≤ T ≤ T_g en vez de "T = T_sat".
+  - Ruido en el estado de referencia: el agua en el punto triple mostraba
+    u_f = −6,6048×10⁻¹¹ kJ/kg (Cengel A-4: 0,000) y el aire líquido a 1 atm
+    h_f = −1,2×10⁻⁵ kJ/kg; ahora valen 0.
 - **Scope**: Isoentrópicos con las validaciones de `fluid_state_from_pair`
   (mensajes en castellano: entrada líquida a un compresor, vapor en la
   bomba, interenfriador que condensaría), valores iniciales calculables
@@ -179,13 +190,15 @@
   §3.3, §6.3, §16.9) y descarga CSV/JSON (`core/export.py`). Ecuaciones
   en renglones cortos (`latex_chain`): en Técnico ya no hay ninguna más
   ancha que el celular.
-- **Tests**: de 791 a 921 (+130): AppTest de Isoentrópicos (7 fluidos ×
+- **Tests**: de 791 a 952 (+161): AppTest de Isoentrópicos (7 fluidos ×
   4 dispositivos, modo inverso, errores, unidades, aire en SI e Inglés),
   de Interpolación y de ISO 6976; navegación por las cuatro páginas;
   isolíneas por sistema (7 fluidos × 3 sistemas); export y helpers de
-  LaTeX. Las 890 ecuaciones distintas de las páginas 1–4 (24 estados de
-  Propiedades, 7 fluidos × 4 dispositivos, 3 sistemas) validan con KaTeX
-  en modo estricto y se midió su ancho renderizado en Chromium.
+  LaTeX; pseudo-puros a lo largo de la campana; ruido de referencia. Sin
+  warnings de pytest (fixtures de clase con `@classmethod`). Las 1013
+  ecuaciones distintas de las páginas 1–4 (28 estados de Propiedades,
+  7 fluidos × 4 dispositivos, 3 sistemas) validan con KaTeX en modo
+  estricto y se midió su ancho renderizado en Chromium.
 - Sin dependencias nuevas.
 
 ---
@@ -195,15 +208,12 @@
 - **Detectado en Fase 1.7, sin resolver**:
   - En sistema SI (J/kg con ×10ⁿ) algunas sustituciones siguen siendo más
     anchas que el celular (regla de la palanca, h₂ de Isoentrópicos: hasta
-    475 px) y se deslizan; en Inglés, 4 apenas pasadas (≤ 339 px). Se
+    475 px) y se deslizan; en Inglés, 5 apenas pasadas (≤ 339 px). Se
     resolvería mostrando las energías en kJ/kg dentro del SI o con otro
-    formato de número.
-  - Aire (pseudo-puro): un líquido saturado reconstruido desde (p, h) se
-    clasifica como líquido comprimido (afecta a la tabla de estados de
-    Isoentrópicos si se elige x = 0 a mano; el valor inicial lo evita).
-  - Un fixture con scope de clase usado como método de instancia en un
-    test viejo (`TestWaterSubcooledAt25C1Bar`) emite
-    `PytestRemovedIn10Warning`.
+    formato de número (decisión del autor: hoy el SI es J/kg).
+  - Pseudo-puros con T y (s o v) dentro de la campana: no se revisó si
+    CoolProp los resuelve bien cerca de los bordes (con p ya está
+    resuelto).
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
 - **Fase 3.1** — Ciclos termodinámicos con TESPy: Rankine simple,
