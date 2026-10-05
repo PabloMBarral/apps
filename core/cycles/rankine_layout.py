@@ -1,7 +1,8 @@
-"""Topología y numeración de estados del ciclo de Rankine — Fase 3.1b.
+"""Topología y numeración de estados del ciclo de Rankine — Fases 3.1b y 3.1c.
 
 Describe la planta —bombas, calentadores de agua de alimentación, caldera,
-recalentador, tramos de turbina y condensador— a partir de los datos, sin
+recalentador, tramos de turbina, condensador y, en el ciclo real, las
+cañerías con pérdidas y el recuperador del ORC— a partir de los datos, sin
 calcular nada: no importa TESPy ni CoolProp. Sirve para numerar los estados
 como Çengel & Boles (*Termodinámica*, cap. 10) **antes** de resolver (los
 rótulos de la página) y como plano para la red de TESPy, el procedimiento y
@@ -16,16 +17,18 @@ Calentadores de agua de alimentación (Cengel §10-6):
   T_sat(p_ext) − TTD (TTD = 0 en el calentador ideal); la extracción
   condensa y sale como líquido saturado (el drenaje). El drenaje va **en
   cascada hacia atrás** —por una válvula— al calentador de presión
-  inmediatamente menor o al condensador; solo el cerrado de mayor presión
-  puede **bombearlo hacia adelante** a una cámara de mezcla antes de la
-  caldera. Con esas reglas cada fracción de extracción se despeja en orden,
-  de mayor a menor presión, como en el libro.
+  inmediatamente menor o al condensador, o se **bombea hacia adelante** a
+  una cámara de mezcla en la línea de agua, justo después del calentador
+  (en Cengel 10-6, el de mayor presión, antes de la caldera). Con un
+  subenfriador de drenaje el drenaje sale más frío (DCA) y con un
+  desrecalentador el agua puede salir por encima de T_sat (TTD < 0).
 
 Numeración: primero la línea de agua de alimentación desde la salida del
-condensador (con el drenaje bombeado y la mezcla en su lugar), después el
-vapor desde la caldera —la extracción comparte el número del estado del que
-sale— y al final los drenajes en cascada. Así quedan los ejemplos 10-1 a
-10-6 de Cengel.
+condensador (con el recuperador, los drenajes bombeados, las mezclas y la
+cañería hasta la caldera en su lugar), después el vapor desde la caldera
+—la extracción comparte el número del estado del que sale— y al final los
+drenajes en cascada. Así quedan los ejemplos 10-1 a 10-6 de Cengel (10-2,
+el ciclo real, con sus cañerías: 1 a 6).
 """
 
 from __future__ import annotations
@@ -47,12 +50,16 @@ ComponentKind = Literal[
     "closed_heater",
     "valve",
     "mixer",
+    "pipe",
+    "recuperator",
 ]
 
 #: Rol de cada conexión de un componente lógico.
-#: ``in``/``out``: entrada y salida simples; ``fw_in``/``fw_out``: agua de
-#: alimentación; ``bleed``: extracción de la turbina; ``drain_in``: drenaje
-#: que llega de otro calentador; ``drain_out``: drenaje que sale.
+#: ``in``/``out``: entrada y salida simples (en el recuperador, el lado
+#: caliente: el escape de la turbina); ``fw_in``/``fw_out``: agua de
+#: alimentación (en el recuperador, el líquido que sale de la bomba);
+#: ``bleed``: extracción de la turbina; ``drain_in``: drenaje que llega de
+#: otro calentador; ``drain_out``: drenaje que sale.
 PortRole = Literal["in", "out", "fw_in", "fw_out", "bleed", "drain_in", "drain_out"]
 
 INLET_ROLES: frozenset[str] = frozenset({"in", "fw_in", "bleed", "drain_in"})
@@ -72,14 +79,30 @@ _ROMAN = ("I", "II", "III", "IV")
 class FeedwaterHeater:
     """Calentador de agua de alimentación (Cengel §10-6), en SI.
 
-    ``p_Pa`` es la presión de extracción. ``ttd_K`` es la diferencia
-    terminal de un cerrado: el agua de alimentación sale a
-    T_sat(p_ext) − TTD (0 = calentador ideal).
+    ``p_Pa`` es la presión de extracción. Lo demás es solo para los
+    cerrados:
+
+    - ``ttd_K``: diferencia terminal; el agua de alimentación sale a
+      T_sat(p_ext) − TTD (0 = calentador ideal). Negativa solo con
+      desrecalentador.
+    - ``dca_K``: con subenfriador de drenaje, el drenaje sale a
+      T_entrada del agua + DCA (*drain cooler approach*) en vez de líquido
+      saturado; ``None`` = sin subenfriador.
+    - ``desuperheater``: zona de desrecalentamiento; la extracción
+      sobrecalentada se enfría hasta vapor saturado calentando el agua que
+      ya sale de la zona de condensación.
+    - ``drain_forward``: el drenaje se bombea hacia adelante, a una cámara de
+      mezcla en la línea de agua justo después del calentador.
+    - ``dp_Pa``: caída de presión del agua en los tubos.
     """
 
     p_Pa: float
     kind: HeaterKind = "open"
     ttd_K: float = 0.0
+    dca_K: float | None = None
+    desuperheater: bool = False
+    drain_forward: bool = False
+    dp_Pa: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -132,6 +155,12 @@ class PlantLayout:
     """Plano de la planta: estados numerados y componentes lógicos.
 
     Los índices son posiciones en ``labels`` (estado número = índice + 1).
+    ``drain_forward`` dice si el calentador de mayor presión bombea su
+    drenaje hacia adelante (como Cengel 10-6) y ``forward_drains`` lista
+    todos los que lo hacen. ``boiler_in``/``boiler_out`` son la entrada y la
+    salida de la caldera (con cañerías, distintas de la salida de la línea
+    de agua y de la entrada a la turbina) y ``condenser_in`` lo que entra al
+    condensador (con recuperador, su salida del lado caliente).
     """
 
     labels: tuple[str, ...]
@@ -144,6 +173,11 @@ class PlantLayout:
     reheat_in: int | None
     reheat_out: int | None
     extraction_states: tuple[int, ...]
+    forward_drains: tuple[int, ...]
+    boiler_in: int
+    boiler_out: int
+    condenser_in: int
+    boiler: str = "caldera"
 
     @property
     def n_states(self) -> int:
@@ -180,25 +214,49 @@ def _same_p(a: float, b: float) -> bool:
     return math.isclose(a, b, rel_tol=_SAME_P_RTOL)
 
 
+_MASCULINE = frozenset({"evaporador", "generador de vapor"})
+
+
+def _of(name: str) -> str:
+    """``"de la caldera"`` / ``"del evaporador"``."""
+    return f"del {name}" if name in _MASCULINE else f"de la {name}"
+
+
+def _to(name: str) -> str:
+    """``"a la caldera"`` / ``"al evaporador"``."""
+    return f"al {name}" if name in _MASCULINE else f"a la {name}"
+
+
 def plant_layout(
     *,
     heaters: Sequence[FeedwaterHeater] = (),
     reheat_p_Pa: float | None = None,
     drain_forward: bool = False,
+    feed_pipe: bool = False,
+    steam_pipe: bool = False,
+    recuperator: bool = False,
+    boiler: str = "caldera",
 ) -> PlantLayout:
-    """Arma el plano de la planta (Cengel §10-6).
+    """Arma el plano de la planta (Cengel §10-5 y §10-6).
 
     ``heaters`` va de menor a mayor presión (la validación de
     :mod:`core.cycles.rankine` lo exige antes de llegar acá).
     ``drain_forward`` bombea hacia adelante el drenaje del calentador de
-    mayor presión, que tiene que ser cerrado.
+    mayor presión, que tiene que ser cerrado (también se puede pedir para
+    cada cerrado con :attr:`FeedwaterHeater.drain_forward`).
+    ``feed_pipe`` y ``steam_pipe`` suman las cañerías con pérdidas de la línea
+    de agua a la caldera y de la caldera a la turbina (Cengel 10-2);
+    ``recuperator``, el recuperador del ORC entre el escape de la turbina y el
+    líquido que sale de la bomba. ``boiler`` es el nombre del equipo donde
+    entra el calor ("caldera"; en el ORC, "evaporador").
 
     Raises
     ------
     ValueError
         Si la configuración no se puede representar (más de tres
-        calentadores, presiones fuera de orden o repetidas, o drenaje hacia
-        adelante con el calentador de mayor presión abierto).
+        calentadores, presiones fuera de orden o repetidas, drenaje hacia
+        adelante desde un calentador abierto, o recuperador con
+        calentadores).
     """
     heaters = tuple(heaters)
     n = len(heaters)
@@ -210,14 +268,26 @@ def plant_layout(
                 "Las presiones de extracción tienen que ir de menor a mayor y ser distintas "
                 "(cada calentador a su propia presión)."
             )
-    forward = drain_forward and n > 0
-    if forward and heaters[-1].kind != "closed":
+    if drain_forward and n > 0 and heaters[-1].kind != "closed":
         raise ValueError(
             "Solo un calentador cerrado puede bombear su drenaje hacia adelante, y el de mayor "
             "presión es abierto."
         )
     names = heater_names(heaters)
+    for name, h in zip(names, heaters, strict=True):
+        if h.drain_forward and h.kind != "closed":
+            raise ValueError(
+                f"El {name} es abierto: solo un calentador cerrado puede bombear su drenaje "
+                "hacia adelante."
+            )
+    if recuperator and n:
+        raise ValueError(
+            "El recuperador se arma en el ciclo sin calentadores de agua de alimentación."
+        )
     top = n - 1
+    forward = {i for i, h in enumerate(heaters) if h.drain_forward}
+    if drain_forward and n > 0:
+        forward.add(top)
 
     labels: list[str] = []
 
@@ -232,12 +302,17 @@ def plant_layout(
     def stage_of(i: int) -> int:
         return sum(1 for j in opens if j < i)
 
+    def forward_suffix(i: int) -> str:
+        """Con más de un drenaje bombeado, cada bomba y cada mezcla llevan el calentador."""
+        return "" if len(forward) == 1 else f" del {names[i]}"
+
     # Lo que se arma al final, cuando ya están todos los números.
     pumps: list[CycleComponent] = []
     feed_order: list[tuple[str, int]] = []  # ("pump", k) / ("heater", i) / ("drain", i)
     closed_fw: dict[int, tuple[int, int]] = {}
     open_io: dict[int, tuple[int, int]] = {}
-    forward_states: tuple[int, int, int] | None = None  # drenaje, bomba, mezcla
+    forward_states: dict[int, tuple[int, int, int]] = {}  # drenaje, bomba, mezcla
+    recuperator_cold: tuple[int, int] | None = None
 
     # 1. Línea de agua de alimentación, desde la salida del condensador.
     cond_out = new_state("salida del condensador" if n else "entrada a la bomba")
@@ -249,16 +324,20 @@ def plant_layout(
         )
         feed_order.append(("pump", stage))
         current = pump_out
+        if recuperator and stage == 0:
+            cold_out = new_state("salida del recuperador (líquido)")
+            recuperator_cold = (current, cold_out)
+            current = cold_out
         for i in (i for i, h in enumerate(heaters) if h.kind == "closed" and stage_of(i) == stage):
             fw_out = new_state(f"agua de alimentación a la salida del {names[i]}")
             closed_fw[i] = (current, fw_out)
             feed_order.append(("heater", i))
             current = fw_out
-            if forward and i == top:
+            if i in forward:
                 drain = new_state(f"drenaje del {names[i]}")
-                pumped = new_state("salida de la bomba del drenaje")
-                mixed = new_state("salida de la cámara de mezcla")
-                forward_states = (drain, pumped, mixed)
+                pumped = new_state(f"salida de la bomba del drenaje{forward_suffix(i)}")
+                mixed = new_state(f"salida de la cámara de mezcla{forward_suffix(i)}")
+                forward_states[i] = (drain, pumped, mixed)
                 feed_order.append(("drain", i))
                 current = mixed
         if stage < len(opens):
@@ -267,11 +346,28 @@ def plant_layout(
             open_io[i] = (current, out)
             feed_order.append(("heater", i))
             current = out
+    feed_pipe_comp: CycleComponent | None = None
+    if feed_pipe:
+        pipe_out = new_state(f"entrada {_to(boiler)}")
+        feed_pipe_comp = CycleComponent(
+            "pipe", "cañería de alimentación", (Port("in", current), Port("out", pipe_out))
+        )
+        current = pipe_out
     boiler_in = current
 
-    # 2. Camino del vapor: caldera, tramos de turbina y recalentador.
+    # 2. Camino del vapor: caldera, cañería, tramos de turbina y recalentador.
     reheat = reheat_p_Pa is not None
-    turbine_in = new_state("entrada a la turbina de alta" if reheat else "entrada a la turbina")
+    inlet_label = "entrada a la turbina de alta" if reheat else "entrada a la turbina"
+    steam_pipe_comp: CycleComponent | None = None
+    if steam_pipe:
+        boiler_out = new_state(f"salida {_of(boiler)}")
+        turbine_in = new_state(inlet_label)
+        steam_pipe_comp = CycleComponent(
+            "pipe", "cañería de vapor", (Port("in", boiler_out), Port("out", turbine_in))
+        )
+    else:
+        turbine_in = new_state(inlet_label)
+        boiler_out = turbine_in
     events: list[tuple[float, list[int], bool]] = []
     for i, h in enumerate(heaters):
         for event in events:
@@ -347,13 +443,28 @@ def plant_layout(
             casing=casing,
         )
     )
+    condenser_in = exhaust
+    recuperator_comp: CycleComponent | None = None
+    if recuperator_cold is not None:
+        hot_out = new_state("salida del recuperador (vapor)")
+        recuperator_comp = CycleComponent(
+            "recuperator",
+            "recuperador",
+            (
+                Port("fw_in", recuperator_cold[0]),
+                Port("fw_out", recuperator_cold[1]),
+                Port("in", exhaust),
+                Port("out", hot_out),
+            ),
+        )
+        condenser_in = hot_out
 
     # 3. Drenajes en cascada, de mayor a menor presión.
     valves: list[CycleComponent] = []
     drains_into: dict[int | None, list[int]] = {}  # destino (None = condensador)
     back_drain: dict[int, int] = {}  # salida del drenaje de cada cerrado
     for i in reversed(range(n)):
-        if heaters[i].kind != "closed" or (forward and i == top):
+        if heaters[i].kind != "closed" or i in forward:
             continue
         drain = new_state(f"drenaje del {names[i]}")
         after = new_state(f"drenaje del {names[i]}, tras la válvula")
@@ -376,13 +487,12 @@ def plant_layout(
             continue
         i = k
         if what == "drain":
-            assert forward_states is not None
-            drain, pumped, mixed = forward_states
+            drain, pumped, mixed = forward_states[i]
             fw_out = closed_fw[i][1]
             feed.append(
                 CycleComponent(
                     "pump",
-                    "bomba del drenaje",
+                    f"bomba del drenaje{forward_suffix(i)}",
                     (Port("in", drain), Port("out", pumped)),
                     heater=i,
                 )
@@ -390,7 +500,7 @@ def plant_layout(
             feed.append(
                 CycleComponent(
                     "mixer",
-                    "cámara de mezcla",
+                    f"cámara de mezcla{forward_suffix(i)}",
                     (Port("fw_in", fw_out), Port("drain_in", pumped), Port("out", mixed)),
                     heater=i,
                 )
@@ -408,7 +518,7 @@ def plant_layout(
             feed.append(CycleComponent("open_heater", names[i], ports, heater=i))
         else:
             fw_in, fw_out = closed_fw[i]
-            drain_out = forward_states[0] if (forward and i == top) else back_drain[i]  # type: ignore[index]
+            drain_out = forward_states[i][0] if i in forward else back_drain[i]
             ports = (
                 Port("fw_in", fw_in),
                 Port("fw_out", fw_out),
@@ -418,28 +528,42 @@ def plant_layout(
             )
             feed.append(CycleComponent("closed_heater", names[i], ports, heater=i))
 
-    boiler = CycleComponent("boiler", "caldera", (Port("in", boiler_in), Port("out", turbine_in)))
+    boiler_comp = CycleComponent("boiler", boiler, (Port("in", boiler_in), Port("out", boiler_out)))
     condenser = CycleComponent(
         "condenser",
         "condensador",
         (
-            Port("in", exhaust),
+            Port("in", condenser_in),
             *(Port("drain_in", s) for s in drains_into.get(None, [])),
             Port("out", cond_out),
         ),
     )
-    components = (*feed, boiler, *steam_order, condenser, *valves)
+    components = (
+        *feed,
+        *((feed_pipe_comp,) if feed_pipe_comp else ()),
+        boiler_comp,
+        *((steam_pipe_comp,) if steam_pipe_comp else ()),
+        *steam_order,
+        *((recuperator_comp,) if recuperator_comp else ()),
+        condenser,
+        *valves,
+    )
     return PlantLayout(
         labels=tuple(labels),
         components=components,
         heaters=heaters,
         heater_names=names,
-        drain_forward=forward,
+        drain_forward=n > 0 and top in forward,
         turbine_inlet=turbine_in,
         exhaust=exhaust,
         reheat_in=reheat_in,
         reheat_out=reheat_out,
         extraction_states=tuple(bleed_state[i] for i in range(n)),
+        forward_drains=tuple(sorted(forward)),
+        boiler_in=boiler_in,
+        boiler_out=boiler_out,
+        condenser_in=condenser_in,
+        boiler=boiler,
     )
 
 
@@ -461,17 +585,20 @@ def port_flows(layout: PlantLayout) -> dict[tuple[int, int], Flow]:
     Es el balance de masa que Cengel escribe sobre el esquema (1, y, 1 − y…):
     la extracción del calentador k es y_k; el vapor que sigue en la turbina,
     1 menos lo extraído antes; el drenaje de un cerrado, su extracción más los
-    drenajes que recibe. Las claves son ``(componente, conexión)`` con los
-    índices de ``layout.components`` y de sus ``ports``.
+    drenajes que recibe; por cada cámara de mezcla se reincorpora un drenaje
+    bombeado. Las claves son ``(componente, conexión)`` con los índices de
+    ``layout.components`` y de sus ``ports``.
     """
     comps = layout.components
     flows: dict[tuple[int, int], Flow] = {}
     one: Flow = {None: 1}
 
-    # Vapor: caldera, tramos de turbina y recalentador.
+    # Vapor: caldera, cañerías, tramos de turbina y recalentador. Por las
+    # cañerías pasa todo el caudal (la de alimentación está después de la
+    # última bomba, cuando ya se juntó todo).
     current = dict(one)
     for ci, comp in enumerate(comps):
-        if comp.kind == "boiler":
+        if comp.kind in ("boiler", "pipe"):
             for pi in range(len(comp.ports)):
                 flows[(ci, pi)] = dict(one)
         elif comp.kind in ("turbine", "reheater"):
@@ -508,6 +635,13 @@ def port_flows(layout: PlantLayout) -> dict[tuple[int, int], Flow]:
                 flows[(ci, pi)] = drain_out[feeds[port.state]]
                 cond_out = _plus(cond_out, flows[(ci, pi)])
         flows[(ci, [p.role for p in comp.ports].index("out"))] = cond_out
+
+    # Recuperador (solo sin calentadores): el escape de un lado y, del otro, el
+    # líquido que sale de la primera bomba.
+    for ci, comp in enumerate(comps):
+        if comp.kind == "recuperator":
+            for pi, port in enumerate(comp.ports):
+                flows[(ci, pi)] = dict(exhaust if port.role in ("in", "out") else cond_out)
 
     # Línea de agua de alimentación, desde el condensador hasta la caldera.
     line = dict(cond_out)
