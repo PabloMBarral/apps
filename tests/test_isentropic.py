@@ -360,6 +360,7 @@ from core.isentropic import (  # noqa: E402
     pump_incompressible_comparison,
     suggested_device_inputs,
     summary_csv,
+    to_fluid_states,
 )
 
 _DIRECT = {"turbine": turbine_direct, "compressor": compressor_direct, "pump": pump_direct}
@@ -461,6 +462,15 @@ class TestSuggestedDeviceInputs:
     def test_unknown_device(self) -> None:
         with pytest.raises(ValueError, match="desconocido"):
             suggested_device_inputs("Water", "nozzle")  # type: ignore[arg-type]
+
+
+def test_liquid_air_pump_with_saturated_inlet_keeps_its_region() -> None:
+    """La tabla reconstruye cada estado desde (p, h): el líquido saturado de
+    un pseudo-puro aparecía como "líquido comprimido"."""
+    state_in = state_from_pair("Air", "PX", p=2.0e5, x=0.0)
+    result = pump_direct(fluid="Air", state_in=state_in, p_out_Pa=2.0e6, eta_s=0.75)
+    (_, inlet), *_ = to_fluid_states("Air", isentropic_labeled_states(result))
+    assert inlet.region == "saturated_liquid"
 
 
 class TestPumpComparison:

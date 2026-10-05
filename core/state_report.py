@@ -534,12 +534,43 @@ def _lever_line(y: str, x: float, sat: SaturationProperties, system: UnitSystem)
     )
 
 
+_GLIDE_TXT = (
+    " Al ser un pseudo-puro, la temperatura no es constante dentro de la campana: va de "
+    "la de burbuja (T_f, x = 0) a la de rocío (T_g, x = 1) a la misma presión."
+)
+
+
+def _two_phase_T_line(state: FluidState, sat: SaturationProperties, system: UnitSystem) -> str:
+    """T dentro de la campana a p dada: T_sat, o entre burbuja y rocío si hay glide."""
+    T = _q(state.T_K, "temperature", system)
+    if abs(sat.glide_K) > 1e-6:
+        # Pseudo-puro: la T va de la de burbuja (x = 0) a la de rocío (x = 1).
+        return (
+            rf"\begin{{aligned}}T_f &= {_q(sat.liquid.T_K, 'temperature', system)} \\ "
+            rf"&\le T = {T} \\ &\le T_g = {_q(sat.vapor.T_K, 'temperature', system)}"
+            r"\end{aligned}"
+        )
+    return rf"T = T_{{\mathrm{{sat}}}} = {T}"
+
+
 def _sat_table_lines(
     sat: SaturationProperties, system: UnitSystem, ys: tuple[str, ...] = ("v", "u", "h", "s")
 ) -> list[str]:
     lines: list[str] = []
-    if sat.basis == "P":
+    if sat.basis == "P" and abs(sat.glide_K) > 1e-6:
+        # Pseudo-puro: a esa presión hay una T de burbuja (f) y una de rocío (g).
+        lines.append(
+            rf"\begin{{aligned}}T_f &= {_q(sat.liquid.T_K, 'temperature', system)} \\ "
+            rf"T_g &= {_q(sat.vapor.T_K, 'temperature', system)}\end{{aligned}}"
+        )
+    elif sat.basis == "P":
         lines.append(rf"T_{{\mathrm{{sat}}}}(p) = {_q(sat.T_sat_K, 'temperature', system)}")
+    elif abs(sat.vapor.P_Pa - sat.liquid.P_Pa) > 1e-9 * sat.liquid.P_Pa:
+        # Pseudo-puro a T dada: presión de burbuja (f) y de rocío (g).
+        lines.append(
+            rf"\begin{{aligned}}p_f &= {_q(sat.liquid.P_Pa, 'pressure', system)} \\ "
+            rf"p_g &= {_q(sat.vapor.P_Pa, 'pressure', system)}\end{{aligned}}"
+        )
     else:
         lines.append(rf"p_{{\mathrm{{sat}}}}(T) = {_q(sat.P_sat_Pa, 'pressure', system)}")
     if len(ys) == 1:
@@ -682,10 +713,11 @@ def _steps_quality_given(
             "Es **vapor húmedo**: cada propiedad específica es el promedio de las de f y g "
             "pesado con el título (vademecum §12.2)."
         )
-    other = "T" if pair == "PX" else "p"
+        if abs(sat.glide_K) > 1e-6:
+            region_txt += _GLIDE_TXT
     other_line = (
-        rf"T = T_{{\mathrm{{sat}}}} = {_q(state.T_K, 'temperature', system)}"
-        if other == "T"
+        _two_phase_T_line(state, sat, system)
+        if pair == "PX"
         else rf"p = p_{{\mathrm{{sat}}}} = {_q(state.P_Pa, 'pressure', system)}"
     )
     steps.append(
@@ -776,7 +808,7 @@ def _steps_anchor(
 
     if state.is_two_phase and state.x is not None:
         other_line = (
-            rf"T = T_{{\mathrm{{sat}}}} = {_q(state.T_K, 'temperature', system)}"
+            _two_phase_T_line(state, sat, system)
             if anchor == "p"
             else rf"p = p_{{\mathrm{{sat}}}} = {_q(state.P_Pa, 'pressure', system)}"
         )
@@ -793,7 +825,7 @@ def _steps_anchor(
                 title="Título y demás propiedades (regla de la palanca)",
                 text=(
                     "Se despeja el título de la regla de la palanca (vademecum §12.2) y con "
-                    "él se calcula el resto:"
+                    "él se calcula el resto:" + (_GLIDE_TXT if abs(sat.glide_K) > 1e-6 else "")
                 ),
                 latex=(quality, other_line, *others),
             )

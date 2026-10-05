@@ -203,8 +203,8 @@ def state_from_pair(fluid: str, pair: PairCode, **kwargs: float) -> StatePoint:
     return StatePoint(
         T_K=float(T_K),
         P_Pa=float(P_Pa),
-        h_J_per_kg=float(h_J_per_kg),
-        s_J_per_kg_K=float(s_J_per_kg_K),
+        h_J_per_kg=_zero_if_noise(float(h_J_per_kg), _ENERGY_ZERO_J_PER_KG),
+        s_J_per_kg_K=_zero_if_noise(float(s_J_per_kg_K), _ENTROPY_ZERO_J_PER_KG_K),
         x=float(x),
         v_m3_per_kg=1.0 / float(rho_kg_per_m3),
     )
@@ -213,6 +213,22 @@ def state_from_pair(fluid: str, pair: PairCode, **kwargs: float) -> StatePoint:
 # Tolerancia para aceptar como saturado un título que CoolProp devuelve
 # apenas fuera de [0, 1] por redondeo numérico.
 _QUALITY_TOL: float = 1e-9
+
+# Ruido numérico alrededor del estado de referencia de cada fluido (donde
+# u, h o s valen 0 por convención): el agua en el punto triple (IAPWS:
+# u_f = s_f = 0) da u_f = −6.6×10⁻⁸ J/kg y el aire líquido saturado a
+# 1 atm (NBP: h_f = s_f = 0) da h_f = −0.012 J/kg, que la página mostraba
+# como "−6.6048×10⁻¹¹ kJ/kg". Por debajo de estos valores (SI) la
+# propiedad es cero dentro de la precisión de la ecuación de estado; un
+# estado real nunca está tan cerca de la referencia sin estar en ella
+# (h_f del agua en el punto triple, p·v = 0.61 J/kg, queda intacta).
+_ENERGY_ZERO_J_PER_KG: float = 0.1
+_ENTROPY_ZERO_J_PER_KG_K: float = 1e-3
+
+
+def _zero_if_noise(value: float, tol: float) -> float:
+    """``0.0`` si ``value`` es ruido alrededor del estado de referencia."""
+    return 0.0 if abs(value) < tol else value
 
 
 def _normalize_quality(q: float) -> float:
@@ -469,9 +485,9 @@ def _saturation(fluid: str, basis: Literal["P", "T"], value: float) -> Saturatio
                 T_K=float(state.T()),
                 P_Pa=float(state.p()),
                 v_m3_per_kg=1.0 / float(state.rhomass()),
-                u_J_per_kg=float(state.umass()),
-                h_J_per_kg=float(state.hmass()),
-                s_J_per_kg_K=float(state.smass()),
+                u_J_per_kg=_zero_if_noise(float(state.umass()), _ENERGY_ZERO_J_PER_KG),
+                h_J_per_kg=_zero_if_noise(float(state.hmass()), _ENERGY_ZERO_J_PER_KG),
+                s_J_per_kg_K=_zero_if_noise(float(state.smass()), _ENTROPY_ZERO_J_PER_KG_K),
             )
         )
     return SaturationProperties(fluid=fluid, basis=basis, liquid=phases[0], vapor=phases[1])
@@ -650,14 +666,22 @@ def fluid_state_from_pair(fluid: str, pair: PairCode, **kwargs: float) -> FluidS
 
     state = _abstract_state(fluid)
     inputs_desc = f"{_describe_input(kw1, val1)} y {_describe_input(kw2, val2)}"
+    lever_x = (
+        _pseudo_pure_lever_quality(fluid, val1, kw2, val2, limits)
+        if not limits.is_pure and kw1 == "p"
+        else None
+    )
     try:
-        update_pair, in1, in2 = cp.generate_update_pair(
-            _COOLPROP_INPUT_INDEX[cp1],
-            _to_coolprop_value(kw1, val1),
-            _COOLPROP_INPUT_INDEX[cp2],
-            _to_coolprop_value(kw2, val2),
-        )
-        state.update(update_pair, in1, in2)
+        if lever_x is not None:
+            state.update(CoolProp.PQ_INPUTS, val1, lever_x)
+        else:
+            update_pair, in1, in2 = cp.generate_update_pair(
+                _COOLPROP_INPUT_INDEX[cp1],
+                _to_coolprop_value(kw1, val1),
+                _COOLPROP_INPUT_INDEX[cp2],
+                _to_coolprop_value(kw2, val2),
+            )
+            state.update(update_pair, in1, in2)
         T_K = float(state.T())
         P_Pa = float(state.p())
     except Exception as exc:
@@ -683,9 +707,9 @@ def fluid_state_from_pair(fluid: str, pair: PairCode, **kwargs: float) -> FluidS
         T_K=T_K,
         P_Pa=P_Pa,
         v_m3_per_kg=1.0 / float(state.rhomass()),
-        u_J_per_kg=float(state.umass()),
-        h_J_per_kg=float(state.hmass()),
-        s_J_per_kg_K=float(state.smass()),
+        u_J_per_kg=_zero_if_noise(float(state.umass()), _ENERGY_ZERO_J_PER_KG),
+        h_J_per_kg=_zero_if_noise(float(state.hmass()), _ENERGY_ZERO_J_PER_KG),
+        s_J_per_kg_K=_zero_if_noise(float(state.smass()), _ENTROPY_ZERO_J_PER_KG_K),
         x=x,
         region=region,
         cp_J_per_kg_K=_optional("cpmass"),
@@ -698,6 +722,44 @@ def fluid_state_from_pair(fluid: str, pair: PairCode, **kwargs: float) -> FluidS
         sat_at_T=_saturation_or_none(fluid, "T", T_K, limits),
         limits=limits,
     )
+
+
+# Propiedad específica de una fase saturada, por kwarg del par.
+_LEVER_ATTRS: dict[str, str] = {
+    "h": "h_J_per_kg",
+    "s": "s_J_per_kg_K",
+    "v": "v_m3_per_kg",
+    "u": "u_J_per_kg",
+}
+
+
+def _pseudo_pure_lever_quality(
+    fluid: str, p_Pa: float, kw: str, value: float, limits: FluidLimits
+) -> float | None:
+    """Título de un pseudo-puro con p y (h, s, v o u) dentro de la campana.
+
+    Con deslizamiento de temperatura (aire a 1 atm: de 78,9 K en el punto
+    de burbuja a 81,7 K en el de rocío), el cálculo de CoolProp con p y h
+    no reconoce la campana cerca de la línea de burbuja: en el borde
+    devuelve "líquido" y apenas adentro falla. En su modelo cada propiedad
+    específica es lineal en el título a p constante (regla de la palanca,
+    vademecum §12.2; Cengel §3-5), así que el título se despeja de ahí y
+    el estado se calcula con (p, x). Devuelve ``None`` si el dato cae
+    fuera de la campana (o p está fuera del rango de saturación).
+    """
+    attr = _LEVER_ATTRS.get(kw)
+    if attr is None or not limits.P_triple_Pa <= p_Pa < limits.P_crit_Pa:
+        return None
+    try:
+        sat = _saturation(fluid, "P", p_Pa)
+    except ValueError:
+        return None
+    y_f = float(getattr(sat.liquid, attr))
+    y_g = float(getattr(sat.vapor, attr))
+    x = (value - y_f) / (y_g - y_f)
+    if -_QUALITY_TOL <= x <= 1.0 + _QUALITY_TOL:
+        return min(max(x, 0.0), 1.0)
+    return None
 
 
 def _saturation_or_none(
@@ -756,14 +818,14 @@ def suggested_inputs(fluid: str, pair: PairCode) -> dict[str, float]:
     limits = fluid_limits(fluid)
     T_ref = min(max(273.15, limits.T_triple_K + 10.0), limits.T_crit_K - 15.0)
     P_ref = _saturation(fluid, "T", T_ref).P_sat_Pa
-    # La mezcla se arma con p-h (regla de la palanca sobre h) porque los
-    # pseudo-puros no aceptan 0 < x < 1 como dato; por eso también su
-    # título sugerido es 1 (vapor saturado, la salida de un evaporador).
+    # La mezcla se arma con p-h (regla de la palanca sobre h). Los
+    # pseudo-puros no aceptan 0 < x < 1 junto con T: su título sugerido
+    # en T-x es 1 (vapor saturado, la salida de un evaporador).
     sat_P = _saturation(fluid, "P", P_ref)
     mix = fluid_state_from_pair(
         fluid, "PH", p=P_ref, h=sat_P.liquid.h_J_per_kg + 0.5 * sat_P.h_fg_J_per_kg
     )
-    x_ref = 0.5 if limits.is_pure else 1.0
+    x_ref_T = 0.5 if limits.is_pure else 1.0
     if limits.T_crit_K < 273.15:
         gas = fluid_state_from_pair(fluid, "TP", t=298.15, p=101_325.0)
         mix_like = gas
@@ -775,8 +837,8 @@ def suggested_inputs(fluid: str, pair: PairCode) -> dict[str, float]:
         "TP": {"t": gas.T_K, "p": gas.P_Pa},
         "PH": {"p": mix_like.P_Pa, "h": mix_like.h_J_per_kg},
         "HS": {"h": gas.h_J_per_kg, "s": gas.s_J_per_kg_K},
-        "PX": {"p": P_ref, "x": x_ref},
-        "TX": {"t": T_ref, "x": x_ref},
+        "PX": {"p": P_ref, "x": 0.5},
+        "TX": {"t": T_ref, "x": x_ref_T},
         "PS": {"p": mix_like.P_Pa, "s": mix_like.s_J_per_kg_K},
         "TS": {"t": gas.T_K, "s": gas.s_J_per_kg_K},
         "TV": {"t": mix_like.T_K, "v": mix_like.v_m3_per_kg},
@@ -867,14 +929,13 @@ def _validate_against_limits(kw: str, value: float, pair: str, limits: FluidLimi
             f"La presión p = {_fmt_p(value)} supera el máximo de validez de la ecuación "
             f"de estado {_del(fluid)} ({_fmt_p(limits.P_max_Pa)})."
         )
-    if pair in ("PX", "TX") and kw == "x" and 0.0 < value < 1.0 and not limits.is_pure:
+    if pair == "TX" and kw == "x" and 0.0 < value < 1.0 and not limits.is_pure:
         raise ValueError(
             f"{_el(fluid).capitalize()} es un fluido pseudo-puro (una mezcla tratada como "
-            f"un solo fluido): CoolProp no define sus estados de dos fases a partir del "
-            f"título 0 < x < 1, "
-            f"solo el líquido saturado (x = 0) y el vapor saturado (x = 1). Para un "
-            f"estado dentro de la campana calculá h = h_f + x·(h_g − h_f) con esos dos "
-            f"estados y usá el par p-h."
+            f"un solo fluido): dentro de la campana su temperatura no es constante, va de "
+            f"la de burbuja (x = 0) a la de rocío (x = 1) a la misma presión. Por eso con T "
+            f"solo están definidos el líquido saturado (x = 0) y el vapor saturado "
+            f"(x = 1). Para un estado dentro de la campana usá el par p-x (o p-h)."
         )
     # El título solo existe dentro de la campana: la variable "ancla" (p o T)
     # tiene que estar entre el punto triple y el crítico.

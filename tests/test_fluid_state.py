@@ -470,13 +470,77 @@ class TestStudentFacingErrors:
             fluid_state_from_pair(WATER, "TP", t=math.nan, p=1.0e5)
 
     @pytest.mark.parametrize("fluid", ["R410A", "Air"])
-    def test_pseudo_pure_quality_is_explained(self, fluid: str) -> None:
-        with pytest.raises(ValueError, match="pseudo-puro"):
-            fluid_state_from_pair(fluid, "PX", p=fluid_limits(fluid).P_crit_Pa / 4, x=0.5)
+    def test_pseudo_pure_quality_with_temperature_is_explained(self, fluid: str) -> None:
+        # A T fija, la presión de un pseudo-puro cambia a lo largo de la campana.
+        T = fluid_limits(fluid).T_crit_K - 20.0
+        with pytest.raises(ValueError, match="pseudo-puro.*p-x"):
+            fluid_state_from_pair(fluid, "TX", t=T, x=0.5)
 
     def test_pseudo_pure_accepts_saturation_ends(self) -> None:
         state = fluid_state_from_pair("R410A", "PX", p=8.0e5, x=1.0)
         assert state.region == "saturated_vapor"
+        state = fluid_state_from_pair("Air", "TX", t=100.0, x=0.0)
+        assert state.region == "saturated_liquid"
+
+
+class TestReferenceStateNoise:
+    """Donde u, h o s valen 0 por convención, CoolProp devuelve ruido
+    (−6.6×10⁻⁸ J/kg) que la página mostraba como "−6.6048×10⁻¹¹ kJ/kg"."""
+
+    def test_water_triple_point_like_table_a4(self) -> None:
+        # Cengel A-4, 0.01 °C: u_f = 0.000, h_f = 0.001 kJ/kg, s_f = 0.0000.
+        sat = saturation_at_temperature(WATER, 273.16)
+        assert sat.liquid.u_J_per_kg == 0.0
+        assert sat.liquid.s_J_per_kg_K == 0.0
+        assert sat.liquid.h_J_per_kg == pytest.approx(0.6118, rel=1e-3)  # p·v, no es ruido
+
+    def test_liquid_air_at_one_atmosphere(self) -> None:
+        state = fluid_state_from_pair("Air", "PX", p=101_325.0, x=0.0)
+        assert (state.h_J_per_kg, state.s_J_per_kg_K) == (0.0, 0.0)
+        assert state.u_J_per_kg == pytest.approx(-115.8, rel=1e-3)  # u = h − p·v
+
+
+class TestPseudoPureTwoPhase:
+    """Aire y R410A (pseudo-puros: mezclas tratadas como un fluido) en la campana.
+
+    Con deslizamiento de temperatura, el cálculo de CoolProp con p y h no
+    reconoce la campana cerca de la línea de burbuja: en el borde devolvía
+    "líquido comprimido" y apenas adentro (x ≈ 1e-4 … 1e-2) fallaba con un
+    mensaje que decía que el estado no existía. Ahora el título sale de la
+    regla de la palanca a p constante y el estado se calcula con (p, x).
+    """
+
+    P = 101_325.0  # aire a 1 atm: burbuja 78,90 K, rocío 81,72 K
+
+    _ATTR = {"h": "h_J_per_kg", "s": "s_J_per_kg_K", "v": "v_m3_per_kg", "u": "u_J_per_kg"}
+
+    @pytest.mark.parametrize("x", [0.0, 1e-4, 1e-3, 1e-2, 0.5, 1.0])
+    @pytest.mark.parametrize("kw", ["h", "s", "v", "u"])
+    def test_air_along_the_dome(self, kw: str, x: float) -> None:
+        sat = saturation_at_pressure("Air", self.P)
+        y_f = getattr(sat.liquid, self._ATTR[kw])
+        y_g = getattr(sat.vapor, self._ATTR[kw])
+        value = y_f + x * (y_g - y_f)
+        state = fluid_state_from_pair("Air", f"P{kw.upper()}", p=self.P, **{kw: value})
+        expected = {0.0: "saturated_liquid", 1.0: "saturated_vapor"}.get(x, "saturated_mixture")
+        assert state.region == expected
+        assert state.x == pytest.approx(x, abs=1e-9)
+        assert sat.liquid.T_K - 1e-9 <= state.T_K <= sat.vapor.T_K + 1e-9
+
+    @pytest.mark.parametrize(("fluid", "p"), [("Air", 1.5e5), ("R410A", 8.0e5)])
+    def test_px_inside_the_dome_matches_ph(self, fluid: str, p: float) -> None:
+        state = fluid_state_from_pair(fluid, "PX", p=p, x=0.3)
+        assert state.region == "saturated_mixture"
+        again = fluid_state_from_pair(fluid, "PH", p=p, h=state.h_J_per_kg)
+        assert again.x == pytest.approx(0.3)
+        assert again.T_K == pytest.approx(state.T_K)
+
+    def test_outside_the_dome_is_unchanged(self) -> None:
+        sat = saturation_at_pressure("Air", self.P)
+        below = fluid_state_from_pair("Air", "PH", p=self.P, h=sat.liquid.h_J_per_kg - 1000.0)
+        above = fluid_state_from_pair("Air", "PH", p=self.P, h=sat.vapor.h_J_per_kg + 1000.0)
+        assert below.region == "compressed_liquid"
+        assert above.region == "superheated_vapor"
 
 
 # ---------------------------------------------------------------------

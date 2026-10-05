@@ -125,16 +125,19 @@ def _assert_U_k2(q: Quantity, expected: dict[str, Any]) -> None:
 
 class TestExample1_D2:
     @pytest.fixture(scope="class")
-    def result(self, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
+    @classmethod
+    def result(cls, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
         inputs = _build_inputs(annex_d["example_1"]["inputs"])
         return calculate(inputs, tables=tables)
 
     @pytest.fixture(scope="class")
-    def expected_inter(self, annex_d: dict) -> dict:
+    @classmethod
+    def expected_inter(cls, annex_d: dict) -> dict:
         return annex_d["example_1"]["expected_intermediate"]
 
     @pytest.fixture(scope="class")
-    def expected_final(self, annex_d: dict) -> dict:
+    @classmethod
+    def expected_final(cls, annex_d: dict) -> dict:
         return annex_d["example_1"]["expected_final"]
 
     # Intermedios
@@ -177,16 +180,19 @@ class TestExample1_D2:
 
 class TestExample2_D3:
     @pytest.fixture(scope="class")
-    def result(self, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
+    @classmethod
+    def result(cls, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
         inputs = _build_inputs(annex_d["example_2"]["inputs"])
         return calculate(inputs, tables=tables)
 
     @pytest.fixture(scope="class")
-    def expected_inter(self, annex_d: dict) -> dict:
+    @classmethod
+    def expected_inter(cls, annex_d: dict) -> dict:
         return annex_d["example_2"]["expected_intermediate"]
 
     @pytest.fixture(scope="class")
-    def expected_final(self, annex_d: dict) -> dict:
+    @classmethod
+    def expected_final(cls, annex_d: dict) -> dict:
         return annex_d["example_2"]["expected_final"]
 
     def test_molar_mass(self, result, expected_inter) -> None:
@@ -274,12 +280,14 @@ class TestExample3_D4_caseA_identity:
     CASE_KEY = "case_a_iso_standard_identity"
 
     @pytest.fixture(scope="class")
-    def result(self, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
-        return calculate(_example_3_case_inputs(annex_d, self.CASE_KEY), tables=tables)
+    @classmethod
+    def result(cls, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
+        return calculate(_example_3_case_inputs(annex_d, cls.CASE_KEY), tables=tables)
 
     @pytest.fixture(scope="class")
-    def expected_final(self, annex_d: dict) -> dict:
-        return annex_d["example_3"]["cases"][self.CASE_KEY]["expected_final"]
+    @classmethod
+    def expected_final(cls, annex_d: dict) -> dict:
+        return annex_d["example_3"]["cases"][cls.CASE_KEY]["expected_final"]
 
     def test_Hv_G_value(self, result, expected_final) -> None:
         _assert_value(result.Hv_G_volume_MJ_per_m3, expected_final["Hv_G_volume_MJ_per_m3"])
@@ -330,19 +338,22 @@ class TestExample3_D4_caseB_normalization:
     CASE_KEY = "case_b_iso_standard_normalization"
 
     @pytest.fixture(scope="class")
-    def result(self, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
-        return calculate(_example_3_case_inputs(annex_d, self.CASE_KEY), tables=tables)
+    @classmethod
+    def result(cls, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
+        return calculate(_example_3_case_inputs(annex_d, cls.CASE_KEY), tables=tables)
 
     @pytest.fixture(scope="class")
-    def result_a(self, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
+    @classmethod
+    def result_a(cls, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
         return calculate(
             _example_3_case_inputs(annex_d, "case_a_iso_standard_identity"),
             tables=tables,
         )
 
     @pytest.fixture(scope="class")
-    def expected_final(self, annex_d: dict) -> dict:
-        return annex_d["example_3"]["cases"][self.CASE_KEY]["expected_final"]
+    @classmethod
+    def expected_final(cls, annex_d: dict) -> dict:
+        return annex_d["example_3"]["cases"][cls.CASE_KEY]["expected_final"]
 
     def test_values_identical_to_case_a(self, result, result_a) -> None:
         """Los valores Y son iguales en identity y normalization
@@ -388,12 +399,14 @@ class TestExample3_D4_caseC_identity_25_0:
     CASE_KEY = "case_c_25c_0c_identity"
 
     @pytest.fixture(scope="class")
-    def result(self, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
-        return calculate(_example_3_case_inputs(annex_d, self.CASE_KEY), tables=tables)
+    @classmethod
+    def result(cls, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
+        return calculate(_example_3_case_inputs(annex_d, cls.CASE_KEY), tables=tables)
 
     @pytest.fixture(scope="class")
-    def expected_final(self, annex_d: dict) -> dict:
-        return annex_d["example_3"]["cases"][self.CASE_KEY]["expected_final"]
+    @classmethod
+    def expected_final(cls, annex_d: dict) -> dict:
+        return annex_d["example_3"]["cases"][cls.CASE_KEY]["expected_final"]
 
     def test_Hv_G_value(self, result, expected_final) -> None:
         _assert_value(result.Hv_G_volume_MJ_per_m3, expected_final["Hv_G_volume_MJ_per_m3"])
@@ -430,12 +443,14 @@ class TestExample3_D4_caseD_normalization_25_0:
     CASE_KEY = "case_d_25c_0c_normalization"
 
     @pytest.fixture(scope="class")
-    def result(self, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
-        return calculate(_example_3_case_inputs(annex_d, self.CASE_KEY), tables=tables)
+    @classmethod
+    def result(cls, annex_d: dict, tables: ISO6976Tables) -> ISO6976Result:
+        return calculate(_example_3_case_inputs(annex_d, cls.CASE_KEY), tables=tables)
 
     @pytest.fixture(scope="class")
-    def expected_final(self, annex_d: dict) -> dict:
-        return annex_d["example_3"]["cases"][self.CASE_KEY]["expected_final"]
+    @classmethod
+    def expected_final(cls, annex_d: dict) -> dict:
+        return annex_d["example_3"]["cases"][cls.CASE_KEY]["expected_final"]
 
     @pytest.mark.skip(reason=_NORMALIZATION_DEFERRED)
     def test_Hv_G_uncertainty(self, result, expected_final) -> None:

@@ -24,7 +24,8 @@ class TestWaterSubcooledAt25C1Bar:
     """
 
     @pytest.fixture(scope="class")
-    def state(self) -> StatePoint:
+    @classmethod
+    def state(cls) -> StatePoint:
         return state_from_pair(WATER, "TP", t=298.15, p=1.0e5)
 
     def test_returns_state_point(self, state: StatePoint) -> None:

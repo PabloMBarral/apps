@@ -321,6 +321,13 @@ class TestProcedure:
         state = fluid_state_from_pair(WATER, "TP", t=700.0, p=1.0e7)
         assert "Fuera del rango de saturación" in _titles(build_procedure(state, "TP", "SI"))
 
+    def test_pseudo_pure_temperature_glides_inside_the_dome(self) -> None:
+        state = fluid_state_from_pair("Air", "PX", p=1.5e5, x=0.3)
+        tex = _all_latex(build_procedure(state, "PX", "Técnico"))
+        assert r"&\le T_g = " in tex  # T_f ≤ T ≤ T_g en vez de T = T_sat
+        assert r"T = T_{\mathrm{sat}}" not in tex
+        assert r"T_{\mathrm{sat}}(p)" not in tex  # burbuja y rocío por separado
+
     def test_ingles_units_and_pv_factor(self, superheated: FluidState) -> None:
         tex = _all_latex(build_procedure(superheated, "TP", "Inglés"))
         assert r"\mathrm{Btu/lb}" in tex
