@@ -95,26 +95,37 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   redondas en las unidades de cada sistema. _Fase 1.5a cerrada._
 - ✅ **Ciclo de Rankine** (agua) resuelto con
   [TESPy](https://tespy.readthedocs.io) como una red de componentes
-  (bomba, caldera, turbina, condensador): simple o **con
-  recalentamiento**, ideal o real (rendimientos isoentrópicos de turbina y
-  bomba), con entrada a la turbina sobrecalentada o como vapor saturado
-  seco, y caudal másico o potencia neta como dato. Muestra η térmico,
+  (bomba, caldera, turbina, condensador): simple, **con
+  recalentamiento** o **con regeneración** —hasta tres calentadores de
+  agua de alimentación, abiertos o cerrados (con TTD y el drenaje en
+  cascada o bombeado hacia adelante), combinables con el recalentamiento—,
+  ideal o real (rendimientos isoentrópicos de turbina y bomba), con entrada
+  a la turbina sobrecalentada o como vapor saturado seco, y caudal másico o
+  potencia neta como dato. Numera los estados como Cengel (los ejemplos
+  10-5 y 10-6 dan 1–7 y 1–13). Muestra η térmico, las fracciones de
+  extracción,
   trabajo neto, título a la salida de la turbina (aviso si baja de 0,88),
   relación de trabajo de retroceso, comparación con Carnot y con la
   temperatura media de aporte de calor, potencias, la tabla de estados
   (numeración de Cengel) y el ciclo sobre el diagrama T–s (u otro). El
   **procedimiento** lo resuelve estado por estado como con las tablas
-  (bomba con v·Δp, regla de la palanca con h_fg y s_fg, balances), en
-  LaTeX y en el sistema de unidades activo; un expansor muestra cómo lo
-  arma TESPy (red y balances por componente) y otro, **cómo aumentar el
-  rendimiento**: barridos de η y del título vs. presión de caldera,
-  temperatura de entrada a la turbina y presión del condensador
-  (Cengel §10-6). Ejemplos precargados de Cengel (10-1, 10-3 a/b/c, 10-4
-  y uno basado en 10-2), verificados contra el libro. Validación con
+  (bomba con v·Δp, regla de la palanca con h_fg y s_fg, balances de los
+  calentadores con la fracción despejada, de mayor a menor presión, y
+  trabajos y calores con (1 − y)), en LaTeX y en el sistema de unidades
+  activo; calcula el **agua de enfriamiento** del condensador; un expansor
+  muestra cómo lo arma TESPy (red y balances por componente) y otro, **cómo
+  aumentar el rendimiento**: barridos de η y del título vs. presión de
+  caldera, temperatura de entrada a la turbina y presión del condensador
+  (Cengel §10-4), y de la presión de cada extracción, que tiene un óptimo
+  (§10-6). Ejemplos precargados de Cengel (10-1, 10-3 a/b/c, 10-4, 10-5,
+  10-6, uno basado en 10-2 y un cerrado con drenaje al condensador),
+  verificados contra el libro y contra el cálculo a mano. Validación con
   mensajes en castellano (vapor que entraría líquido a la turbina,
-  condensador por encima de la caldera, recalentamiento que enfriaría…).
-  Fórmulas del vademecum (§3.3, §9.2, §10.1, §10.4, §12, §13) y descarga
-  CSV/JSON. _Fase 3.1a cerrada._
+  condensador por encima de la caldera, recalentamiento que enfriaría,
+  calentador que no puede calentar o que necesitaría una extracción
+  negativa, agua de enfriamiento más caliente que el vapor…). Fórmulas del
+  vademecum (§3.3, §9.2, §10.1, §10.4, §12, §13) y descarga CSV/JSON.
+  _Fases 3.1a y 3.1b cerradas._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -122,8 +133,8 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
 
 ### En desarrollo (roadmap)
 - **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
-  Rankine con regeneración (calentadores abierto y cerrado), condensador
-  con agua de enfriamiento y pérdidas de carga, ORC con otros fluidos;
+  Rankine con pérdidas de carga, subenfriador de drenajes y
+  desrecalentador, ORC con otros fluidos;
   refrigeración por compresión de vapor (simple, con economizador, cascada),
   Brayton (simple, con regeneración, intercooling, recalentamiento),
   ciclo combinado, cogeneración.
@@ -181,7 +192,9 @@ apps/
 │   │   └── iso6976.py
 │   ├── cycles/
 │   │   ├── tespy_utils.py # red de TESPy en SI y errores en castellano
-│   │   └── rankine.py     # Rankine simple / con recalentamiento (TESPy)
+│   │   ├── rankine.py     # Rankine simple, con recalentamiento y regenerativo (TESPy)
+│   │   ├── rankine_layout.py     # topología y numeración de estados (sin TESPy)
+│   │   └── rankine_procedure.py  # procedimiento «como con las tablas»
 │   └── plots.py
 ├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
@@ -199,7 +212,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.11.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.12.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---

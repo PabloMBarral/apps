@@ -701,28 +701,22 @@ def _join_with_gaps(chunks: list[dict[str, np.ndarray]]) -> dict[str, np.ndarray
     return {k: np.array(v, dtype=float) for k, v in out.items()}
 
 
-def cycle_overlays(
+def segments_overlays(
     diagram: FluidPropertyDiagram,
     spec: DiagramSpec,
-    states: Sequence[StatePoint],
-    *,
-    close: bool = True,
+    segments: Sequence[tuple[StatePoint, StatePoint]],
 ) -> list[ProcessOverlay]:
-    """Overlays para unir ``states`` en orden (y cerrar el ciclo si ``close``).
+    """Overlays para unir pares de estados: cada proceso de un ciclo, con ramas.
 
-    Devuelve hasta dos curvas: los tramos isobáricos/isoentrópicos reales
-    (línea llena) y las uniones rectas de referencia (punteada). Ver
-    :func:`segment_between`.
+    Sirve para ciclos que no son un solo lazo (extracciones, drenajes y
+    mezclas de un Rankine regenerativo). Devuelve hasta dos curvas: los
+    tramos isobáricos/isoentrópicos reales (línea llena) y las uniones
+    rectas de referencia (punteada), p. ej. una válvula o una turbina real.
+    Ver :func:`segment_between`.
     """
-    seq = list(states)
-    if len(seq) < 2:
-        return []
-    pairs = list(zip(seq[:-1], seq[1:], strict=True))
-    if close and len(seq) > 2:
-        pairs.append((seq[-1], seq[0]))
     real: list[dict[str, np.ndarray]] = []
     straight: list[dict[str, np.ndarray]] = []
-    for start, end in pairs:
+    for start, end in segments:
         kind, coords = segment_between(diagram, spec, start, end)
         (straight if kind == "straight" else real).append(coords)
     overlays: list[ProcessOverlay] = []
@@ -745,6 +739,28 @@ def cycle_overlays(
             )
         )
     return overlays
+
+
+def cycle_overlays(
+    diagram: FluidPropertyDiagram,
+    spec: DiagramSpec,
+    states: Sequence[StatePoint],
+    *,
+    close: bool = True,
+) -> list[ProcessOverlay]:
+    """Overlays para unir ``states`` en orden (y cerrar el ciclo si ``close``).
+
+    Devuelve hasta dos curvas: los tramos isobáricos/isoentrópicos reales
+    (línea llena) y las uniones rectas de referencia (punteada). Ver
+    :func:`segments_overlays` y :func:`segment_between`.
+    """
+    seq = list(states)
+    if len(seq) < 2:
+        return []
+    pairs = list(zip(seq[:-1], seq[1:], strict=True))
+    if close and len(seq) > 2:
+        pairs.append((seq[-1], seq[0]))
+    return segments_overlays(diagram, spec, pairs)
 
 
 # ---------------------------------------------------------------------

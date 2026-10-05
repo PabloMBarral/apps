@@ -283,7 +283,7 @@ def test_solve_explains_a_failed_network() -> None:
 
 
 # ---------------------------------------------------------------------
-# Barridos (Cengel §10-6: ¿cómo aumentar el rendimiento?)
+# Barridos (Cengel §10-4: ¿cómo aumentar el rendimiento?)
 # ---------------------------------------------------------------------
 
 
