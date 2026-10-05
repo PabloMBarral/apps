@@ -51,6 +51,8 @@ apps/
 │   │                          # Fase 3.1b: regeneración (hasta 3 calentadores),
 │   │                          # rótulos con la numeración del layout, agua de
 │   │                          # enfriamiento, barrido de la presión de extracción.
+│   │                          # Fase 3.1c: fluido de trabajo (ORC), pérdidas,
+│   │                          # calentadores reales, recuperador, barrido de ε.
 │   ├── 6_Refrigeracion.py
 │   ├── 7_Psicrometria.py
 │   ├── 8_Combustion.py
@@ -72,6 +74,7 @@ apps/
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
 │   │                          # región, saturación, transporte, validación con
 │   │                          # mensajes al alumno, suggested_inputs).
+│   │                          # Fase 3.1c: + R-245fa, R-1233zd(E), isopentano, tolueno.
 │   ├── state_report.py        # ✅ Fase 1.6 — Presentación pura de un FluidState:
 │   │                          # tablas, notas, procedimiento LaTeX por sistema
 │   │                          # de unidades, export JSON/CSV, tabla de estados.
@@ -90,6 +93,7 @@ apps/
 │   │                          # FLUPRODIA_UNITS, DEFAULT_RANGES, build_diagram,
 │   │                          # isentropic/isobaric/isothermal_process, overlays,
 │   │                          # axis_window_si, cycle_overlays (Fase 1.6).
+│   │                          # Fase 3.1c: con fricción, casi isobárica.
 │   ├── exergy.py              # Exergía física y química
 │   ├── combustion/
 │   │   ├── __init__.py
@@ -108,11 +112,19 @@ apps/
 │   │   │                      # rankine_to_dict. Fase 3.1b: red genérica desde el
 │   │   │                      # layout (calentadores), componentes con fracciones,
 │   │   │                      # agua de enfriamiento, barrido de extracción.
+│   │   │                      # Fase 3.1c: Losses/PipeLoss (ciclo real), DCA,
+│   │   │                      # desrecalentador, bombeados intermedios, fluid
+│   │   │                      # (ORC), Recuperator, fluid_behavior,
+│   │   │                      # suggested_rankine_inputs.
 │   │   ├── rankine_layout.py  # ✅ Fase 3.1b — Topología y numeración tipo Cengel
 │   │   │                      # (sin TESPy): FeedwaterHeater, plant_layout,
 │   │   │                      # port_flows (caudales 1 − y… simbólicos).
+│   │   │                      # Fase 3.1c: cañerías, recuperador, bombeados en
+│   │   │                      # cualquier cerrado, "evaporador".
 │   │   ├── rankine_procedure.py # ✅ Fase 3.1b — rankine_steps (se mudó; rankine.py
 │   │   │                      # lo reexporta): simple, recalentamiento y regenerativo.
+│   │   │                      # Fase 3.1c: ciclo real, recuperador, calentadores
+│   │   │                      # reales, sistema acoplado, textos por fluido.
 │   │   ├── refrigeration.py
 │   │   ├── brayton.py
 │   │   └── combined.py
@@ -287,6 +299,52 @@ Notas de la Fase 3.1b (regeneración):
 - Con regeneración η < 1 − T_C/T̄_H (los calentadores generan entropía).
 - "Cómo aumentar el rendimiento" es Cengel §10-4 (ediciones 7.ª a 9.ª);
   §10-6 es la regeneración.
+
+Notas de la Fase 3.1c (ciclo real, calentadores reales y ORC):
+
+- Ciclo real (`Losses`, `PipeLoss`): los datos siguen siendo los de la
+  turbina (p y T de entrada, presión de escape, presión de recalentamiento
+  a la salida de la de alta) y la bomba compensa todas las caídas: cada
+  componente lleva su `dp` y TESPy resuelve la presión de la bomba.
+  Cañerías = `Pipe` con `dp` y la T de salida (la de alimentación, con
+  `Ref(entrada, 1, −ΔT)`); sin ΔT, `Q = 0`. Subenfriamiento con
+  `td_bubble` a la salida del condensador. Primer principio:
+  w_neto = q_H − q_C − q_pérd. `T_low_K` es la de condensación (T_sat a
+  la presión de escape), no la del condensado subenfriado.
+- Calentador cerrado real: subenfriador de drenaje = `Condenser` con
+  `subcooling=True` y `ttd_l` = DCA (el ejemplo de la doc de TESPy);
+  desrecalentador = `Desuperheater` en serie (la extracción sale como vapor
+  saturado) y el TTD se fija como la T del agua a la salida: el `ttd_u` de
+  TESPy tiene mínimo 0 y un TTD < 0 en un `Condenser` da status 1.
+- Un drenaje bombeado desde un cerrado que no es el de mayor presión
+  acopla las fracciones (la mezcla cambia la h que entra al calentador
+  siguiente): el procedimiento muestra el sistema, la solución y la
+  verificación de cada balance en vez de despejar y de a una.
+- Antes de resolver se calculan la línea de expansión (`_expansion_line`)
+  y la de agua (`_feedwater_line`, `_line_pressures`) para validar:
+  extracción sobrecalentada para el desrecalentador, escape sobrecalentado
+  para el recuperador, calentador que no puede calentar, presión de la
+  bomba.
+- ORC: `RankineInputs.fluid` (`RANKINE_FLUIDS`). TESPy recibe `water` para
+  el agua (como el tutorial) y el nombre de CoolProp para el resto. En la
+  página las keys de los widgets llevan el fluido, salvo el agua (las de la
+  0.12.0 no cambian); los valores por defecto de cada fluido salen de
+  `suggested_rankine_inputs` (un test los recorre). Recuperador =
+  `HeatExchanger` con `eff_max` = ε (q/q_máx), solo sin calentadores.
+  Seco, húmedo o casi isoentrópico (`fluid_behavior`): T·(ds_g/dT)/s_fg a
+  0,8·T_c, con umbral ±0,25 (Chen, Goswami y Stefanakos, 2010).
+- Textos según el fluido: tablas de Cengel para el agua (A-4 a A-7) y el
+  R-134a (A-11 a A-13); si no, "ecuación de estado". En el LaTeX, los
+  subíndices con tilde van en `\text{}`: KaTeX estricto avisa con
+  `\mathrm{pérd}`.
+- Diagramas: un intercambiador o una cañería con caída de presión
+  (presiones a menos de 1/4 una de otra) se dibuja con p lineal en h, no
+  como recta.
+- Streamlit no recarga los módulos de `core/` al editarlos: reiniciar el
+  servidor antes del smoke test (si no, el síntoma es un diagrama viejo).
+- Regresión: un snapshot de la 0.12.0 (24 casos: estados, red de TESPy con
+  todas sus especificaciones, pasos en los tres sistemas, export y
+  barridos) queda idéntico.
 
 ### Citas y licencias
 

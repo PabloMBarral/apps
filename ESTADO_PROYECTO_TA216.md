@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.12.0` — Fase 3.1b cerrada (2026-10-05).
+> **Versión actual**: `0.13.0` — Fase 3.1c cerrada (2026-10-05).
 
 ---
 
@@ -336,6 +336,87 @@
     directo y /Rankine con el ejemplo 10-6.
 - **Dependencias**: ninguna nueva.
 
+### Fase 3.1c — Ciclo real, calentadores cerrados reales y ORC
+- **Versión**: `0.13.0` (2026-10-05). Rama `claude/water-state-analyzer-f4fiev`.
+- **Commits**: `492f4fc` (feat: fluidos de ORC en `core/fluids` y
+  `core/diagrams`), `000ff6e` (feat: plano de la planta con cañerías,
+  recuperador y drenajes bombeados desde cualquier cerrado), `4400272`
+  (feat: ciclo real, calentadores reales y ORC en `core/cycles`), `9997147`
+  (feat: página `/Rankine`) y el commit de docs que cierra la fase.
+- **Scope**:
+  - **Fluidos**: R-245fa, R-1233zd(E), isopentano y tolueno se suman a
+    `SUPPORTED_FLUIDS` (Propiedades, Interpolación, Isoentrópicos y ciclos),
+    con su rango de diagrama hasta la T máx. de su ecuación de estado.
+  - **Ciclo real** (Cengel §10-5): `Losses` con caídas de presión en la
+    caldera, el recalentador, el condensador y los cerrados (lado del agua),
+    subenfriamiento del condensado y cañerías de alimentación y de vapor
+    (`PipeLoss`: Δp y ΔT). La bomba compensa todas las caídas; q_pérd y
+    w_neto = q_H − q_C − q_pérd. En TESPy: `dp` en cada componente, `Pipe`,
+    `Ref` y `td_bubble`.
+  - **Calentadores cerrados reales**: subenfriador de drenaje (DCA;
+    `Condenser` con `subcooling` y `ttd_l`), desrecalentador (`Desuperheater`
+    en serie, TTD < 0) y drenaje bombeado hacia adelante desde cualquier
+    cerrado. Si el bombeado no es el de mayor presión las fracciones quedan
+    acopladas y el procedimiento muestra el sistema, su solución y la
+    verificación de cada balance.
+  - **ORC**: `RankineInputs.fluid` (agua, R-245fa, R-1233zd(E), isopentano,
+    tolueno, R-134a, R-1234yf, amoníaco), "evaporador" en lugar de
+    "caldera", recuperador (`HeatExchanger` con `eff_max` = ε) en el ciclo
+    sin calentadores, clasificación del fluido en seco, húmedo o casi
+    isoentrópico (`fluid_behavior`; Chen, Goswami y Stefanakos, 2010) y
+    valores por defecto calculables para cada fluido
+    (`suggested_rankine_inputs`; Quoilin et al., 2013). Barridos por
+    fluido y de la efectividad del recuperador.
+  - **Procedimiento**: textos según el fluido (tablas de Cengel para el
+    agua y el R-134a; si no, ecuación de estado) y pasos nuevos (condensado
+    subenfriado, presión de cada bomba con ΣΔp, cañerías, recuperador,
+    calentadores con DCA y desrecalentador —con la temperatura entre
+    zonas—, primer principio con q_pérd).
+  - **Diagramas**: un intercambiador o una cañería con fricción se dibuja
+    casi sobre la isobara (antes, una recta que cruzaba la campana).
+  - **Página `/Rankine`**: selector de fluido (keys por fluido; las del agua
+    no cambian), bloques de pérdidas y recuperador, casillas por cerrado
+    (desrecalentador, subenfriador, bombeado, Δp) y teoría de §10-5 y del
+    ORC. Ejemplos nuevos: Cengel 10-2 completo, una planta con
+    calentadores reales y ORC con R-245fa, tolueno y R-134a.
+- **Validación**:
+  - Cengel 10-2 con los estados de su figura: η = 36,10 % y
+    Ẇ_neto = 18,87 MW (libro: 36,1 % y 18,9 MW); estados contra CoolProp a
+    10⁻⁶.
+  - DCA y desrecalentador contra los balances a mano; el sistema acoplado
+    de un cerrado bombeado intermedio contra `fsolve` (10⁻⁶).
+  - ORC con R-245fa contra CoolProp; recuperador con ε = q/q_máx.
+  - Sin pérdidas, sin calentadores reales y con agua, los 24 casos del
+    snapshot de la 0.12.0 (estados, red de TESPy, pasos, export y
+    barridos) quedan idénticos.
+- **Mensajes al alumno**:
+  - Pérdidas negativas, condensado bajo el punto triple o que se
+    congelaría, bomba fuera del rango de la ecuación de estado.
+  - Cañería de vapor que pide a la caldera algo que no es vapor;
+    extracción dentro del recalentador; caída en el recalentador sin
+    recalentamiento.
+  - DCA sin nada que enfriar; desrecalentador con extracción húmeda o con
+    un TTD que dejaría el agua más caliente que la extracción; opciones de
+    cerrado en un abierto.
+  - Recuperador con escape húmedo, con calentadores o con ε fuera de
+    (0, 1); fluido no disponible y límites de su ecuación de estado.
+- **Tests**: de 1265 a 1740 (+475), sin warnings de pytest.
+  - `tests/test_rankine_layout.py` (+172): numeración de 10-2, ORC con
+    recuperador, bombeados intermedios y balances de masa simbólicos en
+    una grilla de plantas reales.
+  - `tests/test_rankine_losses.py` (35), `tests/test_rankine_heaters_real.py`
+    (95, con una grilla de 78 plantas) y `tests/test_rankine_orc.py` (44).
+  - AppTest de la página (42; 8 nuevos o cambiados) y los fluidos nuevos
+    en los tests que recorren todos los fluidos.
+  - LaTeX: validan con KaTeX estricto las 2427 expresiones distintas del
+    procedimiento nuevo y las de la teoría. En Técnico e Inglés ninguna
+    supera el ancho de un celular (máx. 308 y 321 px); en SI se deslizan
+    las de ×10ⁿ (≤ 393 px).
+  - Smoke test en Chromium a 1280 y 390 px: todas las páginas por link
+    directo, Propiedades con tolueno y /Rankine con 10-2, calentadores
+    reales, los tres ORC y 10-6.
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
@@ -343,8 +424,8 @@
 - **Detectado en Fase 1.7, sin resolver**:
   - En sistema SI (J/kg con ×10ⁿ) algunas sustituciones siguen siendo más
     anchas que el celular (regla de la palanca, h₂ de Isoentrópicos: hasta
-    475 px; en Rankine, la h de la turbina real y las sumas del ciclo
-    regenerativo: ≤ 387 px) y se deslizan;
+    475 px; en Rankine, la h de la turbina real, la bomba de los ORC y las
+    sumas del ciclo regenerativo: ≤ 393 px) y se deslizan;
     en Inglés, 5 apenas pasadas (≤ 339 px). Se resolvería mostrando las
     energías en kJ/kg dentro del SI o con otro formato de número (decisión
     del autor: hoy el SI es J/kg).
@@ -355,10 +436,6 @@
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
-- **Fase 3.1c** — Rankine con pérdidas de carga (caldera, condensador,
-  calentadores), subenfriador de drenajes y desrecalentador, drenajes
-  bombeados hacia adelante en calentadores intermedios, ORC con otros
-  fluidos (R134a, R1234yf…).
 - **Fase 3.1 (continuación)** — Refrigeración por compresión de vapor;
   Brayton; ciclo combinado; exergía de los ciclos. Evaluar
   `tespy.tools.get_plotting_data` para los diagramas (hoy el ciclo se

@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.12.0"
+PAGE_VERSION = "0.13.0"
 
 
 def _home_page() -> None:
@@ -73,7 +73,9 @@ def _home_page() -> None:
           ISO 14912:2003).
         - ♨️ **Rankine** — ciclo de potencia de vapor simple, con
           recalentamiento o con regeneración (calentadores abiertos y
-          cerrados), ideal o real, resuelto con
+          cerrados, con subenfriador de drenaje y desrecalentador), ideal
+          o real (con pérdidas de carga y de calor), con agua o con un
+          fluido orgánico (ORC, con recuperador), resuelto con
           [TESPy](https://tespy.readthedocs.io): estados, fracciones de
           extracción, ciclo sobre el diagrama, procedimiento con las tablas,
           agua de enfriamiento y barridos para ver cómo mejora el
@@ -90,8 +92,8 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Rankine con pérdidas de carga y ORC, ciclos de refrigeración,
-        Brayton y combinado, psicrometría, combustión, exergía. Ver el
+        Ciclos de refrigeración, Brayton y combinado, psicrometría,
+        combustión, exergía. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 

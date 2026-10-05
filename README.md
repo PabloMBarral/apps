@@ -63,7 +63,8 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   validaciones en la 1.7._
 - ✅ **Multifluido + selector global de unidades**: la página de
   Propiedades trabaja con cualquier fluido de `core.fluids.SUPPORTED_FLUIDS`
-  (Water, R134a, R410A, R1234yf, NH₃, CO₂, Air). Selector global en
+  (Water, R134a, R410A, R1234yf, NH₃, CO₂, Air y, para el ORC, R-245fa,
+  R-1233zd(E), isopentano y tolueno). Selector global en
   sidebar entre **SI** (K, Pa, J/kg, J/(kg·K)), **Técnico** (°C, bar,
   kJ/kg, kJ/(kg·K)) — default — e **Inglés** (°F, psia, Btu/lb,
   Btu/(lb·°R)). El sistema se persiste vía `st.session_state` y aplica
@@ -85,7 +86,7 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
 - ✅ **Diagramas de propiedades** (log p–h, T–s, h–s, p–log v) con
   [fluprodia](https://github.com/fwitte/fluprodia) + plotly. La página de
   **Propiedades** dibuja el estado calculado sobre el diagrama elegido
-  para los 7 fluidos del proyecto. La página de **Isoentrópicos** dibuja
+  para los 11 fluidos del proyecto. La página de **Isoentrópicos** dibuja
   el proceso completo: la isoentrópica real 1→2s vía CoolProp, los
   segmentos 2s→2 y 1→2 como referencia visual (línea recta que **no**
   representa la trayectoria termodinámica real), y para el compresor
@@ -93,39 +94,50 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   ``(fluido, sistema de unidades)`` cacheado con `@st.cache_resource`
   para amortizar el cálculo de isolíneas, con isotermas e isobaras
   redondas en las unidades de cada sistema. _Fase 1.5a cerrada._
-- ✅ **Ciclo de Rankine** (agua) resuelto con
+- ✅ **Ciclo de Rankine** (agua u ORC) resuelto con
   [TESPy](https://tespy.readthedocs.io) como una red de componentes
   (bomba, caldera, turbina, condensador): simple, **con
   recalentamiento** o **con regeneración** —hasta tres calentadores de
-  agua de alimentación, abiertos o cerrados (con TTD y el drenaje en
-  cascada o bombeado hacia adelante), combinables con el recalentamiento—,
-  ideal o real (rendimientos isoentrópicos de turbina y bomba), con entrada
-  a la turbina sobrecalentada o como vapor saturado seco, y caudal másico o
-  potencia neta como dato. Numera los estados como Cengel (los ejemplos
-  10-5 y 10-6 dan 1–7 y 1–13). Muestra η térmico, las fracciones de
-  extracción,
+  agua de alimentación, abiertos o cerrados (con TTD, subenfriador de
+  drenaje (DCA), desrecalentador y el drenaje en cascada o bombeado hacia
+  adelante desde cualquier cerrado), combinables con el recalentamiento—,
+  ideal o real (rendimientos isoentrópicos y **pérdidas de carga y de
+  calor** del ciclo real de Cengel §10-5: caídas de presión en caldera,
+  recalentador, condensador, calentadores y cañerías, subenfriamiento del
+  condensado), con entrada a la turbina sobrecalentada o como vapor
+  saturado seco, y caudal másico o potencia neta como dato. Con un fluido
+  orgánico es un **ORC** (R-245fa, R-1233zd(E), isopentano, tolueno,
+  R-134a, R-1234yf, amoníaco), con **recuperador** y la clasificación del
+  fluido en seco, húmedo o casi isoentrópico. Numera los estados como
+  Cengel (los ejemplos 10-5, 10-6 y 10-2 dan 1–7, 1–13 y 1–6). Muestra η
+  térmico, las fracciones de extracción,
   trabajo neto, título a la salida de la turbina (aviso si baja de 0,88),
   relación de trabajo de retroceso, comparación con Carnot y con la
   temperatura media de aporte de calor, potencias, la tabla de estados
   (numeración de Cengel) y el ciclo sobre el diagrama T–s (u otro). El
   **procedimiento** lo resuelve estado por estado como con las tablas
   (bomba con v·Δp, regla de la palanca con h_fg y s_fg, balances de los
-  calentadores con la fracción despejada, de mayor a menor presión, y
-  trabajos y calores con (1 − y)), en LaTeX y en el sistema de unidades
-  activo; calcula el **agua de enfriamiento** del condensador; un expansor
+  calentadores con la fracción despejada, de mayor a menor presión —o, si
+  un drenaje bombeado las acopla, el sistema con su verificación—, las
+  cañerías y el recuperador, y trabajos y calores con (1 − y)), en LaTeX y
+  en el sistema de unidades activo; calcula el **agua de enfriamiento** del
+  condensador; un expansor
   muestra cómo lo arma TESPy (red y balances por componente) y otro, **cómo
   aumentar el rendimiento**: barridos de η y del título vs. presión de
   caldera, temperatura de entrada a la turbina y presión del condensador
-  (Cengel §10-4), y de la presión de cada extracción, que tiene un óptimo
-  (§10-6). Ejemplos precargados de Cengel (10-1, 10-3 a/b/c, 10-4, 10-5,
-  10-6, uno basado en 10-2 y un cerrado con drenaje al condensador),
-  verificados contra el libro y contra el cálculo a mano. Validación con
-  mensajes en castellano (vapor que entraría líquido a la turbina,
-  condensador por encima de la caldera, recalentamiento que enfriaría,
-  calentador que no puede calentar o que necesitaría una extracción
-  negativa, agua de enfriamiento más caliente que el vapor…). Fórmulas del
-  vademecum (§3.3, §9.2, §10.1, §10.4, §12, §13) y descarga CSV/JSON.
-  _Fases 3.1a y 3.1b cerradas._
+  (Cengel §10-4), de la presión de cada extracción, que tiene un óptimo
+  (§10-6), y de la efectividad del recuperador. Ejemplos precargados de
+  Cengel (10-1, 10-2 completo con sus pérdidas, 10-3 a/b/c, 10-4, 10-5,
+  10-6, uno basado en 10-2 sin pérdidas y un cerrado con drenaje al
+  condensador), una planta con calentadores reales y tres ORC, verificados
+  contra el libro y contra el cálculo a mano. Validación con mensajes en
+  castellano (vapor que entraría líquido a la turbina, condensador por
+  encima de la caldera, recalentamiento que enfriaría, calentador que no
+  puede calentar o que necesitaría una extracción negativa, pérdidas que
+  congelarían el condensado, desrecalentador sin sobrecalentamiento,
+  recuperador con un fluido húmedo, agua de enfriamiento más caliente que
+  el vapor…). Fórmulas del vademecum (§3.3, §9.2, §10.1, §10.4, §12, §13)
+  y descarga CSV/JSON. _Fases 3.1a, 3.1b y 3.1c cerradas._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -133,8 +145,6 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
 
 ### En desarrollo (roadmap)
 - **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
-  Rankine con pérdidas de carga, subenfriador de drenajes y
-  desrecalentador, ORC con otros fluidos;
   refrigeración por compresión de vapor (simple, con economizador, cascada),
   Brayton (simple, con regeneración, intercooling, recalentamiento),
   ciclo combinado, cogeneración.
@@ -192,7 +202,7 @@ apps/
 │   │   └── iso6976.py
 │   ├── cycles/
 │   │   ├── tespy_utils.py # red de TESPy en SI y errores en castellano
-│   │   ├── rankine.py     # Rankine simple, con recalentamiento y regenerativo (TESPy)
+│   │   ├── rankine.py     # Rankine simple, recalentamiento, regeneración, ciclo real y ORC (TESPy)
 │   │   ├── rankine_layout.py     # topología y numeración de estados (sin TESPy)
 │   │   └── rankine_procedure.py  # procedimiento «como con las tablas»
 │   └── plots.py
@@ -212,7 +222,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.12.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.13.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -280,6 +290,34 @@ las fuentes correspondientes:
 relative density and Wobbe indices from composition*. International
 Organization for Standardization, 2016.
 
+**Ciclo de Rankine orgánico (ORC)** — clasificación de los fluidos de trabajo
+(seco, húmedo, isoentrópico) y estado del arte:
+
+```bibtex
+@article{chen2010review,
+  author  = {Chen, Huijuan and Goswami, D. Yogi and Stefanakos, Elias K.},
+  title   = {A review of thermodynamic cycles and working fluids for the
+             conversion of low-grade heat},
+  journal = {Renewable and Sustainable Energy Reviews},
+  volume  = {14},
+  number  = {9},
+  pages   = {3059--3067},
+  year    = {2010},
+  doi     = {10.1016/j.rser.2010.07.006}
+}
+
+@article{quoilin2013orc,
+  author  = {Quoilin, Sylvain and Van Den Broek, Martijn and Declaye, S{\'e}bastien
+             and Dewallef, Pierre and Lemort, Vincent},
+  title   = {Techno-economic survey of {Organic Rankine Cycle} ({ORC}) systems},
+  journal = {Renewable and Sustainable Energy Reviews},
+  volume  = {22},
+  pages   = {168--186},
+  year    = {2013},
+  doi     = {10.1016/j.rser.2013.01.028}
+}
+```
+
 ---
 
 ## Notas de uso
@@ -290,6 +328,8 @@ Organization for Standardization, 2016.
   página muestra "—" (en la API de bajo nivel, `StatePoint.x = -1`).
 - Las propiedades del agua salen de CoolProp con la formulación
   IAPWS-95; pueden diferir en el último decimal de las tablas impresas.
+  Las de los fluidos orgánicos (ORC), de las ecuaciones de estado de
+  Helmholtz de CoolProp.
 - Los ciclos usan la numeración de estados de Çengel & Boles,
   *Termodinámica* (cap. 10), y sus ejemplos precargados se verificaron
   contra los resultados del libro.
