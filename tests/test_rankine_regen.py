@@ -394,11 +394,12 @@ def test_negative_extraction_into_an_open_heater_is_explained() -> None:
 # ---------------------------------------------------------------------
 
 
-def test_new_examples_are_at_the_end_and_solve_without_warnings() -> None:
+def test_regenerative_examples_keep_their_place_and_solve_without_warnings() -> None:
+    # Los de la 0.12.0 van del 6 al 8 (los de la 3.1c se suman después).
     names = list(RANKINE_EXAMPLES)
     assert names[0].startswith("Cengel 10-1")
-    regen = [n for n in names if RANKINE_EXAMPLES[n].heaters]
-    assert names[-len(regen) :] == regen and len(regen) == 3
+    regen = [n for n in names[:9] if RANKINE_EXAMPLES[n].heaters]
+    assert names[6:9] == regen and len(regen) == 3
     for name in regen:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
