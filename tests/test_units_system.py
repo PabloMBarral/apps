@@ -36,6 +36,8 @@ _KINDS = (
     "dynamic_viscosity",
     "thermal_conductivity",
     "diffusivity",
+    "mass_flow",
+    "power",
 )
 
 
@@ -87,6 +89,12 @@ class TestUnitLabels:
             ("diffusivity", "SI", "m²/s"),
             ("diffusivity", "Técnico", "m²/s"),
             ("diffusivity", "Inglés", "ft²/s"),
+            ("mass_flow", "SI", "kg/s"),
+            ("mass_flow", "Técnico", "kg/s"),
+            ("mass_flow", "Inglés", "lb/s"),
+            ("power", "SI", "W"),
+            ("power", "Técnico", "kW"),
+            ("power", "Inglés", "Btu/s"),
         ],
     )
     def test_label(self, kind: str, system: str, expected: str) -> None:
@@ -110,6 +118,8 @@ class TestRoundTrip:
         "dynamic_viscosity": (1.0e-6, 1.8e-5, 8.9e-4, 1.0),
         "thermal_conductivity": (0.01, 0.026, 0.6, 400.0),
         "diffusivity": (1.0e-8, 1.4e-7, 1.5e-5, 1.0e-3),
+        "mass_flow": (0.0, 1.0, 50.0, 600.0),
+        "power": (0.0, 1.0, 1.0e3, 2.1e8),
     }
 
     @pytest.mark.parametrize("kind", _KINDS)
@@ -251,6 +261,15 @@ class TestKnownConversionPoints:
 
     def test_one_ft2_per_s_in_m2_per_s(self) -> None:
         assert convert_to_si(1.0, "diffusivity", "Inglés") == pytest.approx(0.09290304, rel=1e-12)
+
+    def test_mass_flow_and_power_are_coherent_with_specific_energy(self) -> None:
+        # Potencia = caudal · energía específica sin factores en cada sistema:
+        # 1 lb/s · 1 Btu/lb = 1 Btu/s (= 1055.06 W) y 1 kg/s · 1 kJ/kg = 1 kW.
+        for system in SUPPORTED_SYSTEMS:
+            m = convert_to_si(1.0, "mass_flow", system)
+            w = convert_to_si(1.0, "specific_enthalpy", system)
+            assert convert_from_si(m * w, "power", system) == pytest.approx(1.0, rel=1e-12)
+        assert convert_to_si(1.0, "power", "Inglés") == pytest.approx(1055.05585262, rel=1e-12)
 
 
 class TestFormatQuantity:
