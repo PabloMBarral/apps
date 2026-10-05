@@ -48,6 +48,9 @@ apps/
 │   │                          # 1.5b y validaciones / defaults por fluido (1.7)
 │   ├── 5_Rankine.py           # ✅ Fase 3.1a — Rankine simple / con
 │   │                          # recalentamiento (TESPy), Carnot, barridos de η.
+│   │                          # Fase 3.1b: regeneración (hasta 3 calentadores),
+│   │                          # rótulos con la numeración del layout, agua de
+│   │                          # enfriamiento, barrido de la presión de extracción.
 │   ├── 6_Refrigeracion.py
 │   ├── 7_Psicrometria.py
 │   ├── 8_Combustion.py
@@ -101,8 +104,15 @@ apps/
 │   │   ├── tespy_utils.py     # ✅ Fase 3.1a — new_network() en SI y
 │   │   │                      # solve() (status de TESPy → ValueError en castellano).
 │   │   ├── rankine.py         # ✅ Fase 3.1a — RankineInputs / solve_rankine /
-│   │   │                      # RankineResult, validaciones, rankine_steps (LaTeX
-│   │   │                      # por sistema), barridos y rankine_to_dict.
+│   │   │                      # RankineResult, validaciones, barridos y
+│   │   │                      # rankine_to_dict. Fase 3.1b: red genérica desde el
+│   │   │                      # layout (calentadores), componentes con fracciones,
+│   │   │                      # agua de enfriamiento, barrido de extracción.
+│   │   ├── rankine_layout.py  # ✅ Fase 3.1b — Topología y numeración tipo Cengel
+│   │   │                      # (sin TESPy): FeedwaterHeater, plant_layout,
+│   │   │                      # port_flows (caudales 1 − y… simbólicos).
+│   │   ├── rankine_procedure.py # ✅ Fase 3.1b — rankine_steps (se mudó; rankine.py
+│   │   │                      # lo reexporta): simple, recalentamiento y regenerativo.
 │   │   ├── refrigeration.py
 │   │   ├── brayton.py
 │   │   └── combined.py
@@ -248,6 +258,35 @@ Notas de la Fase 3.1a (TESPy 0.11):
 - Ecuaciones: el factor de unidades de v·Δp y los términos con ×10ⁿ (SI)
   van en un renglón de continuación (`\\ &\quad`); la regla de la palanca
   usa h_fg y s_fg, como Cengel.
+
+Notas de la Fase 3.1b (regeneración):
+
+- Calentador cerrado = `Condenser` (`ttd_u` se mide contra T_sat a la
+  presión de la extracción; `ttd_u = 0` es el ideal de Cengel y la salida
+  caliente queda en líquido saturado); abierto = `Merge` con x = 0 a la
+  salida; extracción = `Splitter`; drenaje en cascada = `Valve` + `Merge`
+  (antes del condensador o de la entrada caliente del cerrado de menor
+  presión); drenaje hacia adelante = bomba + `Merge`. Todo como los ejemplos
+  oficiales (tutorial de optimización de una central, modelo SEGS de sus
+  tests, CCPP).
+- La presión se fija una sola vez: entrada de la turbina y salida de cada
+  tramo; bombas, válvulas y `Merge` la toman de la red.
+- Topologías: hasta 3 calentadores; solo el cerrado de mayor presión
+  bombea el drenaje hacia adelante. Así cada fracción se despeja en orden
+  (de mayor a menor presión) en el procedimiento.
+- η_T se mide desde la entrada de cada turbina (soluciones de Cengel): los
+  tramos llevan el `eta_s` local que reproduce esa línea de expansión.
+- TESPy no avisa una extracción negativa hacia un abierto (un `Merge` no
+  tiene límites): `solve_rankine` revisa cada fracción después de resolver.
+  Antes de resolver, cada calentador tiene que poder calentar (incluido el
+  calentamiento en la bomba).
+- La numeración sale de `core.cycles.rankine_layout` antes de resolver: la
+  página la usa para los rótulos (lee de `session_state` los widgets que
+  están más abajo). Las opciones de los radios no llevan números: cambiar
+  las opciones reinicia el widget.
+- Con regeneración η < 1 − T_C/T̄_H (los calentadores generan entropía).
+- "Cómo aumentar el rendimiento" es Cengel §10-4 (ediciones 7.ª a 9.ª);
+  §10-6 es la regeneración.
 
 ### Citas y licencias
 

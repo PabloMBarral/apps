@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.11.0` — Fase 3.1a cerrada (2026-10-05).
+> **Versión actual**: `0.12.0` — Fase 3.1b cerrada (2026-10-05).
 
 ---
 
@@ -251,6 +251,91 @@
 - **Dependencias**: `tespy>=0.11.2,<0.12` (ya estaba; se acota a la API
   de unidades de la 0.11).
 
+### Fase 3.1b — Rankine regenerativo y agua de enfriamiento
+- **Versión**: `0.12.0` (2026-10-05). Rama `claude/water-state-analyzer-f4fiev`.
+- **Commits**: `287c9e0` (feat: plano de la planta y numeración de Cengel),
+  `d8b9b1e` (feat: Rankine regenerativo con TESPy, procedimiento y agua de
+  enfriamiento), `45975d1` (feat: regeneración en la página) y el commit de
+  docs que cierra la fase.
+- **Scope**:
+  - `core/cycles/rankine_layout.py` (nuevo, sin TESPy): topología y
+    numeración de estados como Cengel (10-5: 1–7; 10-6: 1–13; sin
+    calentadores, la de la 0.11.0), componentes lógicos con conexiones por
+    rol y `port_flows`, el caudal de cada corriente como 1 − y… La página
+    lo usa para numerar los rótulos antes de resolver.
+  - `core/cycles/rankine.py`: hasta 3 calentadores de agua de alimentación,
+    abiertos o cerrados (TTD; drenaje en cascada hacia atrás, o bombeado
+    hacia adelante en el cerrado de mayor presión), combinables con el
+    recalentamiento. Red genérica de TESPy desde el layout, como los
+    ejemplos oficiales: cerrado = `Condenser`, abierto = `Merge` con x = 0,
+    extracción = `Splitter`, cascada = `Valve` + `Merge`. η_T se mide desde
+    la entrada de cada turbina (tramos con el `eta_s` local que reproduce
+    la línea de expansión). Componentes con la fracción de cada corriente;
+    las propiedades (w_T, w_B, q_H, q_C, T̄_H…) salen de ahí. Agua de
+    enfriamiento del condensador; barrido de la presión de extracción;
+    export con calentadores, fracciones y agua de enfriamiento.
+  - `core/cycles/rankine_procedure.py` (nuevo): el procedimiento se mudó
+    (sin calentadores, la salida es idéntica a la de la 0.11.0) y suma el
+    regenerativo en el orden de Cengel: estados de la línea de
+    alimentación, turbinas, balances de los calentadores de mayor a menor
+    presión con la fracción despejada, mezcla, calores y trabajos con
+    (1 − y), T̄_H, potencias y agua de enfriamiento.
+  - `core/diagrams.py`: `segments_overlays` (une pares de estados; la usa
+    `cycle_overlays`). `ui/diagrams.py`: `point_legend` agrupa los puntos de
+    un color en una sola entrada de la leyenda.
+  - Página `/Rankine`: bloque de regeneración, rótulos con la numeración del
+    layout (las opciones de los radios ya no llevan números), tabla de
+    extracciones, agua de enfriamiento, diagrama con extracciones, drenajes,
+    válvulas y mezcla, barrido de la presión de extracción, teoría de §10-6
+    y ejemplos 10-5, 10-6 (con la nota de la errata) y un cerrado con
+    drenaje al condensador.
+- **Correcciones de la 3.1a**:
+  - "Cómo aumentar el rendimiento", el límite de humedad y T̄_H son Cengel
+    §10-4 (estaba §10-6, que es la regeneración).
+  - η = 1 − T_C/T̄_H solo vale sin regeneración y con salida húmeda
+    (docstring y teoría).
+- **Validación**:
+  - Cengel 10-5: y = 0,2271 y η = 46,31 % (libro: 0,2270 y 46,3 %); los
+    estados coinciden con CoolProp a 10⁻⁶.
+  - Cengel 10-6: y = 0,1729, z = 0,1313 y η = 48,98 %, igual que el
+    cálculo a mano. El libro da 0,1766 / 0,1306 / 49,2 %, números que
+    salen de una bomba II hasta 4 MPa (h₄ = 643,9 kJ/kg); el ejemplo lo
+    aclara en pantalla.
+  - Cerrado que drena al condensador, cascadas y dos abiertos: iguales a
+    los balances a mano.
+  - Ciclo real con 3 calentadores y recalentamiento: estados sobre la línea
+    de expansión de cada turbina a 10⁻⁹; el balance cierra a 10⁻⁸.
+- **Mensajes al alumno**:
+  - Presiones de extracción fuera de rango, desordenadas, repetidas o por
+    encima de la crítica.
+  - TTD negativo, o en un abierto.
+  - Drenaje hacia adelante con el calentador de mayor presión abierto.
+  - Calentador que no puede calentar el agua (incluido el calentamiento en
+    la bomba).
+  - Extracción negativa hacia un abierto (TESPy no la avisa).
+  - Agua de enfriamiento más caliente que el vapor que condensa.
+- **Tests**: de 1070 a 1265 (+195), sin warnings de pytest.
+  - `tests/test_rankine_layout.py` (79, sin TESPy): numeración, cascadas
+    y una grilla de configuraciones.
+  - `tests/test_rankine_regen.py` (101): 10-5, 10-6, cerrado al
+    condensador, cascadas, dos abiertos, ciclo real con 3 calentadores,
+    balances por componente, validaciones, caudales simbólicos iguales a
+    los de TESPy, procedimiento en los tres sistemas, agua de enfriamiento,
+    barridos, export, tramos del diagrama y una grilla de robustez de 42
+    ciclos reales.
+  - AppTest de la página (+12) y los ejemplos nuevos en
+    `tests/test_rankine.py` (+3).
+  - Regresión: sin calentadores, los resultados, la red de TESPy, los
+    pasos y el export son idénticos a los de la 0.11.0 (snapshot de 12
+    casos; solo cambian las citas corregidas).
+  - LaTeX: validan con KaTeX las 1576 expresiones distintas del
+    regenerativo (con agua de enfriamiento) y las 953 de la página. En
+    Técnico e Inglés ninguna supera el ancho de un celular (máx. 308 px);
+    en SI se deslizan las sumas con ×10ⁿ (≤ 387 px).
+  - Smoke test en Chromium a 1280 y 390 px: todas las páginas por link
+    directo y /Rankine con el ejemplo 10-6.
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
@@ -258,7 +343,8 @@
 - **Detectado en Fase 1.7, sin resolver**:
   - En sistema SI (J/kg con ×10ⁿ) algunas sustituciones siguen siendo más
     anchas que el celular (regla de la palanca, h₂ de Isoentrópicos: hasta
-    475 px; en Rankine, la h de la turbina real: ≤ 347 px) y se deslizan;
+    475 px; en Rankine, la h de la turbina real y las sumas del ciclo
+    regenerativo: ≤ 387 px) y se deslizan;
     en Inglés, 5 apenas pasadas (≤ 339 px). Se resolvería mostrando las
     energías en kJ/kg dentro del SI o con otro formato de número (decisión
     del autor: hoy el SI es J/kg).
@@ -269,13 +355,14 @@
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
-- **Fase 3.1b** — Rankine regenerativo (calentadores abierto y
-  cerrado), condensador con agua de enfriamiento, pérdidas de carga en
-  caldera y condensador, ORC con otros fluidos (R134a, R1234yf…).
+- **Fase 3.1c** — Rankine con pérdidas de carga (caldera, condensador,
+  calentadores), subenfriador de drenajes y desrecalentador, drenajes
+  bombeados hacia adelante en calentadores intermedios, ORC con otros
+  fluidos (R134a, R1234yf…).
 - **Fase 3.1 (continuación)** — Refrigeración por compresión de vapor;
   Brayton; ciclo combinado; exergía de los ciclos. Evaluar
   `tespy.tools.get_plotting_data` para los diagramas (hoy el ciclo se
-  dibuja con `core.diagrams.cycle_overlays`).
+  dibuja con `core.diagrams.segments_overlays`).
 - **Fase 4** — Psicrometría (carta interactiva, procesos HVAC).
 - **Fase 5** — Combustión: estequiometría, exceso de aire, productos
   de combustión, temperatura adiabática de llama.
