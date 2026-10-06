@@ -446,11 +446,11 @@ Notas de la Fase 3.3 (HRSG de una presión):
   ΔT de un extremo menor que el pinch, approach 0.
 - El barrido de la presión no es monótono: cerca de la crítica h_fg se
   achica y el caudal vuelve a subir. Se limita a 1–160 bar.
-- La página recalcula sola en cada cambio (~0,1 s, `st.cache_data`); los
-  barridos van con botón. En el diagrama, el pinch y el approach (unos
-  pocos kelvin) se señalan con flechas que vienen de zonas libres del
-  evaporador, y los nombres de las secciones van arriba; medido en
-  1280 y 390 px.
+- La página recalcula sola en cada cambio (~0,2 s con la comparación,
+  `st.cache_data`); los barridos van con botón. En el diagrama, el pinch y
+  el approach (unos pocos kelvin) se señalan con flechas que vienen de
+  zonas libres del evaporador, y los nombres de las secciones van arriba;
+  medido en 1280 y 390 px.
 - Los textos usan °C y bar (como el Rankine); el LaTeX sigue el sistema.
   En SI las restas con ×10ⁿ se parten (`_times_diff`) y el calor total va
   un sumando por renglón: máximo 304 px.
