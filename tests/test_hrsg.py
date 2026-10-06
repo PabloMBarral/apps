@@ -445,3 +445,92 @@ def test_other_steam_option() -> None:
     cold = replace(sat, T_gas_in_K=solve_hrsg(sat).T_sat_K + 30.0)
     assert default_steam_temperature(cold) is None
     assert other_steam_option(cold) is None
+
+
+# ---------------------------------------------------------------------
+# Diseño por temperatura de chimenea (Cengel §10-9)
+# ---------------------------------------------------------------------
+
+
+def _cengel_10_9_hrsg() -> HRSGInputs:
+    """El intercambiador de Cengel 10-9: aire a 853 K (la salida de la turbina de 9-6),
+    vapor a 7 MPa y 500 °C desde la bomba ideal de 5 kPa, gases a 450 K."""
+    from core.ideal_gas import AIR_DRY
+
+    T_fw = PropsSI(
+        "T",
+        "P",
+        7e6,
+        "H",
+        PropsSI("H", "P", 5e3, "Q", 0, "Water")
+        + PropsSI("D", "P", 5e3, "Q", 0, "Water") ** -1 * (7e6 - 5e3),
+        "Water",
+    )
+    air = AIR_DRY
+    h3 = air.h(1300.0)
+    h4 = h3 - 0.85 * (h3 - air.h(air.T_isentropic(1300.0, 800e3, 100e3)))
+    return HRSGInputs(
+        air.T_from_h(h4), 1.0, air, 7e6, T_fw, 773.15, approach_K=0.0, T_stack_K=450.0
+    )
+
+
+def test_stack_design_reproduces_cengel_10_9() -> None:
+    r = solve_hrsg(_cengel_10_9_hrsg())
+    assert r.inputs.by_stack
+    assert r.m_steam_kg_s == pytest.approx(0.131, abs=5e-4)  # y = ṁ_v / ṁ_g del libro
+    assert r.T_stack_K == pytest.approx(450.0)
+    assert r.pinch_K == pytest.approx(33.5, abs=0.3)  # un resultado, no un dato
+    assert r.Q_W == pytest.approx(r.Q_gas_W, rel=1e-9)
+    prof = hrsg_tq_profile(r)
+    assert prof.min_dT_K == pytest.approx(r.pinch_K, abs=1e-6)
+    data = hrsg_to_dict(r, "Técnico")
+    assert data["datos"]["diseno"] == "temperatura de chimenea"
+    assert data["datos"]["pinch"] is None
+    assert data["resultados"]["pinch"]["valor"] == pytest.approx(r.pinch_K)
+
+
+def test_stack_design_matches_the_pinch_design() -> None:
+    """Por pinch o con la chimenea que ese pinch da: la misma caldera."""
+    base = solve_hrsg(BASE)
+    by_stack = solve_hrsg(replace(BASE, T_stack_K=base.T_stack_K, pinch_K=99.0))
+    assert by_stack.m_steam_kg_s == pytest.approx(base.m_steam_kg_s, rel=1e-9)
+    assert by_stack.pinch_K == pytest.approx(BASE.pinch_K, abs=1e-6)
+    assert by_stack.T_gas_K == pytest.approx(base.T_gas_K, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("T_stack", "match"),
+    [
+        (50.0 + C, "tiene que quedar entre"),
+        (700.0 + C, "tiene que quedar entre"),
+        (100.0 + C, "cruce de temperaturas"),
+    ],
+)
+def test_stack_design_errors(T_stack: float, match: str) -> None:
+    inputs = replace(BASE, T_stack_K=T_stack)
+    with pytest.raises(ValueError, match=match):
+        solve_hrsg(inputs)
+
+
+@pytest.mark.parametrize("system", ["SI", "Técnico", "Inglés"])
+def test_stack_design_procedure(system: str) -> None:
+    r = solve_hrsg(_cengel_10_9_hrsg())
+    steps = hrsg_steps(r, system)  # type: ignore[arg-type]
+    titles = [s.title for s in steps]
+    assert titles.index("Economizador (agua 1 → 2; gases d → c)") < next(
+        i for i, t in enumerate(titles) if t.startswith("Evaporador")
+    )
+    latex = [t for s in steps for t in s.latex]
+    assert all(t.count("{") == t.count("}") for t in latex)
+    assert any(r"\Delta T_{\mathrm{pinch}}" in t for t in latex)
+    flow = next(s for s in steps if s.title == "Caudal de vapor")
+    assert "h_1" in flow.latex[0] and "T_d" in flow.latex[0]
+
+
+def test_stack_design_note_on_a_tiny_pinch() -> None:
+    base = solve_hrsg(BASE)
+    # una chimenea un poco más fría que la del pinch de 2 K: pinch < 5 K
+    tight = solve_hrsg(replace(BASE, pinch_K=2.0))
+    r = solve_hrsg(replace(BASE, T_stack_K=tight.T_stack_K + 0.5))
+    assert r.pinch_K < 5.0 < base.pinch_K
+    assert any("el pinch queda en" in n for n in hrsg_notes(r))

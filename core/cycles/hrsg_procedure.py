@@ -13,9 +13,10 @@ igualdad por renglón) para que entren en el ancho de un celular.
 
 from __future__ import annotations
 
-from core.cycles.hrsg import R_U, HRSGResult, molar_mass
+from core.cycles.hrsg import HRSGResult
 from core.cycles.rankine_procedure import _bar, _diff, _n, _q, _wrap
 from core.fluids import saturation_at_temperature
+from core.ideal_gas import R_U, FlueGas, molar_mass
 from core.latex import latex_chain, latex_number, latex_paren
 from core.state_report import ProcedureStep
 from core.units_system import QuantityKind, UnitSystem
@@ -34,29 +35,31 @@ def _T(value_K: float, system: UnitSystem) -> str:
     return _q(value_K, "temperature", system)
 
 
-def _times_diff(
+def times_diff(
     factor_si: float, factor_kind: QuantityKind, a_si: float, b_si: float, system: UnitSystem
 ) -> str:
     r"""``f\,(a - b)`` con entalpías; con números ×10ⁿ (SI), el ``- b`` va en otro renglón.
 
     Pensado para un paso de :func:`~core.latex.latex_chain` (ancho de un celular).
     """
-    f = _n(factor_si, factor_kind, system)
+    return factor_times_diff(_n(factor_si, factor_kind, system), a_si, b_si, system)
+
+
+def factor_times_diff(factor: str, a_si: float, b_si: float, system: UnitSystem) -> str:
+    r"""Como :func:`times_diff`, con el factor ya escrito en LaTeX (p. ej. ``1 + f``)."""
     diff = _diff(a_si, b_si, _EH, system)
     if r"\times" not in diff:
-        return rf"{f}\,({diff})"
+        return rf"{factor}\,({diff})"
     b = latex_paren(_n(b_si, _EH, system))
-    return rf"{f}\,({_n(a_si, _EH, system)} \\ &\quad - {b})"
+    return rf"{factor}\,({_n(a_si, _EH, system)} \\ &\quad - {b})"
 
 
 def _molar_unit(system: UnitSystem) -> str:
     return r"\mathrm{lb/lbmol}" if system == "Inglés" else r"\mathrm{kg/kmol}"
 
 
-def _composition_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
-    """Masa molar, fracciones másicas y R de la mezcla (vademecum §5)."""
-    gas = result.inputs.gas
-    english = system == "Inglés"
+def gas_composition_lines(gas: FlueGas, system: UnitSystem) -> list[str]:
+    """M = Σ yᵢ·Mᵢ, wᵢ = yᵢ·Mᵢ/M y R = R_u/M de una mezcla de gases ideales (vademecum §5)."""
     present = [(s, y) for s, y in gas.mole_fractions.items() if y > 0.0]
     M = gas.M_kg_per_mol * 1e3
     rows = [r"M &= \sum_i y_i\,M_i"]
@@ -85,6 +88,13 @@ def _composition_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
             _q(R, "specific_heat", system),
         )
     )
+    return lines
+
+
+def _composition_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
+    """Masa molar, fracciones másicas y R de la mezcla (vademecum §5)."""
+    english = system == "Inglés"
+    lines = gas_composition_lines(result.inputs.gas, system)
     return ProcedureStep(
         title="Composición de los gases",
         text=(
@@ -106,25 +116,33 @@ def _gas_enthalpy_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
     labels = result.gas_labels
     lines = [r"h_g(T) = \sum_i w_i\,\bigl[h_i(T) - h_i(25\ {}^{\circ}\mathrm{C})\bigr]"]
     lines.append(rf"h_g(T_a) = {_q(result.h_gas_J_per_kg[0], _EH, system)}")
-    c = labels.index("c")
-    lines.append(
-        latex_chain(
-            "T_c",
-            r"T_{\mathrm{sat}} + \Delta T_{\mathrm{pinch}}",
-            rf"{_n(result.T_sat_K, 'temperature', system)} + "
-            rf"{_n(inputs.pinch_K, 'temperature_difference', system)}",
-            _T(result.T_gas_K[c], system),
+    if inputs.by_stack:
+        lines.append(rf"h_g(T_d) = {_q(result.h_gas_J_per_kg[-1], _EH, system)}")
+        where = (
+            f"salen por la chimenea a T_d = {_T_text(result.T_stack_K)} (el dato de diseño, "
+            "como en el intercambiador de Cengel §10-9)"
         )
-    )
-    lines.append(rf"h_g(T_c) = {_q(result.h_gas_J_per_kg[c], _EH, system)}")
+    else:
+        c = labels.index("c")
+        lines.append(
+            latex_chain(
+                "T_c",
+                r"T_{\mathrm{sat}} + \Delta T_{\mathrm{pinch}}",
+                rf"{_n(result.T_sat_K, 'temperature', system)} + "
+                rf"{_n(inputs.pinch_K, 'temperature_difference', system)}",
+                _T(result.T_gas_K[c], system),
+            )
+        )
+        lines.append(rf"h_g(T_c) = {_q(result.h_gas_J_per_kg[c], _EH, system)}")
+        where = "salen del evaporador a T_c = T_sat + pinch"
     return ProcedureStep(
         title="Entalpía de los gases",
         text=(
-            f"Los gases entran a T_a = {_T_text(inputs.T_gas_in_K)} y salen del evaporador a "
-            "T_c = T_sat + pinch. En un gas ideal la entalpía depende solo de T: la de cada "
-            "componente sale del gas ideal de CoolProp (lo mismo que integrar los polinomios "
-            "NASA del vademecum §4.8) y la de la mezcla es la suma pesada con las fracciones "
-            "másicas (vademecum §5.6), medida desde 25 °C."
+            f"Los gases entran a T_a = {_T_text(inputs.T_gas_in_K)} y {where}. En un gas ideal "
+            "la entalpía depende solo de T: la de cada componente sale del gas ideal de "
+            "CoolProp (lo mismo que integrar los polinomios NASA del vademecum §4.8) y la de la "
+            "mezcla es la suma pesada con las fracciones másicas (vademecum §5.6), medida desde "
+            "25 °C."
         ),
         latex=tuple(lines),
     )
@@ -181,6 +199,8 @@ def _water_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
 
 def _steam_flow_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
     inputs = result.inputs
+    if inputs.by_stack:
+        return _steam_flow_by_stack_step(result, system)
     top = 5 if inputs.superheated else 4
     w = result.water
     c = result.gas_labels.index("c")
@@ -201,7 +221,7 @@ def _steam_flow_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
             latex_chain(
                 q_sym,
                 r"\dot{m}_g\,\bigl[h_g(T_a) - h_g(T_c)\bigr]",
-                _times_diff(inputs.m_gas_kg_s, "mass_flow", h_a, h_c, system),
+                times_diff(inputs.m_gas_kg_s, "mass_flow", h_a, h_c, system),
                 _q(Q_top, "power", system),
             ),
             latex_chain(
@@ -213,6 +233,60 @@ def _steam_flow_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
             ),
         ),
     )
+
+
+def _steam_flow_by_stack_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
+    """Diseño por chimenea: el balance de toda la caldera da el caudal de vapor."""
+    inputs = result.inputs
+    top = 5 if inputs.superheated else 4
+    w = result.water
+    h_a, h_d = result.h_gas_J_per_kg[0], result.h_gas_J_per_kg[-1]
+    return ProcedureStep(
+        title="Caudal de vapor",
+        text=(
+            "Con la temperatura de chimenea como dato, el balance de energía de toda la "
+            "caldera (adiabática, sin trabajo; vademecum §3.3) da el caudal de vapor: todo el "
+            "calor que ceden los gases entre la entrada (a) y la chimenea (d) lo recibe el "
+            f"agua, desde la alimentación (1) hasta el estado {top}."
+        ),
+        latex=(
+            rf"\dot{{m}}_v\,(h_{top} - h_1) = \dot{{m}}_g\,\bigl[h_g(T_a) - h_g(T_d)\bigr]",
+            latex_chain(
+                r"\dot{Q}",
+                r"\dot{m}_g\,\bigl[h_g(T_a) - h_g(T_d)\bigr]",
+                times_diff(inputs.m_gas_kg_s, "mass_flow", h_a, h_d, system),
+                _q(result.Q_W, "power", system),
+            ),
+            latex_chain(
+                r"\dot{m}_v",
+                rf"\frac{{\dot{{Q}}}}{{h_{top} - h_1}}",
+                rf"\frac{{{_n(result.Q_W, 'power', system)}}}"
+                rf"{{{_diff(w[-1].h_J_per_kg, w[0].h_J_per_kg, _EH, system)}}}",
+                _q(result.m_steam_kg_s, "mass_flow", system),
+            ),
+        ),
+    )
+
+
+def _gas_inlet_lines(
+    result: HRSGResult, system: UnitSystem, i_in: int, i_out: int, Q_W: float, Q_symbol: str
+) -> list[str]:
+    """h_g(T_ent) = h_g(T_sal) + Q̇/ṁ_g y la T que le corresponde (diseño por chimenea)."""
+    m_g = result.inputs.m_gas_kg_s
+    a, b = result.gas_labels[i_in], result.gas_labels[i_out]
+    return [
+        latex_chain(
+            f"h_g(T_{a})",
+            rf"h_g(T_{b}) + \frac{{{Q_symbol}}}{{\dot{{m}}_g}}",
+            _wrap(
+                _n(result.h_gas_J_per_kg[i_out], _EH, system),
+                "+",
+                rf"\frac{{{_n(Q_W, 'power', system)}}}{{{_n(m_g, 'mass_flow', system)}}}",
+            ),
+            _q(result.h_gas_J_per_kg[i_in], _EH, system),
+        ),
+        rf"T_{a} = {_T(result.T_gas_K[i_in], system)}",
+    ]
 
 
 def _gas_outlet_lines(
@@ -256,7 +330,7 @@ def _section_steps(result: HRSGResult, system: UnitSystem) -> list[ProcedureStep
                     latex_chain(
                         r"\dot{Q}_{\mathrm{SH}}",
                         r"\dot{m}_v\,(h_5 - h_4)",
-                        _times_diff(m_s, "mass_flow", h[4], h[3], system),
+                        times_diff(m_s, "mass_flow", h[4], h[3], system),
                         _q(sh.Q_W, "power", system),
                     ),
                     *_gas_outlet_lines(result, system, 0, 1, sh.Q_W, r"\dot{Q}_{\mathrm{SH}}"),
@@ -265,47 +339,73 @@ def _section_steps(result: HRSGResult, system: UnitSystem) -> list[ProcedureStep
         )
     ev = sections["evaporador"]
     c = result.gas_labels.index("c")
-    steps.append(
-        ProcedureStep(
-            title=f"Evaporador (gases {result.gas_labels[c - 1]} → c; agua 2 → 4)",
-            text=(
-                "El agua del economizador entra al domo, se mezcla con la saturada que circula "
-                "por el evaporador y sale como vapor saturado. Los gases se enfrían hasta "
-                "T_c = T_sat + pinch: el pinch es la menor diferencia de temperatura de la "
-                "caldera."
-            ),
-            latex=(
-                latex_chain(
-                    r"\dot{Q}_{\mathrm{EV}}",
-                    r"\dot{m}_v\,(h_4 - h_2)",
-                    _times_diff(m_s, "mass_flow", h[3], h[1], system),
-                    _q(ev.Q_W, "power", system),
-                ),
-            ),
+    ev_text = (
+        "El agua del economizador entra al domo, se mezcla con la saturada que circula por el "
+        "evaporador y sale como vapor saturado. "
+    )
+    if result.inputs.by_stack:
+        ev_text += (
+            "Los gases salen a T_c, la del balance del economizador: el pinch que resulta es la "
+            "menor diferencia de temperatura de la caldera."
         )
+    else:
+        ev_text += (
+            "Los gases se enfrían hasta T_c = T_sat + pinch: el pinch es la menor diferencia de "
+            "temperatura de la caldera."
+        )
+    ev_step = ProcedureStep(
+        title=f"Evaporador (gases {result.gas_labels[c - 1]} → c; agua 2 → 4)",
+        text=ev_text,
+        latex=(
+            latex_chain(
+                r"\dot{Q}_{\mathrm{EV}}",
+                r"\dot{m}_v\,(h_4 - h_2)",
+                times_diff(m_s, "mass_flow", h[3], h[1], system),
+                _q(ev.Q_W, "power", system),
+            ),
+        ),
     )
     eco = sections["economizador"]
-    steps.append(
-        ProcedureStep(
-            title="Economizador (gases c → d; agua 1 → 2)",
+    eco_Q = latex_chain(
+        r"\dot{Q}_{\mathrm{ECO}}",
+        r"\dot{m}_v\,(h_2 - h_1)",
+        times_diff(m_s, "mass_flow", h[1], h[0], system),
+        _q(eco.Q_W, "power", system),
+    )
+    d = len(result.T_gas_K) - 1
+    if result.inputs.by_stack:
+        eco_step = ProcedureStep(
+            title="Economizador (agua 1 → 2; gases d → c)",
             text=(
-                "El agua de alimentación se calienta hasta T_sat − approach con lo que les queda "
-                "a los gases, que salen por la chimenea a T_d:"
+                "El agua de alimentación se calienta hasta T_sat − approach. Como la chimenea es "
+                "dato, el balance da la temperatura de los gases a la entrada del economizador "
+                "(la salida del evaporador) y, con ella, el pinch:"
             ),
             latex=(
+                eco_Q,
+                *_gas_inlet_lines(result, system, c, d, eco.Q_W, r"\dot{Q}_{\mathrm{ECO}}"),
                 latex_chain(
-                    r"\dot{Q}_{\mathrm{ECO}}",
-                    r"\dot{m}_v\,(h_2 - h_1)",
-                    _times_diff(m_s, "mass_flow", h[1], h[0], system),
-                    _q(eco.Q_W, "power", system),
-                ),
-                *_gas_outlet_lines(
-                    result, system, c, len(result.T_gas_K) - 1, eco.Q_W, r"\dot{Q}_{\mathrm{ECO}}"
+                    r"\Delta T_{\mathrm{pinch}}",
+                    r"T_c - T_{\mathrm{sat}}",
+                    rf"{_n(result.T_gas_K[c], 'temperature', system)} - "
+                    rf"{_n(result.T_sat_K, 'temperature', system)}",
+                    _q(result.pinch_K, "temperature_difference", system),
                 ),
             ),
         )
+        return [*steps, eco_step, ev_step]
+    eco_step = ProcedureStep(
+        title="Economizador (gases c → d; agua 1 → 2)",
+        text=(
+            "El agua de alimentación se calienta hasta T_sat − approach con lo que les queda "
+            "a los gases, que salen por la chimenea a T_d:"
+        ),
+        latex=(
+            eco_Q,
+            *_gas_outlet_lines(result, system, c, d, eco.Q_W, r"\dot{Q}_{\mathrm{ECO}}"),
+        ),
     )
-    return steps
+    return [*steps, ev_step, eco_step]
 
 
 def _total_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:

@@ -28,17 +28,26 @@ Todo en SI. No importa Streamlit.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from functools import cache
 from typing import Any, Literal
 
-import CoolProp
 import numpy as np
 from CoolProp.CoolProp import PropsSI
-from scipy.optimize import brentq
 
 from core.fluids import FluidState, fluid_limits, fluid_state_from_pair
+
+# El modelo de gases se mudó a core.ideal_gas (Fase 3.4); se reexporta acá para
+# que la API de la Fase 3.3 no cambie.
+from core.ideal_gas import (
+    GAS_NAMES,
+    GAS_SPECIES,
+    R_U,
+    T_GAS_MAX_K,
+    FlueGas,
+    exhaust_composition,
+    molar_mass,
+)
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, unit_label
 
 __all__ = [
@@ -47,6 +56,7 @@ __all__ = [
     "HRSG_EXAMPLES",
     "HRSG_EXAMPLES_EXCESS_AIR",
     "HRSG_EXAMPLE_NOTES",
+    "R_U",
     "T_GAS_MAX_K",
     "FlueGas",
     "HRSGInputs",
@@ -68,32 +78,8 @@ __all__ = [
     "validate_hrsg_inputs",
 ]
 
-#: Componentes de los gases (fórmula → nombre de CoolProp).
-GAS_SPECIES: tuple[str, ...] = ("N2", "O2", "CO2", "H2O", "Ar")
-_COOLPROP_NAMES: dict[str, str] = {
-    "N2": "Nitrogen",
-    "O2": "Oxygen",
-    "CO2": "CarbonDioxide",
-    "H2O": "Water",
-    "Ar": "Argon",
-}
-#: Fórmulas para mostrar.
-GAS_NAMES: dict[str, str] = {"N2": "N₂", "O2": "O₂", "CO2": "CO₂", "H2O": "H₂O", "Ar": "Ar"}
-
-#: Constante universal de los gases, J/(mol·K) (vademecum §4.1).
-R_U = 8.314462618
-
-# Límite de gas ideal: cada componente a 1 Pa (desvío de la ecuación de estado < 1e-8).
-_P_IDEAL_PA = 1.0
-# Las entalpías de los gases se miden desde 25 °C (h_g = 0 ahí).
-_T_H_REF_K = 298.15
-# Rango del modelo: el agua no baja del punto triple; CoolProp llega a 2000 K.
+# Rango del modelo: el agua de alimentación no baja del punto triple del agua.
 _T_GAS_MIN_K = 273.17
-#: Temperatura máxima de los gases que acepta el modelo (1700 °C).
-T_GAS_MAX_K = 1973.15
-# Aire técnico simplificado del vademecum (§16.1): 21 % O₂ y 79 % N₂ en moles.
-_AIR_O2 = 0.21
-_AIR_N2 = 0.79
 
 Water = "Water"
 _EH: QuantityKind = "specific_enthalpy"
@@ -105,162 +91,6 @@ def _degC(T_K: float) -> str:
 
 def _bar(p_Pa: float) -> str:
     return f"{p_Pa / 1e5:.4g} bar"
-
-
-# ---------------------------------------------------------------------
-# Gases: mezcla de gases ideales (vademecum §5)
-# ---------------------------------------------------------------------
-
-
-@cache
-def molar_mass(species: str) -> float:
-    """Masa molar del componente (kg/mol)."""
-    return float(PropsSI("M", _COOLPROP_NAMES[species]))
-
-
-@cache
-def _h_reference(species: str) -> float:
-    """Entalpía de gas ideal del componente a 25 °C (la referencia de h_g)."""
-    return float(_ideal_gas(species, (_T_H_REF_K,), "h")[0])
-
-
-def _ideal_gas(species: str, temps: Sequence[float], what: Literal["h", "cp"]) -> np.ndarray:
-    """h o c_p de gas ideal (J/kg y J/(kg·K)) de un componente a varias temperaturas."""
-    state = CoolProp.AbstractState("HEOS", _COOLPROP_NAMES[species])
-    out = np.empty(len(temps))
-    for k, T in enumerate(temps):
-        state.update(CoolProp.PT_INPUTS, _P_IDEAL_PA, float(T))
-        out[k] = state.hmass() if what == "h" else state.cpmass()
-    return out
-
-
-@dataclass(frozen=True)
-class FlueGas:
-    """Gases de combustión como mezcla de gases ideales (vademecum §5).
-
-    ``y`` son las fracciones molares normalizadas, en el orden de
-    :data:`GAS_SPECIES`; ``p_Pa`` es la presión de los gases (solo cuenta
-    para el punto de rocío del vapor de agua).
-    """
-
-    y: tuple[float, ...]
-    p_Pa: float = 101_325.0
-
-    @classmethod
-    def from_fractions(
-        cls,
-        fractions: Mapping[str, float],
-        *,
-        basis: Literal["molar", "mass"] = "molar",
-        p_Pa: float = 101_325.0,
-    ) -> FlueGas:
-        """Mezcla a partir de fracciones molares o másicas (se normalizan).
-
-        Raises
-        ------
-        ValueError
-            Si hay un componente desconocido, una fracción negativa o todas son cero.
-        """
-        unknown = set(fractions) - set(GAS_SPECIES)
-        if unknown:
-            raise ValueError(
-                f"Componentes desconocidos: {sorted(unknown)}. Los gases pueden tener "
-                f"{', '.join(GAS_NAMES[s] for s in GAS_SPECIES)}."
-            )
-        values = [float(fractions.get(s, 0.0)) for s in GAS_SPECIES]
-        if any(v < 0.0 or not math.isfinite(v) for v in values):
-            raise ValueError("Las fracciones de los componentes no pueden ser negativas.")
-        if basis == "mass":  # nᵢ ∝ wᵢ / Mᵢ
-            values = [v / molar_mass(s) for v, s in zip(values, GAS_SPECIES, strict=True)]
-        total = sum(values)
-        if total <= 0.0:
-            raise ValueError(
-                "La composición de los gases está vacía: cargá al menos un componente."
-            )
-        if not (math.isfinite(p_Pa) and p_Pa > 0.0):
-            raise ValueError("La presión de los gases tiene que ser positiva.")
-        return cls(tuple(v / total for v in values), float(p_Pa))
-
-    @property
-    def mole_fractions(self) -> dict[str, float]:
-        return dict(zip(GAS_SPECIES, self.y, strict=True))
-
-    @property
-    def M_kg_per_mol(self) -> float:
-        """Masa molar de la mezcla, M = Σ yᵢ·Mᵢ."""
-        return sum(y * molar_mass(s) for s, y in zip(GAS_SPECIES, self.y, strict=True))
-
-    @property
-    def mass_fractions(self) -> dict[str, float]:
-        """wᵢ = yᵢ·Mᵢ / M."""
-        M = self.M_kg_per_mol
-        return {s: y * molar_mass(s) / M for s, y in zip(GAS_SPECIES, self.y, strict=True)}
-
-    @property
-    def R_J_per_kg_K(self) -> float:
-        """Constante particular de la mezcla, R = R_u / M."""
-        return R_U / self.M_kg_per_mol
-
-    def h_array(self, temps: Sequence[float]) -> np.ndarray:
-        """h_g(T) = Σ wᵢ·[hᵢ(T) − hᵢ(25 °C)] para varias temperaturas (J/kg)."""
-        total = np.zeros(len(temps))
-        for s, w in self.mass_fractions.items():
-            if w > 0.0:
-                total += w * (_ideal_gas(s, temps, "h") - _h_reference(s))
-        return total
-
-    def h(self, T_K: float) -> float:
-        """Entalpía de los gases (J/kg), cero a 25 °C."""
-        return float(self.h_array((T_K,))[0])
-
-    def cp(self, T_K: float) -> float:
-        """c_p de la mezcla a T (J/(kg·K)): Σ wᵢ·c_p,i(T)."""
-        return sum(
-            w * float(_ideal_gas(s, (T_K,), "cp")[0])
-            for s, w in self.mass_fractions.items()
-            if w > 0.0
-        )
-
-    def T_from_h(self, h_J_per_kg: float) -> float:
-        """La temperatura a la que los gases tienen esa entalpía (raíz de h_g(T) = h)."""
-        lo, hi = _T_GAS_MIN_K, T_GAS_MAX_K + 20.0
-        if not self.h(lo) <= h_J_per_kg <= self.h(hi):
-            raise ValueError(
-                "Los gases quedarían fuera del rango del modelo (entre el punto triple del agua "
-                f"y {_degC(hi)})."
-            )
-        return float(brentq(lambda T: self.h(T) - h_J_per_kg, lo, hi, xtol=1e-9, rtol=1e-13))
-
-    @property
-    def p_H2O_Pa(self) -> float:
-        """Presión parcial del vapor de agua (ley de Dalton, vademecum §5.3)."""
-        return self.mole_fractions["H2O"] * self.p_Pa
-
-    @property
-    def dew_point_K(self) -> float | None:
-        """Punto de rocío del vapor de agua: T_sat(p_H₂O). ``None`` sin agua (o casi)."""
-        p_w = self.p_H2O_Pa
-        if p_w <= fluid_limits(Water).P_triple_Pa:
-            return None
-        return float(PropsSI("T", "P", p_w, "Q", 1, Water))
-
-
-def exhaust_composition(excess_air: float) -> dict[str, float]:
-    """Gases de la combustión completa del metano con exceso de aire λ (fracciones molares).
-
-    Con el aire técnico simplificado del vademecum (§16.1: 21 % O₂ y 79 % N₂):
-    CH₄ + λ·a_s·(0,21 O₂ + 0,79 N₂) → CO₂ + 2 H₂O + 0,79·λ·a_s N₂ + (λ − 1)·2 O₂,
-    con a_s = 2 / 0,21 (vademecum §16.2). Una turbina de gas trabaja con λ ≈ 3.
-    """
-    if not (math.isfinite(excess_air) and excess_air >= 1.0):
-        raise ValueError(
-            f"El exceso de aire λ = {excess_air:g} tiene que ser al menos 1: con menos aire la "
-            "combustión es incompleta (vademecum §16.2)."
-        )
-    a = excess_air * 2.0 / _AIR_O2
-    moles = {"N2": _AIR_N2 * a, "O2": _AIR_O2 * a - 2.0, "CO2": 1.0, "H2O": 2.0, "Ar": 0.0}
-    total = sum(moles.values())
-    return {s: moles[s] / total for s in GAS_SPECIES}
 
 
 # ---------------------------------------------------------------------
@@ -276,6 +106,10 @@ class HRSGInputs:
     El agua y el vapor se toman a la presión de evaporación ``p_steam_Pa``
     (sin pérdidas de carga). ``T_ref_K`` es la temperatura hasta la que se
     cuenta el calor disponible en los gases (15 °C, la de las normas ISO).
+
+    Con ``T_stack_K`` la caldera se diseña por la **temperatura de
+    chimenea** (como el intercambiador de Cengel §10-9) en vez de por el
+    pinch: ``pinch_K`` no se usa y el pinch pasa a ser un resultado.
     """
 
     T_gas_in_K: float
@@ -287,10 +121,16 @@ class HRSGInputs:
     pinch_K: float = 10.0
     approach_K: float = 5.0
     T_ref_K: float = 288.15
+    T_stack_K: float | None = None
 
     @property
     def superheated(self) -> bool:
         return self.T_steam_K is not None
+
+    @property
+    def by_stack(self) -> bool:
+        """Diseño por temperatura de chimenea (el pinch es un resultado)."""
+        return self.T_stack_K is not None
 
 
 @dataclass(frozen=True)
@@ -350,6 +190,11 @@ class HRSGResult:
     def T_pinch_gas_K(self) -> float:
         """Temperatura de los gases a la salida del evaporador: T_sat + pinch."""
         return self.T_gas_K[-2]
+
+    @property
+    def pinch_K(self) -> float:
+        """Pinch: los gases a la salida del evaporador menos T_sat (dato o resultado)."""
+        return self.T_pinch_gas_K - self.T_sat_K
 
     @property
     def T_after_superheater_K(self) -> float | None:
@@ -469,7 +314,7 @@ def validate_hrsg_inputs(inputs: HRSGInputs) -> None:
             f"({_bar(lim.P_crit_Pa)}): por encima no hay evaporación ni domo. Esta página "
             "resuelve calderas subcríticas."
         )
-    if not inputs.pinch_K > 0.0:
+    if not inputs.by_stack and not inputs.pinch_K > 0.0:
         raise ValueError(
             "El pinch tiene que ser positivo: con ΔT = 0 el evaporador necesitaría un área "
             "infinita (los gases y el agua llegarían a la misma temperatura)."
@@ -489,13 +334,28 @@ def validate_hrsg_inputs(inputs: HRSGInputs) -> None:
             f"que la salida del economizador, T_sat − approach = {_degC(T_eco)} (T_sat = "
             f"{_degC(T_sat)} a {_bar(p)}): si no, no hay nada que calentar en el economizador."
         )
-    T_pinch = T_sat + inputs.pinch_K
-    if inputs.T_gas_in_K <= T_pinch:
-        raise ValueError(
-            f"Los gases entran a {_degC(inputs.T_gas_in_K)}, sin superar T_sat + pinch = "
-            f"{_degC(T_pinch)}: no alcanzan para evaporar a {_bar(p)}. Bajá la presión de "
-            "evaporación o el pinch."
-        )
+    if inputs.T_stack_K is not None:
+        if not inputs.T_feedwater_K < inputs.T_stack_K < inputs.T_gas_in_K:
+            raise ValueError(
+                f"La chimenea ({_degC(inputs.T_stack_K)}) tiene que quedar entre el agua de "
+                f"alimentación ({_degC(inputs.T_feedwater_K)}) y los gases que entran "
+                f"({_degC(inputs.T_gas_in_K)}): los gases se enfrían, pero no por debajo del "
+                "agua que calientan."
+            )
+        if inputs.T_gas_in_K <= T_sat:
+            raise ValueError(
+                f"Los gases entran a {_degC(inputs.T_gas_in_K)}, sin superar T_sat = "
+                f"{_degC(T_sat)}: no alcanzan para evaporar a {_bar(p)}. Bajá la presión de "
+                "evaporación."
+            )
+    else:
+        T_pinch = T_sat + inputs.pinch_K
+        if inputs.T_gas_in_K <= T_pinch:
+            raise ValueError(
+                f"Los gases entran a {_degC(inputs.T_gas_in_K)}, sin superar T_sat + pinch = "
+                f"{_degC(T_pinch)}: no alcanzan para evaporar a {_bar(p)}. Bajá la presión de "
+                "evaporación o el pinch."
+            )
     if inputs.T_steam_K is not None:
         if inputs.T_steam_K <= T_sat + 0.01:
             raise ValueError(
@@ -537,11 +397,17 @@ def _water_states(inputs: HRSGInputs) -> tuple[FluidState, ...]:
 def solve_hrsg(inputs: HRSGInputs) -> HRSGResult:
     """Balance de energía de la HRSG, sección por sección.
 
+    Diseño por pinch (Kehlhofer et al., 2009):
+
     1. El sobrecalentador y el evaporador juntos (de la entrada de los gases
        al pinch) dan el caudal de vapor:
        ṁ_v·(h_vapor − h_2) = ṁ_g·[h_g(T_a) − h_g(T_c)], con T_c = T_sat + pinch.
     2. El sobrecalentador da la temperatura de los gases entre secciones.
     3. El economizador da la de chimenea.
+
+    Diseño por temperatura de chimenea (Cengel §10-9): el balance de toda la
+    caldera da el caudal, ṁ_v·(h_vapor − h_1) = ṁ_g·[h_g(T_a) − h_g(T_d)]; el
+    economizador da T_c y el pinch, T_c − T_sat, es un resultado.
 
     Raises
     ------
@@ -555,31 +421,44 @@ def solve_hrsg(inputs: HRSGInputs) -> HRSGResult:
     h = [s.h_J_per_kg for s in water]
     T_sat = water[2].T_K
     T_a = inputs.T_gas_in_K
-    T_c = T_sat + inputs.pinch_K
-    h_a, h_c = gas.h(T_a), gas.h(T_c)
-    m_s = m_g * (h_a - h_c) / (h[-1] - h[1])
+    h_a = gas.h(T_a)
+    if inputs.T_stack_K is None:
+        T_c = T_sat + inputs.pinch_K
+        h_c = gas.h(T_c)
+        m_s = m_g * (h_a - h_c) / (h[-1] - h[1])
+        h_d = h_c - m_s * (h[1] - h[0]) / m_g
+        try:
+            T_d = gas.T_from_h(h_d)
+        except ValueError:
+            T_d = -math.inf
+        if T_d <= inputs.T_feedwater_K:
+            raise ValueError(
+                "Con ese pinch el economizador tendría un cruce de temperaturas: los gases "
+                "tendrían que salir más fríos que el agua de alimentación "
+                f"({_degC(inputs.T_feedwater_K)}) para calentar todo el vapor que se produce. "
+                "Subí el pinch (menos vapor) o la temperatura del agua de alimentación."
+            )
+    else:
+        T_d = inputs.T_stack_K
+        h_d = gas.h(T_d)
+        m_s = m_g * (h_a - h_d) / (h[-1] - h[0])
+        h_c = h_d + m_s * (h[1] - h[0]) / m_g
+        T_c = gas.T_from_h(h_c)
+        if T_c <= T_sat:
+            raise ValueError(
+                f"Con la chimenea a {_degC(T_d)} hay un cruce de temperaturas: el agua tendría "
+                f"que empezar a hervir ({_degC(T_sat)}) con los gases a {_degC(T_c)}, más fríos "
+                "que ella. Subí la temperatura de chimenea (menos vapor) o bajá la presión de "
+                "evaporación."
+            )
     temps = [T_a]
     enthalpies = [h_a]
     if inputs.superheated:
         h_b = h_a - m_s * (h[4] - h[3]) / m_g
         temps.append(gas.T_from_h(h_b))
         enthalpies.append(h_b)
-    temps.append(T_c)
-    enthalpies.append(h_c)
-    h_d = h_c - m_s * (h[1] - h[0]) / m_g
-    try:
-        T_d = gas.T_from_h(h_d)
-    except ValueError:
-        T_d = -math.inf
-    if T_d <= inputs.T_feedwater_K:
-        raise ValueError(
-            "Con ese pinch el economizador tendría un cruce de temperaturas: los gases "
-            "tendrían que salir más fríos que el agua de alimentación "
-            f"({_degC(inputs.T_feedwater_K)}) para calentar todo el vapor que se produce. Subí "
-            "el pinch (menos vapor) o la temperatura del agua de alimentación."
-        )
-    temps.append(T_d)
-    enthalpies.append(h_d)
+    temps += [T_c, T_d]
+    enthalpies += [h_c, h_d]
     result = HRSGResult(
         inputs=inputs,
         water=water,
@@ -686,20 +565,27 @@ def hrsg_notes(result: HRSGResult) -> list[str]:
     """Observaciones didácticas sobre la caldera calculada (markdown)."""
     notes: list[str] = []
     inputs = result.inputs
+    pinch = result.pinch_K
     sections = {s.name: s for s in result.sections}
+    if inputs.by_stack and pinch < 5.0:
+        notes.append(
+            f"Con la chimenea a {_degC(result.T_stack_K)} el pinch queda en {pinch:.3g} K: los "
+            "gases salen del evaporador casi a la temperatura del agua que hierve, y el "
+            "evaporador necesitaría muchísima área. Se diseña con unos 5 a 15 K."
+        )
     eco = sections["economizador"]
-    if eco.dT_cold_K < inputs.pinch_K:
+    if eco.dT_cold_K < pinch:
         notes.append(
             f"En la chimenea los gases quedan solo {eco.dT_cold_K:.3g} K por encima del agua de "
-            f"alimentación, menos que el pinch ({inputs.pinch_K:.3g} K): ahí está la menor "
+            f"alimentación, menos que el pinch ({pinch:.3g} K): ahí está la menor "
             "diferencia de temperatura de toda la caldera, y el economizador necesita mucha "
             "área."
         )
     sh = sections.get("sobrecalentador")
-    if sh is not None and sh.dT_hot_K < inputs.pinch_K:
+    if sh is not None and sh.dT_hot_K < pinch:
         notes.append(
             f"En el extremo caliente del sobrecalentador los gases quedan solo {sh.dT_hot_K:.3g} K "
-            f"por encima del vapor, menos que el pinch ({inputs.pinch_K:.3g} K): bajá la "
+            f"por encima del vapor, menos que el pinch ({pinch:.3g} K): bajá la "
             "temperatura del vapor o el sobrecalentador va a ser muy grande."
         )
     dew = result.dew_point_K
@@ -898,7 +784,17 @@ def hrsg_to_dict(result: HRSGResult, system: UnitSystem) -> dict[str, Any]:
                 if inputs.T_steam_K is None
                 else _value(inputs.T_steam_K, "temperature", system)
             ),
-            "pinch": _value(inputs.pinch_K, "temperature_difference", system),
+            "diseno": "temperatura de chimenea" if inputs.by_stack else "pinch",
+            "pinch": (
+                None
+                if inputs.by_stack
+                else _value(inputs.pinch_K, "temperature_difference", system)
+            ),
+            "T_chimenea": (
+                None
+                if inputs.T_stack_K is None
+                else _value(inputs.T_stack_K, "temperature", system)
+            ),
             "approach": _value(inputs.approach_K, "temperature_difference", system),
         },
         "gases": {
@@ -918,6 +814,7 @@ def hrsg_to_dict(result: HRSGResult, system: UnitSystem) -> dict[str, Any]:
         "resultados": {
             "caudal_vapor": _value(result.m_steam_kg_s, "mass_flow", system),
             "T_saturacion": _value(result.T_sat_K, "temperature", system),
+            "pinch": _value(result.pinch_K, "temperature_difference", system),
             "T_chimenea": _value(result.T_stack_K, "temperature", system),
             "calor_total": _value(result.Q_W, "power", system),
             "aprovechamiento": result.recovery,
