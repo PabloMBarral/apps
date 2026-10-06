@@ -610,7 +610,7 @@ def test_segments_overlays_draw_bleeds_as_isobars_and_valves_at_constant_h() -> 
     overlays = segments_overlays(diagram, spec, pairs)
     assert [o.name for o in overlays] == [
         "procesos a p o s constante",
-        "válvulas (h constante)",
+        "estrangulamiento (h constante)",
     ]
     assert all(np.isfinite(o.coords_si["s"]).any() for o in overlays)
     # 5 → 7: la extracción condensa a p constante; 7 → 8: la válvula del drenaje

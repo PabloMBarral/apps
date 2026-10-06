@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.13.0"
+PAGE_VERSION = "0.14.0"
 
 
 def _home_page() -> None:
@@ -52,7 +52,8 @@ def _home_page() -> None:
         ### Módulos disponibles
 
         - 💧 **Propiedades** — estado termodinámico del agua y otros
-          fluidos puros (R134a, R410A, R1234yf, amoníaco, CO₂, aire) a
+          fluidos (refrigerantes como R-134a, R-410A, R-32, amoníaco, CO₂,
+          propano o isobutano, aire y fluidos de ORC) a
           partir de cualquier par de propiedades independientes (T-p, p-x,
           T-x, p-h, p-s, T-s, h-s, T-v, p-v, p-u). Región, todas las
           propiedades (incluidas las de transporte), tablas de saturación,
@@ -80,7 +81,14 @@ def _home_page() -> None:
           extracción, ciclo sobre el diagrama, procedimiento con las tablas,
           agua de enfriamiento y barridos para ver cómo mejora el
           rendimiento (ejemplos de Cengel cap. 10).
-        - 📈 **Diagramas** — Propiedades, Isoentrópicos y Rankine incluyen
+        - ❄️ **Refrigeración** — ciclo de compresión de vapor simple, de
+          dos etapas con cámara de evaporación instantánea o en cascada
+          (con uno o dos refrigerantes), ideal o real, como refrigerador o
+          bomba de calor: COP, estados, ciclo sobre el diagrama log p–h,
+          procedimiento con las tablas, exergía destruida en cada
+          componente y barridos (ejemplos de Cengel cap. 11).
+        - 📈 **Diagramas** — Propiedades, Isoentrópicos, Rankine y
+          Refrigeración incluyen
           gráficos interactivos con isolíneas (log p–h, T–s, h–s,
           p–log v) y overlay del estado / proceso calculado, vía
           [fluprodia](https://github.com/fwitte/fluprodia).
@@ -92,8 +100,8 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Ciclos de refrigeración, Brayton y combinado, psicrometría,
-        combustión, exergía. Ver el
+        Caldera de recuperación (HRSG), ciclos Brayton y combinado,
+        psicrometría, combustión, exergía. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -106,8 +114,9 @@ def _home_page() -> None:
         (K, Pa, J/kg, J/(kg·K)), **Técnico** (°C, bar, kJ/kg, kJ/(kg·K))
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
-        Propiedades e Isoentrópicos. Interpolación respeta las unidades
-        del CSV original; ISO 6976 usa las unidades de la norma.
+        Propiedades, Isoentrópicos, Rankine y Refrigeración.
+        Interpolación respeta las unidades del CSV original; ISO 6976 usa
+        las unidades de la norma.
         """
     )
 
@@ -122,6 +131,7 @@ pages = [
     st.Page("app_pages/3_Isoentropicos.py", title="Isoentrópicos", icon="⚙️"),
     st.Page("app_pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
     st.Page("app_pages/5_Rankine.py", title="Rankine", icon="♨️"),
+    st.Page("app_pages/6_Refrigeracion.py", title="Refrigeración", icon="❄️"),
 ]
 pg = st.navigation(pages)
 pg.run()

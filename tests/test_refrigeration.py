@@ -576,4 +576,4 @@ def test_diagram_segments_of_the_flash_cycle(solved) -> None:
             diagram, spec, [(points[a], points[b]) for a, b in r.layout.segments]
         )
     ]
-    assert names == ["procesos a p o s constante", "válvulas (h constante)"]
+    assert names == ["procesos a p o s constante", "estrangulamiento (h constante)"]

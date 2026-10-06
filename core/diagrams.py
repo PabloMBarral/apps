@@ -831,7 +831,7 @@ def segments_overlays(
     if throttling:
         overlays.append(
             ProcessOverlay(
-                name="válvulas (h constante)",
+                name="estrangulamiento (h constante)",
                 color="#444444",
                 dash="dash",
                 coords_si=_join_with_gaps(throttling),

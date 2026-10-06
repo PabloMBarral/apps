@@ -65,7 +65,7 @@ from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_c
 from ui.diagrams import DiagramPoint, diagram_type_selector, get_diagram, render_diagram_plotly
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.13.0"
+PAGE_VERSION = "0.14.0"
 FLUID = "Water"
 
 _EXAMPLES = list(RANKINE_EXAMPLES)
@@ -790,7 +790,7 @@ def _render_metrics(
         + (" q_pérd: calor que pierden las cañerías." if extras.startswith(" · q_pérd") else "")
         + (" q_rec: calor interno del recuperador." if result.has_recuperator else "")
     )
-    for note in rankine_notes(result):
+    for note in rankine_notes(result, system):
         st.info(note)
 
 
@@ -943,8 +943,10 @@ def _cycle_diagram(result: RankineResult, system: UnitSystem) -> None:
             + ". En el ciclo ideal, bombas y "
             "turbina son isoentrópicas (verticales en T–s); en el real, la recta punteada que "
             "une la entrada y la salida es solo una referencia, y la verde es la expansión "
-            "isoentrópica con la que se compara η_T. Las válvulas de los drenajes también son "
-            "rectas de referencia (h constante), como las cañerías con pérdidas del ciclo real."
+            "isoentrópica con la que se compara η_T. Las válvulas de los drenajes (y una "
+            "cañería que pierde presión sin perder calor) se dibujan rayadas sobre su línea de h "
+            "constante: el estrangulamiento es irreversible y sus estados intermedios no son de "
+            "equilibrio."
             + (
                 " El recuperador aparece dos veces: el escape que se enfría y el líquido que se "
                 "calienta, cada uno sobre su isobara."
