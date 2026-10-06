@@ -83,7 +83,7 @@ from core.fluids import (
     saturation_at_pressure,
     saturation_at_temperature,
 )
-from core.state_report import states_table
+from core.state_report import states_table, textbook_reference_note
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, unit_label
 
 # ``rankine_steps`` y ``cooling_water_step`` viven en
@@ -1660,8 +1660,9 @@ def fluid_behavior(fluid: str) -> FluidBehaviorInfo:
     return FluidBehaviorInfo(behavior, float(xi), float(xi_star), float(T))
 
 
-def rankine_notes(result: RankineResult) -> list[str]:
-    """Observaciones didácticas sobre el ciclo calculado (markdown)."""
+def rankine_notes(result: RankineResult, system: UnitSystem = "Técnico") -> list[str]:
+    """Observaciones didácticas sobre el ciclo calculado (markdown), con los
+    valores en ``system``."""
     notes: list[str] = []
     fluid = result.inputs.fluid
     x = result.x_turbine_out
@@ -1722,6 +1723,9 @@ def rankine_notes(result: RankineResult) -> list[str]:
                 "saturación."
             )
         notes.append(text + " (Chen, Goswami y Stefanakos, 2010.)")
+    reference = textbook_reference_note(fluid, system)
+    if reference is not None:  # R-134a: las tablas de Cengel usan otra referencia
+        notes.append(reference)
     return notes
 
 

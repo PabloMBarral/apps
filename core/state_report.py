@@ -48,6 +48,7 @@ from core.fluids import (
     PairCode,
     SaturatedPhase,
     SaturationProperties,
+    textbook_reference_offset,
 )
 from core.latex import latex_chain, latex_number, latex_paren, latex_unit
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, convert_to_si, unit_label
@@ -370,6 +371,27 @@ class StateNote:
 _SATURATION_MARGIN_K = 0.5
 
 
+def textbook_reference_note(fluid: str, system: UnitSystem) -> str | None:
+    """Aclaración para comparar con las tablas de Cengel cuando usan otra referencia.
+
+    Las del R-134a (A-11 a A-13) toman h = s = 0 para el líquido saturado a
+    −40 °C (ASHRAE); CoolProp usa la referencia del IIR. ``None`` si el fluido
+    no lo necesita (el agua usa la misma referencia en las dos).
+    """
+    offset = textbook_reference_offset(fluid)
+    if offset is None:
+        return None
+    dh, ds = offset
+    name = FLUID_NAMES_ES.get(fluid, fluid)
+    return (
+        f"Las tablas de Cengel del {name} (A-11 a A-13) toman h = s = 0 para el líquido "
+        "saturado a −40 °C; CoolProp usa la referencia del IIR (h = 200 kJ/kg y "
+        "s = 1 kJ/(kg·K) para el líquido saturado a 0 °C). Por eso h y u salen "
+        f"{_fmt(dh, 'specific_enthalpy', system)} y s {_fmt(ds, 'specific_entropy', system)} "
+        "más altas que en el libro. Las diferencias —calores, trabajos, COP— son las mismas."
+    )
+
+
 def state_notes(state: FluidState, pair: PairCode, system: UnitSystem) -> list[StateNote]:
     """Advertencias y observaciones didácticas sobre el estado calculado."""
     notes: list[StateNote] = []
@@ -481,6 +503,9 @@ def state_notes(state: FluidState, pair: PairCode, system: UnitSystem) -> list[S
                 "puede solidificarse y CoolProp ya no lo modela.",
             )
         )
+    reference = textbook_reference_note(state.fluid, system)
+    if reference is not None:
+        notes.append(StateNote("info", reference))
     return notes
 
 

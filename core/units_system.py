@@ -71,6 +71,7 @@ QuantityKind = Literal[
     "diffusivity",
     "mass_flow",
     "power",
+    "volume_flow",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -179,6 +180,13 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "W"),
         "Técnico": (1.0e-3, 0.0, "kW"),
         "Inglés": (1.0 / _BTU_IT_J, 0.0, "Btu/s"),
+    },
+    # Fase 3.2 (refrigeración): caudal volumétrico en la aspiración del compresor.
+    # Coherente con el caudal másico: kg/s · m³/kg = m³/s y lb/s · ft³/lb = ft³/s.
+    "volume_flow": {
+        "SI": (1.0, 0.0, "m³/s"),
+        "Técnico": (1.0, 0.0, "m³/s"),
+        "Inglés": (1.0 / _FT_PER_M**3, 0.0, "ft³/s"),
     },
 }
 

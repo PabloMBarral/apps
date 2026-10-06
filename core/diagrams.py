@@ -132,6 +132,11 @@ DEFAULT_RANGES: dict[str, FluidRange] = {
     "R1233zd(E)": FluidRange(T_K_min=233.15, T_K_max=443.15, p_Pa_min=1.0e4, p_Pa_max=4.0e6),
     "Isopentane": FluidRange(T_K_min=223.15, T_K_max=498.15, p_Pa_min=1.0e4, p_Pa_max=4.0e6),
     "Toluene": FluidRange(T_K_min=273.15, T_K_max=673.15, p_Pa_min=1.0e3, p_Pa_max=5.0e6),
+    # Refrigerantes de la Fase 3.2: de la evaporación de un congelador (−50 °C)
+    # a la descarga de un compresor, un poco por encima de la presión crítica.
+    "R32": FluidRange(T_K_min=223.15, T_K_max=423.15, p_Pa_min=1.0e4, p_Pa_max=6.0e6),
+    "Propane": FluidRange(T_K_min=223.15, T_K_max=423.15, p_Pa_min=1.0e4, p_Pa_max=5.0e6),
+    "IsoButane": FluidRange(T_K_min=223.15, T_K_max=448.15, p_Pa_min=1.0e4, p_Pa_max=4.0e6),
 }
 
 
@@ -632,7 +637,7 @@ def linear_segment_overlay(
     )
 
 
-SegmentKind = Literal["isobaric", "isentropic", "straight"]
+SegmentKind = Literal["isobaric", "isentropic", "isenthalpic", "straight"]
 
 # Tolerancia relativa para considerar que dos estados comparten p o s.
 _SAME_PROPERTY_RTOL = 1e-4
@@ -680,6 +685,31 @@ def _friction_coords(
     }
 
 
+def _isenthalpic_coords(
+    spec: DiagramSpec, start: StatePoint, end: StatePoint, n: int = 40
+) -> dict[str, np.ndarray]:
+    """Estrangulamiento en una válvula: h constante entre las dos presiones.
+
+    No es un proceso cuasiestático (los estados intermedios no son de
+    equilibrio), así que se dibuja punteado; pero la curva de h constante
+    muestra dónde quedan los estados de entrada y salida mejor que una recta
+    (en T–s baja dentro de la campana; en log p–h es vertical; Cengel §11-3).
+    """
+    ps = np.geomspace(start.P_Pa, end.P_Pa, n)
+    h = start.h_J_per_kg
+    points = [state_from_pair(spec.fluid, "PH", p=float(p), h=h) for p in ps]
+    return {
+        "p": ps,
+        "T": np.array([pt.T_K for pt in points], dtype=float),
+        "h": np.full(n, h, dtype=float),
+        "s": np.array([pt.s_J_per_kg_K for pt in points], dtype=float),
+        "vol": np.array(
+            [np.nan if pt.v_m3_per_kg is None else pt.v_m3_per_kg for pt in points], dtype=float
+        ),
+        "Q": np.array([pt.x for pt in points], dtype=float),
+    }
+
+
 def segment_between(
     diagram: FluidPropertyDiagram,
     spec: DiagramSpec,
@@ -691,13 +721,16 @@ def segment_between(
     - Misma presión → isobárica real (caldera, condensador, evaporador).
     - Misma entropía → isoentrópica real (bomba, turbina o compresor
       ideales).
+    - Misma entalpía y distinta presión → estrangulamiento en una válvula:
+      la curva de h constante (punteada, porque el proceso es irreversible y
+      sus estados intermedios no son de equilibrio).
     - Presión apenas distinta (intercambiador o cañería con fricción, ciclo
       real de Cengel §10-5) → casi isobárica: la presión baja de a poco
       mientras cambia la entalpía.
     - Si no, o si fluprodia no puede trazarla → segmento recto, que es
-      **solo una referencia visual** (p. ej. una turbina real o una válvula
-      de expansión no son procesos cuasiestáticos con una trayectoria
-      definida en el diagrama).
+      **solo una referencia visual** (p. ej. una turbina o un compresor
+      reales no son procesos cuasiestáticos con una trayectoria definida en
+      el diagrama).
     """
     if _shares(start.P_Pa, end.P_Pa, scale=1.0) and not _shares(
         start.h_J_per_kg, end.h_J_per_kg, scale=1.0e3
@@ -725,6 +758,13 @@ def segment_between(
                 p_end_Pa=end.P_Pa,
             )
             return "isentropic", coords
+        except Exception:
+            pass
+    if _shares(start.h_J_per_kg, end.h_J_per_kg, scale=1.0e3) and not _shares(
+        start.P_Pa, end.P_Pa, scale=1.0
+    ):
+        try:
+            return "isenthalpic", _isenthalpic_coords(spec, start, end)
         except Exception:
             pass
     ratio = start.P_Pa / end.P_Pa
@@ -761,16 +801,23 @@ def segments_overlays(
     """Overlays para unir pares de estados: cada proceso de un ciclo, con ramas.
 
     Sirve para ciclos que no son un solo lazo (extracciones, drenajes y
-    mezclas de un Rankine regenerativo). Devuelve hasta dos curvas: los
-    tramos isobáricos/isoentrópicos reales (línea llena) y las uniones
-    rectas de referencia (punteada), p. ej. una válvula o una turbina real.
-    Ver :func:`segment_between`.
+    mezclas de un Rankine regenerativo; cámara o cascada de un ciclo de
+    refrigeración). Devuelve hasta tres curvas: los tramos isobáricos e
+    isoentrópicos reales (línea llena), las válvulas sobre su línea de h
+    constante (rayada) y las uniones rectas de referencia (punteada), p. ej.
+    una turbina o un compresor reales. Ver :func:`segment_between`.
     """
     real: list[dict[str, np.ndarray]] = []
+    throttling: list[dict[str, np.ndarray]] = []
     straight: list[dict[str, np.ndarray]] = []
     for start, end in segments:
         kind, coords = segment_between(diagram, spec, start, end)
-        (straight if kind == "straight" else real).append(coords)
+        if kind == "straight":
+            straight.append(coords)
+        elif kind == "isenthalpic":
+            throttling.append(coords)
+        else:
+            real.append(coords)
     overlays: list[ProcessOverlay] = []
     if real:
         overlays.append(
@@ -779,6 +826,15 @@ def segments_overlays(
                 color="#444444",
                 dash="solid",
                 coords_si=_join_with_gaps(real),
+            )
+        )
+    if throttling:
+        overlays.append(
+            ProcessOverlay(
+                name="válvulas (h constante)",
+                color="#444444",
+                dash="dash",
+                coords_si=_join_with_gaps(throttling),
             )
         )
     if straight:
