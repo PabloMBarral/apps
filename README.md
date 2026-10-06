@@ -167,14 +167,38 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   punto triple, cámara sin vapor, cascada con el calor al revés, fuentes
   incompatibles con el refrigerante…). Fórmulas del vademecum (§3.3, §9.3,
   §10.4, §11, §12) y descarga CSV/JSON. _Fase 3.2 cerrada._
+- ✅ **Caldera de recuperación (HRSG) de una presión**: arma el **diagrama
+  T–Q** a partir de los gases que entran (temperatura, caudal y
+  composición en fracción molar o másica con N₂, O₂, CO₂, H₂O y Ar, o el
+  escape de una turbina de gas a metano con exceso de aire λ), la presión
+  de evaporación, la temperatura del agua de alimentación, el **pinch**, el
+  **approach** y la temperatura del vapor sobrecalentado, o con **vapor
+  saturado** (sin sobrecalentador). Balance de energía sección por sección
+  (Kehlhofer et al., *Combined-Cycle Gas & Steam Turbine Power Plants*,
+  2009): los gases como mezcla de gases ideales (vademecum §5; la entalpía
+  de cada componente, del gas ideal de CoolProp) y el agua con IAPWS-95.
+  Muestra el caudal de vapor, el calor de cada sección, las temperaturas
+  de los gases entre secciones y de chimenea, el aprovechamiento (contra
+  15 °C), el punto de rocío de los gases, las tablas de secciones y de
+  estados, y la comparación entre vapor saturado y sobrecalentado. El
+  diagrama marca el pinch y el approach (el escalón del domo); el
+  **procedimiento** hace los balances a mano; los barridos muestran cómo
+  cambian el vapor y la chimenea con el pinch, el approach, la presión, la
+  temperatura del vapor, la del agua de alimentación y la de los gases.
+  Una red de TESPy (`HeatExchanger` en serie, como su tutorial de turbina
+  de gas) da lo mismo al 0,02 % en los tests. Validación con mensajes en
+  castellano (cruce de temperaturas, chimenea bajo el punto de rocío,
+  gases que no alcanzan para evaporar, presión supercrítica…). Fórmulas
+  del vademecum (§3.3, §4.8, §5, §12, §13, §16) y descarga CSV/JSON.
+  _Fase 3.3 cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
 igualdad por renglón) para que entren en el ancho de la pantalla.
 
 ### En desarrollo (roadmap)
-- **Caldera de recuperación (HRSG)** de una presión: diagrama T–Q con
-  pinch y approach, para vapor sobrecalentado o saturado.
+- **HRSG de dos y tres presiones**, con recalentamiento y quemadores
+  suplementarios.
 - **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
   Brayton (simple, con regeneración, intercooling, recalentamiento),
   ciclo combinado, cogeneración.
@@ -236,7 +260,9 @@ apps/
 │   │   ├── rankine_layout.py     # topología y numeración de estados (sin TESPy)
 │   │   ├── rankine_procedure.py  # procedimiento «como con las tablas»
 │   │   ├── refrigeration.py      # refrigeración simple, con cámara y en cascada (TESPy)
-│   │   └── refrigeration_procedure.py  # su procedimiento, con la exergía destruida
+│   │   ├── refrigeration_procedure.py  # su procedimiento, con la exergía destruida
+│   │   ├── hrsg.py               # HRSG de una presión: balances, diagrama T–Q, gases
+│   │   └── hrsg_procedure.py     # su procedimiento «a mano»
 │   └── plots.py
 ├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
@@ -254,7 +280,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.14.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.15.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---

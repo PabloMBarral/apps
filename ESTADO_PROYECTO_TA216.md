@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.14.0` — Fase 3.2 cerrada (2026-10-06).
+> **Versión actual**: `0.15.0` — Fase 3.3 cerrada (2026-10-06).
 
 ---
 
@@ -502,6 +502,78 @@
     11-1, 11-3, 11-4, 11-5, la bomba de calor y la cascada CO₂/NH₃.
 - **Dependencias**: ninguna nueva.
 
+### Fase 3.3 — Caldera de recuperación (HRSG) de una presión
+- **Versión**: `0.15.0` (2026-10-06). Rama `claude/water-state-analyzer-f4fiev`
+  (pedido del autor: «el diagrama T–Q de una HRSG de una presión […] y lo
+  mismo si producís vapor saturado»).
+- **Scope**:
+  - **`core/cycles/hrsg.py`** (sin TESPy): `FlueGas`, mezcla de gases
+    ideales con N₂, O₂, CO₂, H₂O y Ar en fracción molar o másica
+    (vademecum §5: M, wᵢ, R, h_g(T) desde 25 °C con la h de gas ideal de
+    CoolProp, T(h), presión parcial y punto de rocío);
+    `exhaust_composition(λ)`, los gases del metano con el aire técnico del
+    vademecum (§16.1–§16.2); `HRSGInputs` / `solve_hrsg` / `HRSGResult`, con
+    el balance de energía sección por sección de Kehlhofer et al. (2009):
+    pinch a la salida de gases del evaporador, approach a la salida del
+    economizador, caudal de vapor del tramo entre la entrada de los gases
+    y el pinch, T de los gases tras el sobrecalentador y de chimenea, calor
+    de cada sección, aprovechamiento contra 15 °C y c_p medio.
+  - **Diagrama T–Q** (`hrsg_tq_profile`): curva de los gases (no recta: c_p
+    crece con T) y del agua con el escalón del domo, de modo que el mínimo
+    ΔT es el pinch; límites de las secciones.
+  - **Vapor sobrecalentado o saturado** (sin sobrecalentador), con la
+    comparación entre las dos opciones (`other_steam_option`: el
+    sobrecalentado a 25 K bajo los gases, hasta 565 °C).
+  - **`core/cycles/hrsg_procedure.py`**: composición, entalpía de los
+    gases, estados del agua (A-5, A-6, A-7 y h_f(T)), caudal de vapor
+    (Q̇ arriba del pinch), cada sección con la T de los gases que sale,
+    calor total y aprovechamiento, y punto de rocío.
+  - **Página `/HRSG`** (`app_pages/10_HRSG.py`, 🏭): gases (T, caudal,
+    composición con λ o cargada, presión), agua y vapor, pinch y approach;
+    se recalcula sola. Métricas, diagrama T–Q (plotly) con el pinch y el
+    approach señalados, tablas de secciones (ΔT de cada extremo) y de
+    estados del agua y de los gases, comparación saturado/sobrecalentado,
+    procedimiento, export y barridos (ṁ_v y chimenea contra pinch,
+    approach, presión, T del vapor, T del agua de alimentación y T de los
+    gases, con la explicación de cada compromiso).
+  - **Ejemplos**: escape típico de una turbina de gas a gas natural (600 °C,
+    100 kg/s; vapor a 60 bar y 540 °C), vapor saturado para proceso
+    (gases de metano con λ = 3 a 500 °C; 10 bar) y pinch chico (5 K).
+- **Validación**:
+  - Cálculo a mano independiente en los tests (PropsSI + brentq): igual a
+    10⁻⁹.
+  - **TESPy** como control cruzado (`HeatExchanger` en serie, gases como
+    mezcla, como su tutorial de turbina de gas): ṁ_v, T tras el
+    sobrecalentador y chimenea al 0,02 % con vapor sobrecalentado y
+    saturado (turbina de gas: 15,385 kg/s, 503,55 °C y 153,05 °C; TESPy
+    15,387 kg/s, 503,55 °C y 153,08 °C).
+  - Balances de cada sección, mínimo del perfil igual al pinch, saturado
+    contra sobrecalentado (más vapor y chimenea más fría), pinch chico
+    contra grande.
+- **Mensajes al alumno**: caudal o presión fuera de rango (supercrítica:
+  sin domo), pinch no positivo, approach negativo, agua de alimentación
+  más caliente que la salida del economizador, gases que no alcanzan
+  T_sat + pinch, vapor más frío que la saturación o más caliente que los
+  gases, cruce de temperaturas en el economizador o dentro de la caldera,
+  chimenea bajo el punto de rocío, composición vacía o negativa. Notas:
+  agua de alimentación bajo el punto de rocío, extremos con ΔT menor que
+  el pinch, approach 0.
+- **Tests**: de 1967 a 2038 (+71), sin warnings de pytest.
+  - `tests/test_hrsg.py` (49): composición contra CoolProp, preset con λ,
+    rocío, ejemplos a mano y con TESPy, balances, perfil T–Q, 11
+    validaciones, notas, barridos, comparación, export y procedimiento.
+  - `tests/test_page_hrsg.py` (21, AppTest): ejemplos, vapor saturado,
+    λ, fracciones másicas (y el cambio de base, que conserva la
+    composición cargada), normalización, errores, notas, unidades, teoría
+    y barridos; la navegación recorre la página nueva.
+  - LaTeX: validan con KaTeX estricto las 726 expresiones distintas
+    (13 casos × 3 sistemas y la teoría); ninguna supera el ancho de un
+    celular (máx. 304 px en SI y Técnico, 293 px en Inglés).
+  - Smoke test en Chromium a 1280 y 390 px por link directo: los tres
+    ejemplos y la turbina de gas con vapor saturado, con el procedimiento
+    y la teoría abiertos; sin ecuaciones con scroll ni desborde.
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
@@ -521,9 +593,10 @@
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
-- **Fase 3.3** — Caldera de recuperación (HRSG) de una presión: diagrama
-  T–Q con pinch y approach, para vapor sobrecalentado o saturado (pedido
-  del autor, en curso).
+- **HRSG (continuación)**: dos y tres presiones, recalentamiento,
+  quemadores suplementarios, pérdidas de carga y purga, diseño de las
+  superficies (UA, NTU), condensación ácida, y el ciclo combinado completo
+  sobre esta base y la del Rankine.
 - **Fase 3.x** — Brayton; ciclo combinado; exergía de los ciclos de
   potencia. Evaluar `tespy.tools.get_plotting_data` para los diagramas
   (hoy el ciclo se dibuja con `core.diagrams.segments_overlays`).

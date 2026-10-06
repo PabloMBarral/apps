@@ -62,6 +62,10 @@ apps/
 │   ├── 8_Combustion.py
 │   ├── 9_Poder_Calorifico.py
 │   ├── 4_ISO6976.py           # ✅ Fase 2.3 (matriz identidad; teoría y export 1.7)
+│   ├── 10_HRSG.py             # ✅ Fase 3.3 — HRSG de una presión: diagrama T–Q
+│   │                          # (plotly) con vapor sobrecalentado o saturado,
+│   │                          # composición con λ o cargada, secciones, estados,
+│   │                          # comparación saturado/sobrecalentado, barridos.
 │   ├── 11_Exergia.py
 │   └── 99_Acerca.py           # Créditos, licencias, citas
 ├── core/                      # Lógica pura, sin dependencia de Streamlit
@@ -141,6 +145,14 @@ apps/
 │   │   ├── refrigeration_procedure.py # ✅ Fase 3.2 — refrigeration_steps (reexportado):
 │   │   │                      # estados, cámara, mezcla, cascada, COP, Carnot,
 │   │   │                      # potencias y exergía destruida por componente.
+│   │   ├── hrsg.py            # ✅ Fase 3.3 — FlueGas (mezcla de gases ideales:
+│   │   │                      # M, w, R, h_g(T), T(h), rocío), exhaust_composition(λ),
+│   │   │                      # HRSGInputs / solve_hrsg / HRSGResult (balances por
+│   │   │                      # sección), hrsg_tq_profile, notas, ejemplos,
+│   │   │                      # other_steam_option, barridos y hrsg_to_dict. Sin TESPy.
+│   │   ├── hrsg_procedure.py  # ✅ Fase 3.3 — hrsg_steps: composición, entalpía de
+│   │   │                      # los gases, agua, caudal de vapor, secciones, total
+│   │   │                      # y aprovechamiento, punto de rocío.
 │   │   ├── brayton.py
 │   │   └── combined.py
 │   └── plots.py               # fluprodia + matplotlib helpers
@@ -406,6 +418,42 @@ Notas de la Fase 3.2 (refrigeración por compresión de vapor):
   de leer el texto.
 - Regresión: el snapshot de la 0.13.0 (29 casos) queda idéntico salvo la
   nota del R-134a en el ORC.
+
+Notas de la Fase 3.3 (HRSG de una presión):
+
+- Cálculo directo en `core/cycles/hrsg.py` (los balances que se hacen a
+  mano, sin TESPy: rápido y transparente). TESPy es el control cruzado en
+  los tests: `HeatExchanger` en serie con los gases como mezcla (como su
+  tutorial de turbina de gas); coincide al 0,02 % (TESPy evalúa cada
+  componente a su presión parcial). Sirve de base para el ciclo combinado.
+- Gases = mezcla de gases ideales: la h de cada componente sale de CoolProp
+  a 1 Pa (`AbstractState`, ~16 µs por punto; `PropsSI` es 8 veces más
+  lento), todos a la misma presión, con h_g = 0 a 25 °C. Con la presión
+  parcial el H₂O cae en la campana a temperaturas bajas. `T_from_h` busca
+  entre el punto triple del agua y 1720 °C.
+- Diseño (Kehlhofer et al., 2009): los gases salen del evaporador a
+  T_sat + pinch y el agua del economizador a T_sat − approach. El caudal
+  de vapor sale del tramo entre la entrada de los gases y el pinch; el
+  economizador fija la chimenea (por eso T_alim no cambia ṁ_v).
+- Diagrama T–Q con la convención del domo: el agua sube vertical de
+  T_sat − approach a T_sat al entrar al evaporador, y los tubos del
+  evaporador ven agua a T_sat (su ΔT frío es el pinch). Así el mínimo ΔT
+  del perfil es exactamente el pinch (test).
+- Errores al alumno: cruce de temperaturas en el economizador o dentro de
+  la caldera, chimenea bajo el punto de rocío (el modelo no condensa),
+  gases que no alcanzan T_sat + pinch, vapor más caliente que los gases,
+  presión supercrítica. Notas: agua de alimentación bajo el punto de rocío,
+  ΔT de un extremo menor que el pinch, approach 0.
+- El barrido de la presión no es monótono: cerca de la crítica h_fg se
+  achica y el caudal vuelve a subir. Se limita a 1–160 bar.
+- La página recalcula sola en cada cambio (~0,1 s, `st.cache_data`); los
+  barridos van con botón. En el diagrama, el pinch y el approach (unos
+  pocos kelvin) se señalan con flechas que vienen de zonas libres del
+  evaporador, y los nombres de las secciones van arriba; medido en
+  1280 y 390 px.
+- Los textos usan °C y bar (como el Rankine); el LaTeX sigue el sistema.
+  En SI las restas con ×10ⁿ se parten (`_times_diff`) y el calor total va
+  un sumando por renglón: máximo 304 px.
 
 ### Citas y licencias
 

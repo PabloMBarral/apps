@@ -31,8 +31,9 @@ keywords:
   - tespy
   - fluprodia
   - iso-6976
+  - hrsg
 license: MIT
-version: "0.14.0"
+version: "0.15.0"
 date-released: "2026-10-06"
 references:
   - type: article
