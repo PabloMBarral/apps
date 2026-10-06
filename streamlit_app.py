@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.14.0"
+PAGE_VERSION = "0.15.0"
 
 
 def _home_page() -> None:
@@ -87,6 +87,13 @@ def _home_page() -> None:
           bomba de calor: COP, estados, ciclo sobre el diagrama log p–h,
           procedimiento con las tablas, exergía destruida en cada
           componente y barridos (ejemplos de Cengel cap. 11).
+        - 🏭 **HRSG** — caldera de recuperación de una presión: con los
+          gases (temperatura, caudal y composición, o el escape de una
+          turbina de gas a metano con exceso de aire λ), la presión de
+          evaporación, el agua de alimentación, el pinch y el approach,
+          arma el **diagrama T–Q** con vapor sobrecalentado o saturado:
+          caudal de vapor, temperaturas de los gases entre secciones y de
+          chimenea, punto de rocío, procedimiento y barridos.
         - 📈 **Diagramas** — Propiedades, Isoentrópicos, Rankine y
           Refrigeración incluyen
           gráficos interactivos con isolíneas (log p–h, T–s, h–s,
@@ -100,7 +107,7 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Caldera de recuperación (HRSG), ciclos Brayton y combinado,
+        HRSG de dos y tres presiones, ciclos Brayton y combinado,
         psicrometría, combustión, exergía. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
@@ -114,7 +121,7 @@ def _home_page() -> None:
         (K, Pa, J/kg, J/(kg·K)), **Técnico** (°C, bar, kJ/kg, kJ/(kg·K))
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
-        Propiedades, Isoentrópicos, Rankine y Refrigeración.
+        Propiedades, Isoentrópicos, Rankine, Refrigeración y HRSG.
         Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
@@ -132,6 +139,7 @@ pages = [
     st.Page("app_pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
     st.Page("app_pages/5_Rankine.py", title="Rankine", icon="♨️"),
     st.Page("app_pages/6_Refrigeracion.py", title="Refrigeración", icon="❄️"),
+    st.Page("app_pages/10_HRSG.py", title="HRSG", icon="🏭"),
 ]
 pg = st.navigation(pages)
 pg.run()
