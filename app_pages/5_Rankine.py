@@ -42,7 +42,6 @@ from core.cycles.rankine import (
     extraction_pressure_sweep,
     rankine_labeled_states,
     rankine_notes,
-    rankine_segments,
     rankine_steps,
     rankine_sweep,
     rankine_to_dict,
@@ -50,19 +49,14 @@ from core.cycles.rankine import (
     suggested_rankine_inputs,
 )
 from core.cycles.rankine_layout import PlantLayout, plant_layout
-from core.diagrams import (
-    DiagramSpec,
-    DiagramType,
-    ProcessOverlay,
-    isentropic_process,
-    segments_overlays,
-)
+from core.diagrams import DiagramType
 from core.export import dict_to_csv
 from core.fluids import FLUID_NAMES_ES, fluid_limits, saturation_at_pressure
 from core.state_report import format_value, states_table
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, convert_to_si, unit_label
 from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_credits
-from ui.diagrams import DiagramPoint, diagram_type_selector, get_diagram, render_diagram_plotly
+from ui.cycle_charts import render_rankine_diagram
+from ui.diagrams import diagram_type_selector
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
 PAGE_VERSION = "0.14.0"
@@ -878,58 +872,8 @@ def _render_tespy(result: RankineResult, system: UnitSystem) -> None:
 def _cycle_diagram(result: RankineResult, system: UnitSystem) -> None:
     with st.expander("📈 Diagrama del ciclo", expanded=True):
         diagram_type: DiagramType = diagram_type_selector(key="rk_diagram_type", default="Ts")
-        labeled = rankine_labeled_states(result)
-        states = [state.to_state_point() for _, state in labeled]
-        points = [
-            DiagramPoint(state=state, label=label.split()[0], color="#d62728")
-            for (label, _), state in zip(labeled, states, strict=True)
-        ]
-        fluid = result.inputs.fluid
         try:
-            diagram = get_diagram(fluid, system)
-            spec = DiagramSpec(fluid=fluid, system=system)
-            overlays: list[ProcessOverlay] = segments_overlays(
-                diagram, spec, [(states[a], states[b]) for a, b in rankine_segments(result)]
-            )
-            if result.inputs.eta_turbine < 1.0:
-                turbines = result.of_kind("turbine")
-                casings: dict[str, tuple[int, int]] = {}
-                for comp in turbines:
-                    start = casings.get(comp.casing, (comp.port("in").state, 0))[0]
-                    casings[comp.casing] = (start, comp.port("out").state)
-                for start_i, end_i in casings.values():
-                    start = result.states[start_i]
-                    overlays.append(
-                        ProcessOverlay(
-                            name=f"{start_i + 1} → {end_i + 1}s (isoentrópica de referencia)",
-                            color="#2ca02c",
-                            dash="dash",
-                            coords_si=isentropic_process(
-                                diagram,
-                                spec,
-                                s_J_per_kg_K=start.s_J_per_kg_K,
-                                p_start_Pa=start.P_Pa,
-                                p_end_Pa=result.states[end_i].P_Pa,
-                            ),
-                        )
-                    )
-                for comp, state_s in zip(turbines, result.turbine_out_s, strict=True):
-                    points.append(
-                        DiagramPoint(
-                            state=state_s.to_state_point(),
-                            label=f"{comp.port('out').state + 1}s",
-                            color="#2ca02c",
-                        )
-                    )
-            render_diagram_plotly(
-                fluid=fluid,
-                diagram_type=diagram_type,
-                system=system,
-                points=points,
-                overlays=overlays,
-                chart_key="rk_diagram_chart",
-                point_legend={"#d62728": "estados", "#2ca02c": "estados isoentrópicos (ks)"},
-            )
+            render_rankine_diagram(result, system, diagram_type, chart_key="rk_diagram_chart")
         except Exception as exc:  # el diagrama no debe tumbar la página
             st.warning(f"No se pudo dibujar el diagrama: {exc}")
         st.caption(

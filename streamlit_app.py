@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.15.0"
+PAGE_VERSION = "0.16.0"
 
 
 def _home_page() -> None:
@@ -94,8 +94,16 @@ def _home_page() -> None:
           arma el **diagrama T–Q** con vapor sobrecalentado o saturado:
           caudal de vapor, temperaturas de los gases entre secciones y de
           chimenea, punto de rocío, procedimiento y barridos.
-        - 📈 **Diagramas** — Propiedades, Isoentrópicos, Rankine y
-          Refrigeración incluyen
+        - ⚡ **Ciclo combinado** — turbina de gas (compresor, cámara de
+          combustión con metano o aire estándar y turbina, con calores
+          específicos variables y TESPy como control) + caldera de
+          recuperación de una presión + ciclo de vapor con desaireador:
+          rendimiento de cada parte y del conjunto, a dónde va la energía
+          (diagrama de Sankey), diagramas T–s y T–Q, procedimiento y
+          barridos para encontrar la relación de presiones óptima
+          (ejemplos de Cengel cap. 9 y 10).
+        - 📈 **Diagramas** — Propiedades, Isoentrópicos, Rankine,
+          Refrigeración y Ciclo combinado incluyen
           gráficos interactivos con isolíneas (log p–h, T–s, h–s,
           p–log v) y overlay del estado / proceso calculado, vía
           [fluprodia](https://github.com/fwitte/fluprodia).
@@ -107,8 +115,9 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        HRSG de dos y tres presiones, ciclos Brayton y combinado,
-        psicrometría, combustión, exergía. Ver el
+        HRSG de dos y tres presiones, ciclo Brayton con regeneración,
+        interenfriamiento y recalentamiento, psicrometría, combustión,
+        exergía. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -121,7 +130,8 @@ def _home_page() -> None:
         (K, Pa, J/kg, J/(kg·K)), **Técnico** (°C, bar, kJ/kg, kJ/(kg·K))
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
-        Propiedades, Isoentrópicos, Rankine, Refrigeración y HRSG.
+        Propiedades, Isoentrópicos, Rankine, Refrigeración, HRSG y Ciclo
+        combinado.
         Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
@@ -140,6 +150,7 @@ pages = [
     st.Page("app_pages/5_Rankine.py", title="Rankine", icon="♨️"),
     st.Page("app_pages/6_Refrigeracion.py", title="Refrigeración", icon="❄️"),
     st.Page("app_pages/10_HRSG.py", title="HRSG", icon="🏭"),
+    st.Page("app_pages/12_Ciclo_Combinado.py", title="Ciclo combinado", icon="⚡"),
 ]
 pg = st.navigation(pages)
 pg.run()

@@ -45,6 +45,7 @@ from core.fluids import fluid_state_from_pair
 from core.state_report import format_value, states_table
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, unit_label
 from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_credits
+from ui.cycle_charts import tq_figure
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
 PAGE_VERSION = "0.15.0"
@@ -69,9 +70,6 @@ _GAS_PLACES = {
     "c": "salida del evaporador (pinch)",
     "d": "chimenea",
 }
-_SECTION_SHORT = {"sobrecalentador": "SH", "evaporador": "EV", "economizador": "ECO"}
-_GAS_COLOR = "#d62728"
-_WATER_COLOR = "#1f77b4"
 
 # (parámetro, magnitud del eje, rótulo del eje)
 _SWEEPS: dict[str, tuple[SweepParameter, QuantityKind, str]] = {
@@ -459,145 +457,10 @@ def _render_metrics(result: HRSGResult, system: UnitSystem) -> None:
         st.info(note)
 
 
-def _tq_figure(result: HRSGResult, profile: TQProfile, system: UnitSystem) -> go.Figure:
-    """Diagrama T–Q: gases y agua contra el calor transferido desde la chimenea."""
-
-    def T(value_K: float) -> float:
-        return convert_from_si(value_K, "temperature", system)
-
-    def Q(value_W: float) -> float:
-        return convert_from_si(value_W, "power", system)
-
-    T_unit = unit_label("temperature", system)
-    Q_unit = unit_label("power", system)
-    dT_unit = unit_label("temperature_difference", system)
-    hover = f"Q̇ = %{{x:,.0f}} {Q_unit}<br>T = %{{y:.1f}} {T_unit}"
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=[Q(q) for q in profile.Q_gas_W],
-            y=[T(t) for t in profile.T_gas_K],
-            mode="lines",
-            name="gases",
-            line={"color": _GAS_COLOR, "width": 3},
-            hovertemplate=hover + "<extra>gases</extra>",
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[Q(q) for q in profile.Q_water_W],
-            y=[T(t) for t in profile.T_water_K],
-            mode="lines",
-            name="agua y vapor",
-            line={"color": _WATER_COLOR, "width": 3},
-            hovertemplate=hover + "<extra>agua y vapor</extra>",
-        )
-    )
-    # Puntos de los gases: Q acumulado desde la chimenea.
-    sections = result.sections
-    gas_Q = [result.Q_W]
-    for section in sections:
-        gas_Q.append(gas_Q[-1] - section.Q_W)
-    gas_pos = {"a": "top left", "b": "top left", "c": "top left", "d": "top center"}
-    fig.add_trace(
-        go.Scatter(
-            x=[Q(q) for q in gas_Q],
-            y=[T(t) for t in result.T_gas_K],
-            mode="markers+text",
-            text=list(result.gas_labels),
-            textposition=[gas_pos[label] for label in result.gas_labels],
-            textfont={"color": _GAS_COLOR, "size": 14},
-            marker={"color": _GAS_COLOR, "size": 8},
-            showlegend=False,
-            hovertemplate=hover + "<extra>gases</extra>",
-        )
-    )
-    # Puntos del agua. El 2 y el 3 (el escalón del approach) quedan a unos pocos
-    # kelvin: los nombran las flechas del pinch y del approach.
-    Q_eco = sections[-1].Q_W
-    Q_ev = sections[-2].Q_W
-    w = result.water
-    water_Q = [0.0, Q_eco, Q_eco, Q_eco + Q_ev, result.Q_W][: len(w)]
-    water_text = ["1", "", "", "4", "5"][: len(w)]
-    fig.add_trace(
-        go.Scatter(
-            x=[Q(q) for q in water_Q],
-            y=[T(s.T_K) for s in w],
-            mode="markers+text",
-            text=water_text,
-            textposition="bottom right",
-            textfont={"color": _WATER_COLOR, "size": 14},
-            marker={"color": _WATER_COLOR, "size": 8},
-            showlegend=False,
-            hovertemplate=hover + "<extra>agua y vapor</extra>",
-        )
-    )
-    # Límites entre secciones y sus nombres (arriba: abajo a la izquierda está el agua
-    # de alimentación).
-    bounds = [0.0, *profile.boundaries_W, result.Q_W]
-    for q in profile.boundaries_W:
-        fig.add_vline(x=Q(q), line_dash="dot", line_color="gray", line_width=1)
-    names = [_SECTION_SHORT[s.name] for s in reversed(sections)]
-    for name, lo, hi in zip(names, bounds, bounds[1:], strict=False):
-        fig.add_annotation(
-            x=Q(0.5 * (lo + hi)),
-            y=0.99,
-            yref="paper",
-            text=name,
-            showarrow=False,
-            font={"color": "gray"},
-            yanchor="top",
-        )
-    # Pinch (entre c y 3) y approach (entre 2 y 3): unos pocos kelvin, no se ven a
-    # escala; las flechas vienen de zonas libres del evaporador (arriba de los gases
-    # y abajo de la meseta), también en un celular.
-    inputs = result.inputs
-    pinch = _value(inputs.pinch_K, "temperature_difference", system, 3)
-    fig.add_annotation(
-        x=Q(Q_eco),
-        y=T(result.T_sat_K + 0.5 * inputs.pinch_K),
-        text=f"pinch {pinch} {dT_unit}<br>(c – 3)",
-        showarrow=True,
-        arrowhead=2,
-        ax=55,
-        ay=-85,
-        font={"color": "#333333"},
-    )
-    if inputs.approach_K > 0.0:
-        approach = _value(inputs.approach_K, "temperature_difference", system, 3)
-        text = f"approach {approach} {dT_unit}<br>(2 → 3)"
-    else:
-        text = "approach 0<br>(2 = 3)"
-    fig.add_annotation(
-        x=Q(Q_eco),
-        y=T(result.T_sat_K - 0.5 * inputs.approach_K),
-        text=text,
-        showarrow=True,
-        arrowhead=2,
-        ax=55,
-        ay=65,
-        font={"color": "#333333"},
-    )
-    fig.update_layout(
-        height=440,
-        margin={"l": 10, "r": 10, "t": 30, "b": 10},
-        xaxis_title=f"Q̇ desde la chimenea [{Q_unit}]",
-        yaxis_title=f"T [{T_unit}]",
-        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
-        separators=". ",
-        hovermode="closest",
-    )
-    Q_max = Q(result.Q_W)  # margen para los rótulos de los extremos
-    fig.update_xaxes(
-        exponentformat="none", separatethousands=True, range=[-0.04 * Q_max, 1.07 * Q_max]
-    )
-    return fig
-
-
 def _render_tq(result: HRSGResult, profile: TQProfile, system: UnitSystem) -> None:
     st.markdown("#### Diagrama T–Q")
     try:
-        st.plotly_chart(_tq_figure(result, profile, system), width="stretch", key="hr_tq_chart")
+        st.plotly_chart(tq_figure(result, profile, system), width="stretch", key="hr_tq_chart")
     except Exception as exc:  # el diagrama no debe tumbar la página
         st.warning(f"No se pudo dibujar el diagrama: {exc}")
     sh = " y el sobrecalentador (SH)" if result.inputs.superheated else ""
