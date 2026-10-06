@@ -102,7 +102,7 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   drenaje (DCA), desrecalentador y el drenaje en cascada o bombeado hacia
   adelante desde cualquier cerrado), combinables con el recalentamiento—,
   ideal o real (rendimientos isoentrópicos y **pérdidas de carga y de
-  calor** del ciclo real de Cengel §10-5: caídas de presión en caldera,
+  calor** del ciclo real de Cengel §10-3: caídas de presión en caldera,
   recalentador, condensador, calentadores y cañerías, subenfriamiento del
   condensado), con entrada a la turbina sobrecalentada o como vapor
   saturado seco, y caudal másico o potencia neta como dato. Con un fluido

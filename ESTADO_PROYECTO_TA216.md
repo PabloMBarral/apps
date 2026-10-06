@@ -347,7 +347,7 @@
   - **Fluidos**: R-245fa, R-1233zd(E), isopentano y tolueno se suman a
     `SUPPORTED_FLUIDS` (Propiedades, Interpolación, Isoentrópicos y ciclos),
     con su rango de diagrama hasta la T máx. de su ecuación de estado.
-  - **Ciclo real** (Cengel §10-5): `Losses` con caídas de presión en la
+  - **Ciclo real** (Cengel §10-3): `Losses` con caídas de presión en la
     caldera, el recalentador, el condensador y los cerrados (lado del agua),
     subenfriamiento del condensado y cañerías de alimentación y de vapor
     (`PipeLoss`: Δp y ΔT). La bomba compensa todas las caídas; q_pérd y
@@ -376,7 +376,7 @@
     casi sobre la isobara (antes, una recta que cruzaba la campana).
   - **Página `/Rankine`**: selector de fluido (keys por fluido; las del agua
     no cambian), bloques de pérdidas y recuperador, casillas por cerrado
-    (desrecalentador, subenfriador, bombeado, Δp) y teoría de §10-5 y del
+    (desrecalentador, subenfriador, bombeado, Δp) y teoría de §10-3 y del
     ORC. Ejemplos nuevos: Cengel 10-2 completo, una planta con
     calentadores reales y ORC con R-245fa, tolueno y R-134a.
 - **Validación**:
@@ -572,6 +572,12 @@
   - Smoke test en Chromium a 1280 y 390 px por link directo: los tres
     ejemplos y la turbina de gas con vapor saturado, con el procedimiento
     y la teoría abiertos; sin ecuaciones con scroll ni desborde.
+- **Corrección en el Rankine** (confirmada por el autor): el ciclo real
+  citaba Cengel §10-5, que es el recalentamiento; el ciclo real con sus
+  pérdidas es el §10-3. Se corrigió en `core/`, la página, el README y
+  este archivo, y el recalentamiento ahora cita §10-5 en la teoría, en la
+  leyenda del procedimiento y en el paso del recalentador. Tests nuevos
+  en `tests/test_rankine.py` y `tests/test_page_rankine.py`.
 - **Dependencias**: ninguna nueva.
 
 ---

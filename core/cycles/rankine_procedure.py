@@ -7,7 +7,7 @@ unidades activo (vademecum §3.3, §9.2, §10.4, §12 y §13; Çengel & Boles,
 
 Sin calentadores, pérdidas ni recuperador sigue el orden de la Fase 3.1a:
 bomba, caldera, turbinas, condensador y balance. Si no, sigue el orden de
-Cengel §10-5 y §10-6: primero los estados que se leen en las tablas (con las
+Cengel §10-3 y §10-6: primero los estados que se leen en las tablas (con las
 caídas de presión y de temperatura del ciclo real y el recuperador), después
 los balances de los calentadores —de mayor a menor presión— para despejar
 las fracciones de extracción (o, si un drenaje bombeado las acopla, el
@@ -214,7 +214,7 @@ def _condenser_outlet_step(result: RankineResult, system: UnitSystem) -> Procedu
             ),
             latex=saturated,
         )
-    # Ciclo real (Cengel §10-5): caída de presión y subenfriamiento del condensado.
+    # Ciclo real (Cengel §10-3): caída de presión y subenfriamiento del condensado.
     lines: list[str] = []
     clauses: list[str] = []
     if losses.dp_condenser_Pa > 0.0:
@@ -235,7 +235,7 @@ def _condenser_outlet_step(result: RankineResult, system: UnitSystem) -> Procedu
         return ProcedureStep(
             title="Estado 1: salida del condensador",
             text=(
-                f"{_cap(clauses[0])} (Cengel §10-5). Sale líquido saturado (x₁ = 0): "
+                f"{_cap(clauses[0])} (Cengel §10-3). Sale líquido saturado (x₁ = 0): "
                 f"{_lookup(result, 'sat_p')}."
             ),
             latex=(*lines, *saturated),
@@ -261,7 +261,7 @@ def _condenser_outlet_step(result: RankineResult, system: UnitSystem) -> Procedu
         "la temperatura de saturación"
     )
     text = (
-        f"{_cap(' y, '.join(clauses))} (Cengel §10-5). Es líquido comprimido: h, v y s casi no "
+        f"{_cap(' y, '.join(clauses))} (Cengel §10-3). Es líquido comprimido: h, v y s casi no "
         "dependen de la presión y se aproximan con los del líquido saturado a la misma "
         "temperatura (vademecum §13); con la ecuación de estado, h(p₁, T₁) da casi lo mismo."
     )
@@ -283,7 +283,7 @@ def _pump_step(
     """Bomba i → o: w ≈ v·Δp (líquido incompresible), h_s = h(p, s) y el estado real.
 
     ``pressure`` es el renglón que explica la presión de salida cuando la bomba
-    tiene que compensar caídas de presión (ciclo real, Cengel §10-5).
+    tiene que compensar caídas de presión (ciclo real, Cengel §10-3).
     """
     s_in, s_out = result.states[i], result.states[o]
     a, b = i + 1, o + 1
@@ -583,7 +583,7 @@ def _simple_steps(result: RankineResult, system: UnitSystem) -> list[ProcedureSt
                 title="4 → 5: recalentador",
                 text=(
                     f"El vapor vuelve {_to(boiler)} y se recalienta a p constante "
-                    f"({_bar(s4.P_Pa)}) hasta {_degC(s5.T_K)}:"
+                    f"({_bar(s4.P_Pa)}) hasta {_degC(s5.T_K)} (Cengel §10-5):"
                 ),
                 latex=(
                     rf"h_5 = {_q(s5.h_J_per_kg, _EH, system)}",
@@ -689,7 +689,7 @@ def _balance_step(
 
 
 def _first_law_lines(result: RankineResult, system: UnitSystem) -> tuple[str, ...]:
-    """Con cañerías, el primer principio incluye el calor que pierden (Cengel §10-5)."""
+    """Con cañerías, el primer principio incluye el calor que pierden (Cengel §10-3)."""
     if result.q_loss_J_per_kg <= 0.0:
         return ()
     return (
@@ -865,7 +865,7 @@ def _line_path(result: RankineResult, state: int) -> tuple[CycleComponent, list[
 
     Devuelve ese componente y las caídas de presión del camino (nombre, Δp):
     los cerrados por los que pasa el agua, la cañería de alimentación, la
-    caldera y la cañería de vapor (Cengel §10-5).
+    caldera y la cañería de vapor (Cengel §10-3).
     """
     inputs = result.inputs
     line_kinds = ("open_heater", "closed_heater", "mixer", "recuperator", "pipe", "boiler")
@@ -1036,7 +1036,7 @@ def _closed_heater_states(
         )
     extra = ""
     if heater.dp_Pa > 0.0:
-        extra += f" En los tubos el agua pierde {_bar(heater.dp_Pa)} por fricción (Cengel §10-5)."
+        extra += f" En los tubos el agua pierde {_bar(heater.dp_Pa)} por fricción (Cengel §10-3)."
     if heater.desuperheater:
         extra += (
             " Tiene desrecalentador: la extracción, sobrecalentada, se enfría primero hasta "
@@ -1054,7 +1054,7 @@ def _closed_heater_states(
 
 
 def _pipe_step(result: RankineResult, comp: CycleComponent, system: UnitSystem) -> ProcedureStep:
-    """Cañería con pérdida de carga y de calor (Cengel §10-5 y ejemplo 10-2)."""
+    """Cañería con pérdida de carga y de calor (Cengel §10-3 y ejemplo 10-2)."""
     assert result.layout is not None
     i, o = comp.port("in").state, comp.port("out").state
     s_in, s_out = result.states[i], result.states[o]
@@ -1145,7 +1145,7 @@ def _pipe_step(result: RankineResult, comp: CycleComponent, system: UnitSystem) 
         )
     return ProcedureStep(
         title=f"{i + 1} → {o + 1}: {comp.label}",
-        text=f"En la cañería {where}, {what} {told} (Cengel §10-5):",
+        text=f"En la cañería {where}, {what} {told} (Cengel §10-3):",
         latex=tuple(lines),
     )
 
@@ -1682,7 +1682,7 @@ def _heat_and_work_steps(
         )
         text += (
             " Las cañerías pierden q_pérd hacia el ambiente: ese calor no llega ni a la turbina "
-            "ni al condensador (Cengel §10-5)."
+            "ni al condensador (Cengel §10-3)."
         )
     steps.append(ProcedureStep(title="Calor recibido y cedido", text=text, latex=tuple(latex)))
     t_sym, t_num = terms(("turbine",), -1)
@@ -1711,7 +1711,7 @@ def _heat_and_work_steps(
 
 
 def _cycle_steps(result: RankineResult, system: UnitSystem) -> list[ProcedureStep]:
-    """Procedimiento general: regeneración (Cengel §10-6), ciclo real (§10-5) y recuperador."""
+    """Procedimiento general: regeneración (Cengel §10-6), ciclo real (§10-3) y recuperador."""
     layout = result.layout
     assert layout is not None
     flows = port_flows(layout)
@@ -1791,7 +1791,7 @@ def _cycle_steps(result: RankineResult, system: UnitSystem) -> list[ProcedureSte
                     title=f"{i + 1} → {o + 1}: recalentador",
                     text=(
                         f"El vapor que sigue vuelve {_to(boiler)} y se recalienta "
-                        f"{pressure_txt} hasta {_degC(st[o].T_K)}:"
+                        f"{pressure_txt} hasta {_degC(st[o].T_K)} (Cengel §10-5):"
                     ),
                     latex=_state_lines(result, o, system),
                 )
@@ -1894,7 +1894,7 @@ def rankine_steps(
     """Procedimiento estado por estado, como se resuelve con las tablas (Cengel cap. 10).
 
     Sin calentadores, pérdidas ni recuperador, el de la Fase 3.1a (§10-2 a
-    §10-4); si no, el general: regenerativo (§10-6), ciclo real (§10-5) y
+    §10-4); si no, el general: regenerativo (§10-6), ciclo real (§10-3) y
     recuperador del ORC. Con ``cooling`` se suma el agua de enfriamiento.
     """
     plain = not (result.has_heaters or result.has_losses or result.has_recuperator)

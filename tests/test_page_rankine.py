@@ -51,6 +51,24 @@ def test_every_example_computes(example: str) -> None:
     assert len(_states(at)) == len(solve_rankine(RANKINE_EXAMPLES[example]).states)
 
 
+@pytest.mark.parametrize(
+    ("prefix", "sections"),
+    [
+        ("Cengel 10-1", "(Cengel §10-2)"),
+        ("Cengel 10-2", "(Cengel §10-2 y §10-3)"),
+        ("Cengel 10-4", "(Cengel §10-2 y §10-5)"),
+        ("Cengel 10-6", "(Cengel §10-2, §10-5 y §10-6)"),
+    ],
+)
+def test_procedure_cites_the_textbook_sections(prefix: str, sections: str) -> None:
+    at = _new_app()
+    at.selectbox(key="rk_example").set_value(next(e for e in EXAMPLES if e.startswith(prefix)))
+    at.run()
+    _no_problems(at)
+    procedure = next(e for e in at.expander if "Procedimiento" in e.label)
+    assert any(sections in c.value for c in procedure.caption)
+
+
 def test_reheat_checkbox_adds_two_states() -> None:
     at = _new_app()
     at.checkbox(key="rk_reheat_0").check().run()

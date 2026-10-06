@@ -659,7 +659,7 @@ _HEAT_EXCHANGE_P_RATIO = 1.0 / 0.75
 def _friction_coords(
     spec: DiagramSpec, start: StatePoint, end: StatePoint, n: int = 40
 ) -> dict[str, np.ndarray]:
-    """Calentamiento o enfriamiento con caída de presión (Cengel §10-5).
+    """Calentamiento o enfriamiento con caída de presión (Cengel §10-3).
 
     Se dibuja con la presión variando linealmente con la entalpía entre los
     dos estados: el proceso real va casi sobre la isobara, perdiendo presión
@@ -725,7 +725,7 @@ def segment_between(
       la curva de h constante (punteada, porque el proceso es irreversible y
       sus estados intermedios no son de equilibrio).
     - Presión apenas distinta (intercambiador o cañería con fricción, ciclo
-      real de Cengel §10-5) → casi isobárica: la presión baja de a poco
+      real de Cengel §10-3) → casi isobárica: la presión baja de a poco
       mientras cambia la entalpía.
     - Si no, o si fluprodia no puede trazarla → segmento recto, que es
       **solo una referencia visual** (p. ej. una turbina o un compresor

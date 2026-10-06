@@ -324,8 +324,12 @@ Notas de la Fase 3.1b (regeneración):
   están más abajo). Las opciones de los radios no llevan números: cambiar
   las opciones reinicia el widget.
 - Con regeneración η < 1 − T_C/T̄_H (los calentadores generan entropía).
-- "Cómo aumentar el rendimiento" es Cengel §10-4 (ediciones 7.ª a 9.ª);
-  §10-6 es la regeneración.
+- Numeración del cap. 10 de Cengel (ediciones 7.ª a 9.ª): §10-2 Rankine
+  ideal, §10-3 desviaciones del ciclo real (pérdidas de carga y de calor,
+  ejemplo 10-2), §10-4 cómo aumentar el rendimiento, §10-5 recalentamiento,
+  §10-6 regeneración, §10-9 ciclos combinados. El autor confirmó §10-3 y
+  §10-5: hasta la 0.15.0 el ciclo real citaba §10-5 por error, y un test
+  (`test_procedure_cites_the_textbook_sections`) lo vigila.
 
 Notas de la Fase 3.1c (ciclo real, calentadores reales y ORC):
 

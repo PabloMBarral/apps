@@ -14,7 +14,7 @@ pérdidas, el condensador entrega líquido saturado (x = 0), como en Cengel.
 
 Fase 3.1c:
 
-- **Ciclo real** (Cengel §10-5 y ejemplo 10-2): caídas de presión en la
+- **Ciclo real** (Cengel §10-3 y ejemplo 10-2): caídas de presión en la
   caldera, el recalentador, el condensador y los calentadores cerrados,
   subenfriamiento del condensado (``td_bubble``) y cañerías con pérdida de
   carga y de calor (``Pipe``).
@@ -171,7 +171,7 @@ class Reheat:
 
 @dataclass(frozen=True)
 class PipeLoss:
-    """Cañería con pérdidas (Cengel §10-5): caída de presión ``dp_Pa`` por la
+    """Cañería con pérdidas (Cengel §10-3): caída de presión ``dp_Pa`` por la
     fricción y caída de temperatura ``dT_K`` por la pérdida de calor al
     ambiente. Con ``dT_K = 0`` la cañería es adiabática (h constante)."""
 
@@ -181,7 +181,7 @@ class PipeLoss:
 
 @dataclass(frozen=True)
 class Losses:
-    """Pérdidas del ciclo real (Cengel §10-5), en SI.
+    """Pérdidas del ciclo real (Cengel §10-3), en SI.
 
     Los datos del ciclo siguen siendo los de la turbina: la presión y la
     temperatura de entrada, la presión de escape (la del condensador, a la
@@ -248,7 +248,7 @@ class RankineInputs:
     puede pedirlo también con :attr:`FeedwaterHeater.drain_forward`. Los
     demás drenajes van en cascada hacia atrás.
 
-    ``losses`` son las pérdidas del ciclo real (Cengel §10-5), ``fluid`` el
+    ``losses`` son las pérdidas del ciclo real (Cengel §10-3), ``fluid`` el
     fluido de trabajo (uno de :data:`RANKINE_FLUIDS`; con uno orgánico es un
     ORC) y ``recuperator`` el recuperador del ORC (sin calentadores).
     """
@@ -348,7 +348,7 @@ class RankineResult:
 
     @property
     def has_losses(self) -> bool:
-        """Ciclo real con pérdidas de carga o de calor (Cengel §10-5)."""
+        """Ciclo real con pérdidas de carga o de calor (Cengel §10-3)."""
         return self.inputs.losses.any
 
     @property
@@ -422,7 +422,7 @@ class RankineResult:
 
     @property
     def q_loss_J_per_kg(self) -> float:
-        """Calor que pierden las cañerías al ambiente (Cengel §10-5); 0 sin cañerías.
+        """Calor que pierden las cañerías al ambiente (Cengel §10-3); 0 sin cañerías.
         Con él, el primer principio queda w_neto = q_H − q_C − q_pérd."""
         return -self._flow_through("pipe")
 
@@ -679,7 +679,7 @@ def validate_rankine_inputs(inputs: RankineInputs) -> None:
 
 
 def _validate_losses(inputs: RankineInputs) -> None:
-    """Pérdidas del ciclo real (Cengel §10-5): signos, punto triple y caldera."""
+    """Pérdidas del ciclo real (Cengel §10-3): signos, punto triple y caldera."""
     losses = inputs.losses
     if not losses.any:
         return
@@ -833,7 +833,7 @@ def _line_pressures(inputs: RankineInputs) -> list[float]:
     Cada bomba lleva el líquido a la presión del próximo calentador abierto o,
     la última, a la de entrada a la turbina, más las caídas de presión del
     camino: los cerrados de su tramo y, la última, las cañerías y la caldera
-    (Cengel §10-5).
+    (Cengel §10-3).
     """
     heaters = inputs.heaters
     losses = inputs.losses
@@ -1214,7 +1214,7 @@ def _build_network(inputs: RankineInputs, layout: PlantLayout) -> _Network:
                 "condenser": losses.dp_condenser_Pa,
             }[comp.kind]
             if dp > 0.0:
-                obj.set_attr(dp=dp)  # pérdida de carga (Cengel §10-5)
+                obj.set_attr(dp=dp)  # pérdida de carga (Cengel §10-3)
             else:
                 obj.set_attr(pr=1)  # sin pérdidas de carga, como en Cengel
         elif comp.kind == "pipe":
