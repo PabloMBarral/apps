@@ -32,8 +32,8 @@ keywords:
   - fluprodia
   - iso-6976
 license: MIT
-version: "0.13.0"
-date-released: "2026-10-05"
+version: "0.14.0"
+date-released: "2026-10-06"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"

@@ -771,10 +771,8 @@ def _cycle_diagram(result: RefrigerationResult, system: UnitSystem) -> None:
             else:
                 tabs = st.tabs(
                     [
-                        f"{title} ({FLUID_NAMES_ES.get(fluid, fluid)})"
-                        for title, (fluid, _, _) in zip(
-                            ("Ciclo de baja", "Ciclo de alta"), groups, strict=True
-                        )
+                        f"{title}: {FLUID_NAMES_ES.get(fluid, fluid)}"
+                        for title, (fluid, _, _) in zip(("Baja", "Alta"), groups, strict=True)
                     ]
                 )
                 for tab, group, chart_key in zip(

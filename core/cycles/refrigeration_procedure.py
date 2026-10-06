@@ -475,12 +475,10 @@ def _mixer_step(
             latex_chain(
                 f"h_{no}",
                 rf"{xs}\,h_{nt} + (1 - {xs})\,h_{nc}",
-                _wrap(
-                    rf"{latex_number(x, 5)}\cdot {_n(st[from_tank].h_J_per_kg, _EH, system)}",
-                    "+",
-                    rf"{latex_number(1.0 - x, 5)}\cdot "
-                    rf"{_n(st[from_compressor].h_J_per_kg, _EH, system)}",
-                ),
+                # Siempre en dos renglones: con los cinco dígitos de x no entra en un celular.
+                rf"{latex_number(x, 5)}\cdot {_n(st[from_tank].h_J_per_kg, _EH, system)} \\ "
+                rf"&\quad + {latex_number(1.0 - x, 5)}\cdot "
+                rf"{_n(st[from_compressor].h_J_per_kg, _EH, system)}",
                 _q(st[o].h_J_per_kg, _EH, system),
             ),
             rf"s_{no} = s(p_{no},\ h_{no}) = {_q(st[o].s_J_per_kg_K, _ES, system)}",
@@ -555,8 +553,16 @@ def _per_kg_terms(
         i, o = comp.inlet, comp.outlet
         a, b = (o, i) if sign > 0 else (i, o)
         sym.append(f"{_fraction_tex(result, comp)}(h_{_ix(a + 1)} - h_{_ix(b + 1)})")
-        num.append(f"{_fraction_number(result, comp)}({_diff(h[a], h[b], _EH, system)})")
+        num.append(f"{_fraction_number(result, comp)}({_diff_wrapped(h[a], h[b], system)})")
     return sym, num
+
+
+def _diff_wrapped(a_si: float, b_si: float, system: UnitSystem) -> str:
+    """``a - b`` (entalpías); con números ×10ⁿ (SI), el ``- b`` va en otro renglón."""
+    diff = _diff(a_si, b_si, _EH, system)
+    if r"\times" not in diff:
+        return diff
+    return rf"{_n(a_si, _EH, system)} \\ &\quad - {latex_paren(_n(b_si, _EH, system))}"
 
 
 def _sum_or_chain(lhs: str, sym: list[str], num: list[str], value: str) -> str:

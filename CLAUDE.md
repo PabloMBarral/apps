@@ -53,7 +53,11 @@ apps/
 │   │                          # enfriamiento, barrido de la presión de extracción.
 │   │                          # Fase 3.1c: fluido de trabajo (ORC), pérdidas,
 │   │                          # calentadores reales, recuperador, barrido de ε.
-│   ├── 6_Refrigeracion.py
+│   ├── 6_Refrigeracion.py     # ✅ Fase 3.2 — Compresión de vapor: simple, cámara
+│   │                          # de evaporación instantánea y cascada (1 o 2
+│   │                          # refrigerantes), refrigerador o bomba de calor,
+│   │                          # niveles por p o por T_sat, ciclo real, segundo
+│   │                          # principio (barras), pestañas por fluido, barridos.
 │   ├── 7_Psicrometria.py
 │   ├── 8_Combustion.py
 │   ├── 9_Poder_Calorifico.py
@@ -69,15 +73,19 @@ apps/
 │   │                          # API format_quantity / convert_*_si / unit_label.
 │   │                          # Fase 1.6: + ΔT, ρ, velocidad, μ, k, difusividad.
 │   │                          # Fase 3.1a: + caudal másico y potencia.
+│   │                          # Fase 3.2: + caudal volumétrico (volume_flow).
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
 │   │                          # región, saturación, transporte, validación con
 │   │                          # mensajes al alumno, suggested_inputs).
 │   │                          # Fase 3.1c: + R-245fa, R-1233zd(E), isopentano, tolueno.
+│   │                          # Fase 3.2: + R-32, propano, isobutano;
+│   │                          # textbook_reference_offset (tablas del R-134a).
 │   ├── state_report.py        # ✅ Fase 1.6 — Presentación pura de un FluidState:
 │   │                          # tablas, notas, procedimiento LaTeX por sistema
 │   │                          # de unidades, export JSON/CSV, tabla de estados.
+│   │                          # Fase 3.2: textbook_reference_note (R-134a).
 │   ├── latex.py               # ✅ Fase 1.7 — latex_number/unit/quantity,
 │   │                          # latex_chain (una igualdad por renglón) y
 │   │                          # latex_paren (negativos tras un signo).
@@ -94,6 +102,7 @@ apps/
 │   │                          # isentropic/isobaric/isothermal_process, overlays,
 │   │                          # axis_window_si, cycle_overlays (Fase 1.6).
 │   │                          # Fase 3.1c: con fricción, casi isobárica.
+│   │                          # Fase 3.2: válvulas a h constante (isenthalpic).
 │   ├── exergy.py              # Exergía física y química
 │   ├── combustion/
 │   │   ├── __init__.py
@@ -125,7 +134,13 @@ apps/
 │   │   │                      # lo reexporta): simple, recalentamiento y regenerativo.
 │   │   │                      # Fase 3.1c: ciclo real, recuperador, calentadores
 │   │   │                      # reales, sistema acoplado, textos por fluido.
-│   │   ├── refrigeration.py
+│   │   ├── refrigeration.py   # ✅ Fase 3.2 — RefrigerationInputs / solve_refrigeration /
+│   │   │                      # RefrigerationResult: layout fijo por ciclo (numeración
+│   │   │                      # de Cengel), red de TESPy, validaciones, ExergyAnalysis,
+│   │   │                      # SingleStage, notas, ejemplos, barridos y export.
+│   │   ├── refrigeration_procedure.py # ✅ Fase 3.2 — refrigeration_steps (reexportado):
+│   │   │                      # estados, cámara, mezcla, cascada, COP, Carnot,
+│   │   │                      # potencias y exergía destruida por componente.
 │   │   ├── brayton.py
 │   │   └── combined.py
 │   └── plots.py               # fluprodia + matplotlib helpers
@@ -345,6 +360,52 @@ Notas de la Fase 3.1c (ciclo real, calentadores reales y ORC):
 - Regresión: un snapshot de la 0.12.0 (24 casos: estados, red de TESPy con
   todas sus especificaciones, pasos en los tres sistemas, export y
   barridos) queda idéntico.
+
+Notas de la Fase 3.2 (refrigeración por compresión de vapor):
+
+- Red como el tutorial de bomba de calor de TESPy 0.11
+  (`tutorial/basics/heat_pump.py`): `CycleCloser` + `SimpleHeatExchanger`
+  + `Compressor` + `Valve`; sobrecalentamiento con `td_dew` y
+  subenfriamiento con `td_bubble` (`tutorial/advanced/stepwise.py`). Cámara
+  de evaporación instantánea = `DropletSeparator` (out1 líquido, out2
+  vapor) + `Merge`; cascada = `HeatExchanger` entre dos lazos, cada uno con
+  su `CycleCloser` y su fluido. Con ΔT = 0 en el intercambiador (ejemplo
+  11-4) TESPy da `kA = nan` sin avisar: no importa (no se usa).
+- Base de cálculo: 1 kg/s por el condensador (la de Cengel en los cinco
+  ejemplos) y después se escala al caudal o a la capacidad.
+- `p_evap_Pa` y `p_cond_Pa` son la aspiración y la descarga del compresor;
+  la T de evaporación es la de rocío ahí y la de condensación la de
+  burbuja (el R-410A tiene deslizamiento). En la página, los niveles por
+  temperatura se convierten con esas mismas definiciones.
+- En una cascada con dos fluidos, la presión del evaporador puede superar
+  a la del condensador (CO₂ abajo, R-134a arriba): las presiones se
+  comparan dentro de cada ciclo, nunca entre ciclos.
+- Notación del vademecum (§9.3): Q_C sale de la fuente fría (Cengel: Q_L).
+  Segundo principio: T₀ es el ambiente (la fuente caliente del
+  refrigerador, la fría de la bomba de calor); X_dest = T₀·S_gen por
+  componente y Ẇ = Ẇ_mín + ΣX_dest cierra (test). La cámara no destruye
+  exergía (separar fases a la misma T es reversible).
+- Cengel 8.ª ed.: §11-5 (segundo principio) es nuevo, así que los
+  ejemplos de cascada y cámara son 11-4 y 11-5 (11-3 y 11-4 en la 7.ª).
+- Tablas del R-134a (A-11 a A-13): h = s = 0 en el líquido saturado a
+  −40 °C; CoolProp usa la del IIR. No se cambia la referencia de CoolProp
+  (es global del proceso y afecta a TESPy): `textbook_reference_note` lo
+  explica con las constantes (148,14 kJ/kg y 0,7956 kJ/(kg·K)) donde se
+  citan esas tablas (Propiedades, Rankine con R-134a y Refrigeración).
+- Con un fluido «seco» (isobutano) la compresión isoentrópica desde vapor
+  saturado termina dentro de la campana: es una nota, no un error.
+- La comparación con el ciclo simple usa el refrigerante del condensador a
+  la misma temperatura de evaporación; en la cascada CO₂/NH₃ el COP casi
+  no cambia, pero la relación de presiones y la descarga sí (la nota lo
+  dice).
+- Diagramas: una válvula (h igual, p distinta) se dibuja rayada sobre su
+  línea de h constante («estrangulamiento (h constante)»), también en los
+  drenajes del Rankine y en una cañería sin pérdida de calor.
+- Smoke test: la primera carga de la página puede seguir dibujando
+  después de que aparece la segunda fila de métricas; esperar ~3 s antes
+  de leer el texto.
+- Regresión: el snapshot de la 0.13.0 (29 casos) queda idéntico salvo la
+  nota del R-134a en el ORC.
 
 ### Citas y licencias
 

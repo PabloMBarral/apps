@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.13.0` — Fase 3.1c cerrada (2026-10-05).
+> **Versión actual**: `0.14.0` — Fase 3.2 cerrada (2026-10-06).
 
 ---
 
@@ -417,6 +417,91 @@
     reales, los tres ORC y 10-6.
 - **Dependencias**: ninguna nueva.
 
+### Fase 3.2 — Refrigeración por compresión de vapor
+- **Versión**: `0.14.0` (2026-10-06). Rama `claude/water-state-analyzer-f4fiev`.
+- **Commits**: `cc97baf` (feat: refrigeración en `core/cycles` y lo
+  compartido en `core/`), `12999b5` (feat: página `/Refrigeracion` y
+  navegación) y el commit que ajusta el ancho de las ecuaciones y cierra la
+  fase con las docs.
+- **Scope**:
+  - **Ciclos** (Cengel 8.ª ed., cap. 11): simple ideal (§11-3) y real
+    (§11-4: η_C, sobrecalentamiento, subenfriamiento y caídas de presión),
+    de dos etapas con cámara de evaporación instantánea («economizador
+    abierto», §11-8, ej. 11-5) y en cascada de dos etapas con uno o dos
+    refrigerantes (§11-8, ej. 11-4). Como refrigerador o bomba de calor
+    (§11-7). Red de TESPy como el tutorial de bomba de calor
+    (`CycleCloser` + `SimpleHeatExchanger` + `Compressor` + `Valve`;
+    `td_dew` / `td_bubble`); cámara = `DropletSeparator` + `Merge`;
+    cascada = `HeatExchanger` entre dos lazos.
+  - **Segundo principio** (Cengel §11-5; vademecum §11.5, §11.8 y §11.10):
+    con las temperaturas de las fuentes, X_dest = T₀·S_gen de cada
+    componente, trabajo mínimo, rendimiento exergético y COP reversible; el
+    balance Ẇ = Ẇ_mín + ΣX_dest cierra. La página lo muestra en tabla y
+    barras, con la interpretación física de cada componente en el
+    procedimiento.
+  - **Refrigerantes**: R-134a, R-1234yf, R-410A (pseudo-puro: rocío en el
+    evaporador, burbuja en el condensador), amoníaco, CO₂ (solo subcrítico)
+    y, nuevos en `core.fluids` (y en Propiedades, Interpolación e
+    Isoentrópicos), **R-32, propano (R-290) e isobutano (R-600a)**.
+  - **Tablas del R-134a**: Cengel usa h = s = 0 en el líquido saturado a
+    −40 °C y CoolProp la referencia del IIR; `textbook_reference_offset` /
+    `textbook_reference_note` lo avisan con las constantes (148,14 kJ/kg y
+    0,7956 kJ/(kg·K)) en Propiedades, en el ORC con R-134a y en
+    Refrigeración. La referencia de CoolProp no se toca (es global).
+  - **Comparación** de la cámara y la cascada con el ciclo simple
+    equivalente (COP, relación de presiones y descarga) y notas
+    didácticas: compresión húmeda con fluidos secos, descarga muy caliente,
+    evaporador bajo la presión atmosférica.
+  - **Diagramas**: las válvulas se dibujan rayadas sobre su línea de h
+    constante (también los drenajes del Rankine); una pestaña por
+    refrigerante en la cascada; log p–h por defecto.
+  - **Página `/Refrigeracion`**: niveles por presión o por temperatura de
+    saturación, rótulos con la numeración de Cengel, ciclo real, tamaño
+    por caudal o capacidad (con toneladas de refrigeración), segundo
+    principio, TESPy, export y barridos (COP y descarga contra T_evap,
+    T_cond, η_C, subenfriamiento y sobrecalentamiento; presión de la cámara
+    y temperatura intermedia de la cascada, con su óptimo). Nueva magnitud
+    `volume_flow` (caudal volumétrico aspirado).
+  - **Ejemplos**: Cengel 11-1 a 11-5 y propios (bomba de calor aire–agua
+    con R-410A, cascada CO₂/amoníaco a −45 °C, amoníaco en dos etapas con
+    cámara, heladera con isobutano).
+- **Validación** (contra el cálculo a mano con CoolProp a 10⁻⁷ y contra el
+  libro):
+  - 11-1: COP 3,968, Q̇_L 7,184 kW, Ẇ 1,811 kW (libro: 3,97; 7,18; 1,81);
+    restando la referencia, h₁, h₂ y h₃ coinciden con las tablas A-12/A-13.
+  - 11-2 con los estados del libro: COP 3,930 y η_C 0,937 (libro: 3,93 y
+    0,939 con sus tablas).
+  - 11-3: X_dest de compresor, condensador, válvula y evaporador 0,394,
+    0,426, 0,673 y 0,409 kW; η_II 34,8 %.
+  - 11-4: ṁ_B 0,03896 kg/s, COP 4,473 (libro: 0,0390 y 4,46).
+  - 11-5: x₆ 0,2049, q_L 146,28 kJ/kg, w 32,69 kJ/kg, COP 4,475 (libro:
+    0,2049; 146,3; 32,71; 4,47).
+  - El Rankine queda idéntico al snapshot de la 0.13.0 (29 casos) salvo la
+    nota del R-134a en el ORC.
+- **Mensajes al alumno**: refrigerante no disponible; presiones
+  invertidas, sobre el punto crítico (con la explicación del CO₂
+  transcrítico) o bajo el punto triple; sobrecalentamiento, subenfriamiento
+  o Δp negativos; líquido que se congelaría; válvula que tendría que subir
+  la presión; cámara fuera de rango o sin vapor que separar; cascada con el
+  calor al revés o con un ciclo desordenado; fuentes incompatibles con las
+  temperaturas del refrigerante; cámara y cascada juntas.
+- **Tests**: de 1740 a 1967 (+227), sin warnings de pytest.
+  - `tests/test_refrigeration.py` (113): ejemplos contra el libro y a mano,
+    balances de energía, masa y exergía de todos los ejemplos, bomba de
+    calor, caudal o capacidad, cada refrigerante en los tres ciclos,
+    R-410A, compresión húmeda, notas, numeración, 25 validaciones,
+    barridos con óptimo interior, export, procedimiento y diagrama.
+  - `tests/test_page_refrigeracion.py` (26, AppTest), navegación y los
+    fluidos nuevos en los tests que recorren todos los fluidos.
+  - LaTeX: validan con KaTeX estricto las 3287 expresiones distintas
+    (30 casos × 3 sistemas, más la teoría); **ninguna supera el ancho de un
+    celular en ningún sistema, SI incluido** (máx. 321 px: las restas con
+    ×10ⁿ se parten antes del signo).
+  - Smoke test en Chromium a 1280 y 390 px: todas las páginas por link
+    directo, Propiedades con R-134a e isobutano, y /Refrigeracion con
+    11-1, 11-3, 11-4, 11-5, la bomba de calor y la cascada CO₂/NH₃.
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
@@ -436,10 +521,15 @@
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
-- **Fase 3.1 (continuación)** — Refrigeración por compresión de vapor;
-  Brayton; ciclo combinado; exergía de los ciclos. Evaluar
-  `tespy.tools.get_plotting_data` para los diagramas (hoy el ciclo se
-  dibuja con `core.diagrams.segments_overlays`).
+- **Fase 3.3** — Caldera de recuperación (HRSG) de una presión: diagrama
+  T–Q con pinch y approach, para vapor sobrecalentado o saturado (pedido
+  del autor, en curso).
+- **Fase 3.x** — Brayton; ciclo combinado; exergía de los ciclos de
+  potencia. Evaluar `tespy.tools.get_plotting_data` para los diagramas
+  (hoy el ciclo se dibuja con `core.diagrams.segments_overlays`).
+- **Refrigeración (continuación)**: ciclo transcrítico de CO₂,
+  intercambiador líquido–vapor, economizador cerrado (subenfriador),
+  refrigeración por gas y por absorción.
 - **Fase 4** — Psicrometría (carta interactiva, procesos HVAC).
 - **Fase 5** — Combustión: estequiometría, exceso de aire, productos
   de combustión, temperatura adiabática de llama.
