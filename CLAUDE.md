@@ -67,6 +67,11 @@ apps/
 │   │                          # composición con λ o cargada, secciones, estados,
 │   │                          # comparación saturado/sobrecalentado, barridos.
 │   ├── 11_Exergia.py
+│   ├── 12_Ciclo_Combinado.py  # ✅ Fase 3.4 — Turbina de gas (metano o aire estándar)
+│   │                          # + HRSG de una presión (por pinch o por chimenea) +
+│   │                          # Rankine con desaireador: métricas, Sankey, T–s de
+│   │                          # la TG, T–Q, ciclo de vapor, control con TESPy,
+│   │                          # procedimiento por partes, barridos.
 │   └── 99_Acerca.py           # Créditos, licencias, citas
 ├── core/                      # Lógica pura, sin dependencia de Streamlit
 │   ├── __init__.py
@@ -107,6 +112,11 @@ apps/
 │   │                          # axis_window_si, cycle_overlays (Fase 1.6).
 │   │                          # Fase 3.1c: con fricción, casi isobárica.
 │   │                          # Fase 3.2: válvulas a h constante (isenthalpic).
+│   ├── ideal_gas.py           # ✅ Fase 3.4 — Mezclas de gases ideales (se mudó de
+│   │                          # hrsg.py, que lo reexporta): FlueGas con h, cp, s°(T),
+│   │                          # s(T, p) absoluta (NIST-JANAF), T_isentropic, T_from_h;
+│   │                          # AIR_DRY / AIR_TECHNICAL, exhaust_composition(λ),
+│   │                          # combustion_products(aire, átomos, λ).
 │   ├── exergy.py              # Exergía física y química
 │   ├── combustion/
 │   │   ├── __init__.py
@@ -150,20 +160,35 @@ apps/
 │   │   │                      # HRSGInputs / solve_hrsg / HRSGResult (balances por
 │   │   │                      # sección), hrsg_tq_profile, notas, ejemplos,
 │   │   │                      # other_steam_option, barridos y hrsg_to_dict. Sin TESPy.
+│   │   │                      # Fase 3.4: el gas pasa a core/ideal_gas.py; diseño
+│   │   │                      # por temperatura de chimenea (T_stack_K, pinch_K).
 │   │   ├── hrsg_procedure.py  # ✅ Fase 3.3 — hrsg_steps: composición, entalpía de
 │   │   │                      # los gases, agua, caudal de vapor, secciones, total
-│   │   │                      # y aprovechamiento, punto de rocío.
-│   │   ├── brayton.py
-│   │   └── combined.py
+│   │   │                      # y aprovechamiento, punto de rocío. Fase 3.4: modo
+│   │   │                      # chimenea, times_diff / factor_times_diff públicos.
+│   │   ├── brayton.py         # ✅ Fase 3.4 — Fuel (ISO 6976), BraytonInputs /
+│   │   │                      # solve_brayton / BraytonResult, validaciones, notas,
+│   │   │                      # brayton_ts_lines y brayton_tespy (control).
+│   │   ├── brayton_procedure.py # ✅ Fase 3.4 — brayton_steps: aire, compresor (s°),
+│   │   │                      # cámara (PCI, aire teórico, f, λ) o aire estándar,
+│   │   │                      # gases, turbina, rendimiento y potencias.
+│   │   ├── combined.py        # ✅ Fase 3.4 — SteamCycle, CombinedInputs /
+│   │   │                      # solve_combined / CombinedResult (Kehlhofer, balance),
+│   │   │                      # notas, ejemplos, barridos y combined_to_dict.
+│   │   └── combined_procedure.py # ✅ Fase 3.4 — combined_sections: TG, HRSG,
+│   │                          # ciclo de vapor y el acople con el rendimiento.
 │   └── plots.py               # fluprodia + matplotlib helpers
 ├── ui/                        # Helpers de UI que sí importan Streamlit
 │   ├── branding.py            # Bloque de créditos compartido (sidebar)
 │   ├── units_ui.py            # ✅ Fase 1.4 — Selector global + number_input_si
 │   │                          # (key real f"{key}@{sistema}": el valor físico
 │   │                          # sobrevive al cambio de unidades, Fase 1.6).
-│   └── diagrams.py            # ✅ Fase 1.5a — Cache de FluidPropertyDiagram
-│                              # (@st.cache_resource), render_diagram_plotly
-│                              # con overlays de puntos / procesos.
+│   ├── diagrams.py            # ✅ Fase 1.5a — Cache de FluidPropertyDiagram
+│   │                          # (@st.cache_resource), render_diagram_plotly
+│   │                          # con overlays de puntos / procesos.
+│   └── cycle_charts.py        # ✅ Fase 3.4 — tq_figure (de /HRSG),
+│                              # render_rankine_diagram (de /Rankine),
+│                              # gas_turbine_ts_figure y energy_sankey_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
@@ -458,6 +483,56 @@ Notas de la Fase 3.3 (HRSG de una presión):
 - Los textos usan °C y bar (como el Rankine); el LaTeX sigue el sistema.
   En SI las restas con ×10ⁿ se parten (`_times_diff`) y el calor total va
   un sumando por renglón: máximo 304 px.
+
+Notas de la Fase 3.4 (turbina de gas y ciclo combinado de una presión):
+
+- Gases ideales en `core/ideal_gas.py` (`hrsg.py` lo reexporta: la API no
+  cambió). h y s°(T) desde 25 °C; la entropía absoluta suma la S° de
+  NIST-JANAF a 25 °C y 1 bar, −R·ln(p/p°) y el término de mezcla, así el
+  aire y los gases quedan en la misma escala del T–s. La isoentrópica sale
+  de s°(T₂s) = s°(T₁) + R·ln(p₂/p₁) (método de la A-17 de Cengel). Cada
+  especie tiene la T mínima de CoolProp (el CO₂ del aire seco limita a
+  216,6 K; con agua, 273,17 K).
+- Aire seco (N₂ 0,7808, O₂ 0,2095, Ar 0,0093, CO₂ 0,0004): reproduce las
+  tablas de Cengel (Δh̄ de A-18 a A-23 al 0,1 %; ejemplos 9-5, 9-6 y
+  10-9). El técnico (21/79) es el del vademecum §16.1.
+- Cámara, por kg de aire y con h desde 25 °C (la referencia del PCI):
+  h_a(T₂) + f·PCI = (1 + f)·h_g(T₃). La composición depende de f: `brentq`
+  entre ~0 y el estequiométrico (si no alcanza, λ < 1 y error). PCI de
+  ISO 6976:2016 a 25 °C: PCS_m − (b/2)·L₀ (metano: 50,027 MJ/kg). Aire
+  estándar = `fuel=None`. TIT ≤ T₂ se valida antes (sin eso `brentq` falla
+  sin explicación).
+- TESPy de control (`brayton_tespy`, como su tutorial de turbina de gas):
+  `Compressor` + `DiabaticCombustionChamber` (combustible a 25 °C con
+  `p=Ref(c2, 1.05, 0)`) + `Turbine`; aire estándar con
+  `SimpleHeatExchanger`. Sin `T0`/`m0` del cálculo directo, Newton pasa por
+  63 K y termina en status 99. Coincide al 0,3 % (gas real a r_p alta).
+- HRSG por chimenea (Cengel 10-9): ṁ_v del balance de toda la caldera; el
+  pinch es un resultado (≤ 0: cruce de temperaturas, con mensaje).
+- Acople: el Rankine se resuelve por kg (bomba → agua de alimentación de
+  la HRSG) y se escala con el ṁ_v de la HRSG (`dataclasses.replace`).
+  η_HRSG = Q̇_HRSG / (Q̇_comb − Ẇ_TG): con esa definición la relación de
+  Kehlhofer y el balance Q̇_comb = Ẇ_TG + Ẇ_TV + Q̇_cond + Q̇_chim (la
+  chimenea contra el aire a T₁) cierran exactos (tests). Los errores llevan
+  el nombre de la parte («Turbina de gas: », «Caldera de recuperación: »,
+  «Ciclo de vapor: »).
+- Barridos: en los de r_p y TIT el vapor se sobrecalienta como mucho hasta
+  T₄ − 25 K (`SH_HOT_END_K`); los puntos sin sentido físico se omiten. En
+  el ejemplo típico el óptimo del ciclo combinado está en r_p ≈ 20 y el de
+  la turbina de gas sola, en el extremo del barrido (40).
+- Página: botón «Calcular» como el Rankine; el TESPy de control se
+  cachea (devuelve el resultado o el texto del error). El diseño por
+  chimenea arranca con la del diseño por pinch del ejemplo redondeada hacia
+  arriba a 5 °C (con 150 °C el típico cruza). Los rótulos del Sankey van
+  en varios renglones (`<br>`): en uno solo se pisaban a 390 px. En el T–s,
+  el tramo gris horizontal en 2 es el cambio de composición de la cámara.
+- Procedimiento con la notación de Cengel (s°₁, s°₂s; s°_g,3 para los
+  gases). En SI la turbina calcula primero Δh_s y w_T usa
+  `factor_times_diff`: máximo 306 px en los tres sistemas (2592
+  ecuaciones). Los pasos del Rankine en SI se siguen deslizando (hasta
+  384 px), igual que en /Rankine.
+- `ui/cycle_charts.py` junta los gráficos de los ciclos: /HRSG y /Rankine
+  importan de ahí el T–Q y el diagrama del Rankine, sin cambios visibles.
 
 ### Citas y licencias
 

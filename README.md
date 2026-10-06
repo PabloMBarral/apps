@@ -190,7 +190,42 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   castellano (cruce de temperaturas, chimenea bajo el punto de rocío,
   gases que no alcanzan para evaporar, presión supercrítica…). Fórmulas
   del vademecum (§3.3, §4.8, §5, §12, §13, §16) y descarga CSV/JSON.
-  _Fase 3.3 cerrada._
+  _Fase 3.3 cerrada._ El núcleo también la diseña por **temperatura de
+  chimenea** (Cengel 10-9: el pinch pasa a ser un resultado), el modo que
+  usa el ciclo combinado.
+- ✅ **Ciclo combinado gas–vapor de una presión**: una **turbina de gas**
+  (compresor, cámara de combustión y turbina) cuyo escape alimenta la HRSG
+  de una presión, y el vapor mueve el **ciclo de Rankine** de la app, con
+  desaireador opcional. La turbina de gas se calcula con calores
+  específicos variables (mezclas de gases ideales con la función s°(T),
+  como la tabla A-17 de Cengel, y entropías absolutas de NIST-JANAF),
+  quemando **metano** (poder calorífico de ISO 6976:2016 a 25 °C; da la
+  relación combustible/aire, el exceso de aire λ y la composición de los
+  gases) o con el modelo de **aire estándar** (Cengel §9-3), con aire seco
+  (el de las tablas de Cengel) o técnico (21 % O₂, vademecum §16.1); la
+  misma turbina resuelta con **TESPy** (`Compressor`,
+  `DiabaticCombustionChamber`, `Turbine`) queda al lado como control y
+  coincide al 0,3 %. La HRSG se diseña por pinch o por temperatura de
+  chimenea, con vapor sobrecalentado o saturado, y el agua de alimentación
+  es la que entrega la bomba del ciclo de vapor. El tamaño sale del caudal
+  de aire o de la potencia neta. Muestra los rendimientos de la turbina de
+  gas, del ciclo de vapor y del **ciclo combinado** (con la relación de
+  Kehlhofer η_CC = η_TG + η_HRSG·η_TV·(1 − η_TG) y el balance de energía,
+  que cierran exactos), las potencias, el caudal de vapor, la chimenea y el
+  heat rate; un **diagrama de Sankey** de a dónde va la energía del
+  combustible; el **T–s** de la turbina de gas (con el enfriamiento de los
+  gases en la HRSG), el **T–Q** de la HRSG y el diagrama del ciclo de
+  vapor; las tablas de estados de las tres partes; el **procedimiento** por
+  partes, y **barridos** que muestran que el óptimo de la relación de
+  presiones del ciclo combinado está por debajo del de la turbina de gas
+  sola (también la TIT, la presión del vapor y el pinch o la chimenea).
+  Ejemplos: una planta típica de una presión, Cengel 10-9 (ṁ_v/ṁ_g = 0,131,
+  η = 48,7 %; además 9-5 y 9-6 en los tests) y una turbina moderna (60,5 %).
+  Validación con mensajes en castellano que nombran la parte (TIT por
+  debajo de la salida del compresor, combustión con λ < 1, vapor más
+  caliente que el escape, desaireador por encima de la caldera…). Fórmulas
+  del vademecum (§3.3, §4.8, §5, §10.4, §16) y descarga CSV/JSON. _Fase 3.4
+  cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -200,8 +235,8 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
 - **HRSG de dos y tres presiones**, con recalentamiento y quemadores
   suplementarios.
 - **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
-  Brayton (simple, con regeneración, intercooling, recalentamiento),
-  ciclo combinado, cogeneración.
+  Brayton con regeneración, interenfriamiento y recalentamiento (página
+  propia, sobre la turbina de gas del ciclo combinado), cogeneración.
 - **Psicrometría** y procesos HVAC sobre carta psicrométrica interactiva.
 - **Estequiometría** de combustión: combustibles puros y mezclas,
   exceso de aire, composición de humos en base seca y húmeda,
@@ -247,6 +282,7 @@ apps/
 │   ├── latex.py           # cantidades y cadenas de igualdades en LaTeX
 │   ├── export.py          # dict → CSV (campo, valor) para las descargas
 │   ├── diagrams.py        # diagramas de propiedades (fluprodia)
+│   ├── ideal_gas.py       # mezclas de gases ideales: aire, gases de combustión, s°(T)
 │   ├── interpolation.py
 │   ├── isentropic.py
 │   ├── exergy.py
@@ -261,10 +297,15 @@ apps/
 │   │   ├── rankine_procedure.py  # procedimiento «como con las tablas»
 │   │   ├── refrigeration.py      # refrigeración simple, con cámara y en cascada (TESPy)
 │   │   ├── refrigeration_procedure.py  # su procedimiento, con la exergía destruida
-│   │   ├── hrsg.py               # HRSG de una presión: balances, diagrama T–Q, gases
-│   │   └── hrsg_procedure.py     # su procedimiento «a mano»
+│   │   ├── hrsg.py               # HRSG de una presión: balances, diagrama T–Q
+│   │   ├── hrsg_procedure.py     # su procedimiento «a mano»
+│   │   ├── brayton.py            # turbina de gas (gases ideales; TESPy de control)
+│   │   ├── brayton_procedure.py  # su procedimiento con la función s°
+│   │   ├── combined.py           # ciclo combinado: turbina de gas + HRSG + Rankine
+│   │   └── combined_procedure.py # su procedimiento por partes
 │   └── plots.py
-├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, créditos
+├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, gráficos
+│                          # de los ciclos (T–Q, T–s, Sankey), créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── requirements.txt
 ├── CITATION.cff
@@ -280,7 +321,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.15.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.16.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -373,6 +414,30 @@ Organization for Standardization, 2016.
   pages   = {168--186},
   year    = {2013},
   doi     = {10.1016/j.rser.2013.01.028}
+}
+```
+
+**Turbina de gas y ciclo combinado** — las entropías absolutas a 25 °C y 1 bar
+de los gases (N₂, O₂, CO₂, H₂O, Ar) son las de las tablas NIST-JANAF; el
+diseño de la HRSG y la relación entre los rendimientos, de Kehlhofer et al.:
+
+```bibtex
+@book{chase1998janaf,
+  author    = {Chase, Jr., Malcolm W.},
+  title     = {{NIST-JANAF} Thermochemical Tables},
+  edition   = {4},
+  series    = {Journal of Physical and Chemical Reference Data, Monograph 9},
+  publisher = {American Chemical Society and American Institute of Physics},
+  year      = {1998}
+}
+
+@book{kehlhofer2009combined,
+  author    = {Kehlhofer, Rolf and Hannemann, Frank and Stirnimann, Franz
+               and Rukes, Bert},
+  title     = {Combined-Cycle Gas \& Steam Turbine Power Plants},
+  edition   = {3},
+  publisher = {PennWell},
+  year      = {2009}
 }
 ```
 

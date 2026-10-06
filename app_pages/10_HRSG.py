@@ -48,7 +48,7 @@ from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_c
 from ui.cycle_charts import tq_figure
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.15.0"
+PAGE_VERSION = "0.16.0"
 
 _EXAMPLES = list(HRSG_EXAMPLES)
 # Opciones fijas: cambiarlas reiniciaría el widget.

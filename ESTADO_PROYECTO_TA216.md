@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.15.0` — Fase 3.3 cerrada (2026-10-06).
+> **Versión actual**: `0.16.0` — Fase 3.4 cerrada (2026-10-06).
 
 ---
 
@@ -580,6 +580,95 @@
   en `tests/test_rankine.py` y `tests/test_page_rankine.py`.
 - **Dependencias**: ninguna nueva.
 
+### Fase 3.4 — Turbina de gas y ciclo combinado de una presión
+- **Versión**: `0.16.0` (2026-10-06). Rama `claude/water-state-analyzer-f4fiev`
+  (pedido del autor: el ciclo combinado antes que la HRSG de varias
+  presiones, «la hrsg esa dejala para despues, primero lo otro»).
+- **Scope**:
+  - **`core/ideal_gas.py`**: el modelo de mezclas de gases ideales se mudó
+    desde `hrsg.py` (que lo reexporta) y suma la función s°(T), la entropía
+    absoluta con las S° de NIST-JANAF a 25 °C y 1 bar (para dibujar el aire
+    y los gases en el mismo T–s), la T de una compresión o expansión
+    isoentrópica (s°₂ = s°₁ + R·ln(p₂/p₁), como la tabla A-17 de Cengel),
+    el aire seco (con Ar y CO₂, el de las tablas de Cengel) y el técnico
+    (vademecum §16.1), y los productos de combustión con cualquier aire.
+  - **`core/cycles/brayton.py`**: turbina de gas (compresor, cámara y
+    turbina) con calores específicos variables. Combustión de metano (o de
+    una mezcla de componentes de ISO 6976) con el PCI de ISO 6976:2016 a
+    25 °C; el balance de la cámara da f, λ y la composición de los gases.
+    Modo aire estándar (Cengel §9-3). Validaciones, notas, líneas del T–s
+    y la misma turbina resuelta con **TESPy** (`Compressor`,
+    `DiabaticCombustionChamber`, `Turbine`) como control.
+  - **HRSG por temperatura de chimenea** (Cengel 10-9): el caudal de vapor
+    sale del balance de toda la caldera y el pinch es un resultado.
+  - **`core/cycles/combined.py`**: turbina de gas + HRSG + el Rankine de la
+    app (con desaireador opcional; el agua de alimentación es la que sale
+    de la bomba). Rendimientos de cada parte y del conjunto, η_HRSG,
+    relación de Kehlhofer, balance de energía, heat rate, dimensionado por
+    caudal de aire o por potencia neta, notas, tres ejemplos, barridos y
+    export.
+  - **Procedimientos**: `brayton_procedure.py` (aire, compresor con s°,
+    cámara con el PCI, el aire teórico, f y λ, gases, turbina, rendimiento
+    y potencias) y `combined_procedure.py` (turbina de gas, HRSG, ciclo de
+    vapor y el acople con el rendimiento del ciclo combinado).
+  - **Página `/Ciclo_Combinado`** (`app_pages/12_Ciclo_Combinado.py`, ⚡):
+    datos de la turbina de gas (metano o aire estándar, aire seco o
+    técnico), de la HRSG (sobrecalentado o saturado, por pinch o por
+    chimenea) y del ciclo de vapor; botón «Calcular». Métricas, notas,
+    diagrama de **Sankey** de la energía, **T–s** de la turbina de gas con
+    el enfriamiento en la HRSG, **T–Q** de la HRSG, diagrama y estados del
+    ciclo de vapor, procedimiento por partes, control con TESPy, export y
+    barridos (relación de presiones, TIT, presión del vapor, pinch o
+    chimenea).
+  - **`ui/cycle_charts.py`**: el T–Q de /HRSG y el diagrama de /Rankine se
+    mudaron ahí (las dos páginas no cambian) junto con los gráficos nuevos.
+  - **Ejemplos**: planta típica (r_p 15, TIT 1250 °C, 500 kg/s de aire;
+    vapor a 60 bar y 540 °C, desaireador a 1,5 bar): η_TG = 39,27 %,
+    η_TV = 36,73 %, **η_CC = 55,61 %** (216 + 90 MW); Cengel 10-9 (aire
+    estándar, chimenea a 450 K): y = 0,1313 y η = 48,70 % (libro: 0,131 y
+    48,7 %); turbina moderna (r_p 17, TIT 1400 °C, 100 bar y 565 °C):
+    η_CC = 60,52 %.
+- **Validación**:
+  - Gas ideal contra Cengel A-18 a A-23 (Δh̄ de 298 a 1000 K, ≤ 0,085 %) y
+    s° de NIST-JANAF a 1000 K (±0,02 J/(mol·K)).
+  - Cengel 9-5: T₂ = 539,8 K, T₄ = 770,4 K, r_bw = 0,402, η = 42,5 %
+    (libro: 540 K, 770 K, 0,403, 42,6 %); 9-6: r_bw = 0,592, η = 26,61 %,
+    T₄ = 853,0 K (libro: 0,592, 26,6 %, 853 K).
+  - Turbina de gas contra un cálculo a mano independiente (10⁻⁷) y contra
+    TESPy (≤ 0,3 %: el gas real a presiones altas). PCI del metano:
+    50,027 MJ/kg (Cengel A-27: 50,05).
+  - Ciclo combinado: el balance de energía y la relación de Kehlhofer
+    cierran a 10⁻⁹; el barrido de r_p tiene un máximo interior (r_p ≈ 20 en
+    el típico) mientras la turbina de gas sola sigue mejorando.
+- **Mensajes al alumno** (con el nombre de la parte): TIT por debajo de la
+  salida del compresor, combustión que pediría λ < 1, relación de
+  presiones, rendimientos, caída de presión, ambiente o caudal fuera de
+  rango, combustible que no está en ISO 6976 o que no se quema, cruce de
+  temperaturas en la HRSG por chimenea, vapor más caliente que el escape,
+  desaireador fuera del rango de presiones, potencia no positiva.
+- **Tests**: de 2056 a **2169** passed (10 skipped), sin warnings de pytest.
+  - `tests/test_ideal_gas.py` (15), `tests/test_brayton.py` (41),
+    `tests/test_combined.py` (24) y 9 nuevos en `tests/test_hrsg.py`
+    (modo chimenea).
+  - `tests/test_page_ciclo_combinado.py` (23, AppTest): ejemplos, botón,
+    aire estándar y técnico, vapor saturado, sin desaireador, diseño por
+    chimenea, potencia neta, errores, unidades, control con TESPy, teoría,
+    export y barridos; la navegación recorre la página nueva.
+  - LaTeX: KaTeX estricto valida las 2592 expresiones distintas (8
+    turbinas de gas y 13 ciclos combinados × 3 sistemas, la HRSG por
+    chimenea y la teoría); lo nuevo entra en 306 px como máximo. Los pasos
+    del ciclo de vapor en SI son los del Rankine y se siguen deslizando
+    (≤ 384 px, como en /Rankine).
+  - Smoke test en Chromium a 1280 y 390 px por link directo: los tres
+    ejemplos y el típico en SI, con el procedimiento, la teoría, el control
+    con TESPy y el diagrama del ciclo de vapor abiertos; sin desborde de la
+    página. El Sankey lleva los rótulos en varios renglones para que no se
+    pisen en el celular.
+- **Dependencias**: ninguna nueva. `CITATION.cff` y el README suman NIST-JANAF
+  (Chase, 1998) y Kehlhofer et al. (2009) como referencias. A la referencia
+  de ISO 6976 del `CITATION.cff` le faltaba `authors` (obligatorio en CFF
+  1.2.0): ahora el archivo valida contra el esquema.
+
 ---
 
 ## Pendientes / próximas fases
@@ -601,11 +690,16 @@
   cuando se incorpore ISO 14912:2003 Formula (69).
 - **HRSG (continuación)**: dos y tres presiones, recalentamiento,
   quemadores suplementarios, pérdidas de carga y purga, diseño de las
-  superficies (UA, NTU), condensación ácida, y el ciclo combinado completo
-  sobre esta base y la del Rankine.
-- **Fase 3.x** — Brayton; ciclo combinado; exergía de los ciclos de
-  potencia. Evaluar `tespy.tools.get_plotting_data` para los diagramas
-  (hoy el ciclo se dibuja con `core.diagrams.segments_overlays`).
+  superficies (UA, NTU), condensación ácida, y el ciclo combinado de dos y
+  tres presiones sobre esta base.
+- **Ciclo combinado (continuación)**: aire húmedo, gas natural con otros
+  componentes en la página (el núcleo ya los acepta), generador y pérdidas
+  mecánicas, cogeneración.
+- **Fase 3.x** — Brayton con regeneración, interenfriamiento y
+  recalentamiento (página propia sobre `core/cycles/brayton.py`); exergía
+  de los ciclos de potencia. Evaluar `tespy.tools.get_plotting_data` para
+  los diagramas (hoy el ciclo se dibuja con
+  `core.diagrams.segments_overlays`).
 - **Refrigeración (continuación)**: ciclo transcrítico de CO₂,
   intercambiador líquido–vapor, economizador cerrado (subenfriador),
   refrigeración por gas y por absorción.
