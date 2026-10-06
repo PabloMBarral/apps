@@ -1,16 +1,18 @@
-"""Procedimiento del ciclo de Rankine «como con las tablas» — Fases 3.1a y 3.1b.
+"""Procedimiento del ciclo de Rankine «como con las tablas» — Fases 3.1a, 3.1b y 3.1c.
 
 Arma los pasos del expansor 🔬 Procedimiento en LaTeX, en el sistema de
 unidades activo (vademecum §3.3, §9.2, §10.4, §12 y §13; Çengel & Boles,
 *Termodinámica*, cap. 10). Recibe un resultado ya calculado
 (:class:`core.cycles.rankine.RankineResult`): no importa TESPy ni Streamlit.
 
-Sin calentadores sigue el orden de la Fase 3.1a: bomba, caldera, turbinas,
-condensador y balance. Con regeneración sigue el orden de Cengel §10-6:
-primero los estados que se leen en las tablas, después los balances de los
-calentadores —de mayor a menor presión— para despejar las fracciones de
-extracción y al final los calores y trabajos por kilogramo de vapor que pasa
-por la caldera.
+Sin calentadores, pérdidas ni recuperador sigue el orden de la Fase 3.1a:
+bomba, caldera, turbinas, condensador y balance. Si no, sigue el orden de
+Cengel §10-5 y §10-6: primero los estados que se leen en las tablas (con las
+caídas de presión y de temperatura del ciclo real y el recuperador), después
+los balances de los calentadores —de mayor a menor presión— para despejar
+las fracciones de extracción (o, si un drenaje bombeado las acopla, el
+sistema resuelto y su verificación) y al final los calores y trabajos por
+kilogramo de vapor que pasa por la caldera.
 
 Las ecuaciones se arman con :func:`core.latex.latex_chain` (una igualdad por
 renglón) para que entren en el ancho de un celular.
@@ -20,10 +22,17 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from core.cycles.rankine_layout import Flow, port_flows
-from core.fluids import fluid_limits, saturation_at_pressure, saturation_at_temperature
+from core.fluids import (
+    _el,
+    fluid_limits,
+    fluid_state_from_pair,
+    saturation_at_pressure,
+    saturation_at_temperature,
+)
 from core.latex import latex_chain, latex_number, latex_paren, latex_quantity, latex_value
 from core.state_report import ProcedureStep, pv_energy_factor
 from core.units_system import QuantityKind, UnitSystem, unit_label
@@ -94,25 +103,169 @@ def _absolute_T(T_K: float, system: UnitSystem) -> str:
 
 
 # ---------------------------------------------------------------------
+# Textos según el fluido (agua o ORC) y el equipo donde entra el calor
+# ---------------------------------------------------------------------
+
+_WATER = "Water"
+_MASCULINE = frozenset({"evaporador"})
+
+
+def _boiler(result: RankineResult) -> str:
+    """«caldera» (ciclo de vapor) o «evaporador» (ORC)."""
+    return result.inputs.boiler_name
+
+
+def _the(name: str) -> str:
+    return f"el {name}" if name in _MASCULINE else f"la {name}"
+
+
+def _of(name: str) -> str:
+    return f"del {name}" if name in _MASCULINE else f"de la {name}"
+
+
+def _to(name: str) -> str:
+    return f"al {name}" if name in _MASCULINE else f"a la {name}"
+
+
+def _cap(text: str) -> str:
+    return text[0].upper() + text[1:]
+
+
+def _q_boiler(result: RankineResult) -> str:
+    """Símbolo del calor de la caldera (q_cald) o del evaporador (q_evap)."""
+    return r"q_{\mathrm{cald}}" if _boiler(result) == "caldera" else r"q_{\mathrm{evap}}"
+
+
+def _fluid(result: RankineResult) -> str:
+    """«el agua», «el R-245fa», «el tolueno»… para usar dentro de una oración."""
+    return _el(result.inputs.fluid)
+
+
+def _read(result: RankineResult, table: str) -> str:
+    """Dónde se lee una propiedad: la tabla de Cengel que corresponde o la ecuación de estado.
+
+    ``table``: ``"sat_p"`` (saturación por presión), ``"sat"`` (saturación),
+    ``"vapor"`` (vapor), ``"superheated"`` (vapor sobrecalentado) o
+    ``"compressed"`` (líquido comprimido).
+    """
+    fluid = result.inputs.fluid
+    if fluid == _WATER:
+        return {
+            "sat_p": "la tabla de saturación por presión (Cengel A-5)",
+            "sat": "la tabla de saturación",
+            "vapor": "la tabla de vapor (Cengel A-6)",
+            "superheated": "la tabla de vapor sobrecalentado (Cengel A-6)",
+            "compressed": "la tabla de líquido comprimido (Cengel A-7)",
+        }[table]
+    if fluid == "R134a" and table != "compressed":
+        return {
+            "sat_p": "la tabla de saturación del R-134a por presión (Cengel A-12)",
+            "sat": "la tabla de saturación del R-134a (Cengel A-12)",
+            "vapor": "la tabla de vapor sobrecalentado del R-134a (Cengel A-13)",
+            "superheated": "la tabla de vapor sobrecalentado del R-134a (Cengel A-13)",
+        }[table]
+    return f"la ecuación de estado (CoolProp; Cengel no tabula {_el(fluid)})"
+
+
+def _cite(text: str, ref: str) -> str:
+    """Agrega una cita: «… (Cengel A-12; vademecum §12)» o «… (vademecum §12)»."""
+    if text.endswith(")"):
+        return f"{text[:-1]}; {ref})"
+    return f"{text} ({ref})"
+
+
+def _tabulated(result: RankineResult) -> bool:
+    return result.inputs.fluid in (_WATER, "R134a")
+
+
+def _lookup(
+    result: RankineResult, table: str, *, interpolate: bool = False, plural: bool = False
+) -> str:
+    """«se lee en la tabla …» o, si Cengel no tabula el fluido, «sale de la ecuación de estado»."""
+    if result.inputs.fluid == "R134a" and table == "compressed":
+        table = "sat"
+    if _tabulated(result):
+        verb = "se leen en" if plural else "se lee en"
+        return f"{verb} {_read(result, table)}" + (", interpolando" if interpolate else "")
+    verb = "salen de" if plural else "sale de"
+    return f"{verb} {_read(result, table)}"
+
+
+# ---------------------------------------------------------------------
 # Pasos que comparten el ciclo simple y el regenerativo
 # ---------------------------------------------------------------------
 
 
 def _condenser_outlet_step(result: RankineResult, system: UnitSystem) -> ProcedureStep:
     s1 = result.states[0]
-    return ProcedureStep(
-        title="Estado 1: salida del condensador",
-        text=(
-            f"Sale líquido saturado (x₁ = 0) a la presión del condensador, "
-            f"{_bar(s1.P_Pa)}: se lee en la tabla de saturación por presión (Cengel A-5)."
-        ),
-        latex=(
-            rf"T_1 = T_{{\mathrm{{sat}}}}(p_1) = {_q(s1.T_K, 'temperature', system)}",
-            rf"h_1 = h_f(p_1) = {_q(s1.h_J_per_kg, _EH, system)}",
-            rf"v_1 = v_f(p_1) = {_q(s1.v_m3_per_kg, 'specific_volume', system)}",
-            rf"s_1 = s_f(p_1) = {_q(s1.s_J_per_kg_K, _ES, system)}",
-        ),
+    losses = result.inputs.losses
+    saturated = (
+        rf"T_1 = T_{{\mathrm{{sat}}}}(p_1) = {_q(s1.T_K, 'temperature', system)}",
+        rf"h_1 = h_f(p_1) = {_q(s1.h_J_per_kg, _EH, system)}",
+        rf"v_1 = v_f(p_1) = {_q(s1.v_m3_per_kg, 'specific_volume', system)}",
+        rf"s_1 = s_f(p_1) = {_q(s1.s_J_per_kg_K, _ES, system)}",
     )
+    if losses.subcooling_K == 0.0 and losses.dp_condenser_Pa == 0.0:
+        return ProcedureStep(
+            title="Estado 1: salida del condensador",
+            text=(
+                f"Sale líquido saturado (x₁ = 0) a la presión del condensador, "
+                f"{_bar(s1.P_Pa)}: {_lookup(result, 'sat_p')}."
+            ),
+            latex=saturated,
+        )
+    # Ciclo real (Cengel §10-5): caída de presión y subenfriamiento del condensado.
+    lines: list[str] = []
+    clauses: list[str] = []
+    if losses.dp_condenser_Pa > 0.0:
+        p_exh = result.inputs.p_condenser_Pa
+        lines.append(
+            latex_chain(
+                "p_1",
+                r"p_{\mathrm{esc}} - \Delta p_{\mathrm{cond}}",
+                _diff(p_exh, losses.dp_condenser_Pa, "pressure", system),
+                _q(s1.P_Pa, "pressure", system),
+            )
+        )
+        clauses.append(
+            f"por la fricción, el condensado sale a p₁ = {_bar(s1.P_Pa)}, "
+            f"{_bar(losses.dp_condenser_Pa)} menos que el escape de la turbina"
+        )
+    if losses.subcooling_K == 0.0:
+        return ProcedureStep(
+            title="Estado 1: salida del condensador",
+            text=(
+                f"{_cap(clauses[0])} (Cengel §10-5). Sale líquido saturado (x₁ = 0): "
+                f"{_lookup(result, 'sat_p')}."
+            ),
+            latex=(*lines, *saturated),
+        )
+    sat = saturation_at_pressure(s1.fluid, s1.P_Pa)
+    liquid = saturation_at_temperature(s1.fluid, s1.T_K).liquid
+    sub = losses.subcooling_K
+    lines += [
+        latex_chain(
+            "T_1",
+            r"T_{\mathrm{sat}}(p_1) - \Delta T_{\mathrm{sub}}",
+            rf"{_n(sat.T_sat_K, 'temperature', system)} - "
+            rf"{_n(sub, 'temperature_difference', system)}",
+            _q(s1.T_K, "temperature", system),
+        ),
+        rf"h_1 = h(p_1,\ T_1) = {_q(s1.h_J_per_kg, _EH, system)}",
+        rf"h_f(T_1) = {_q(liquid.h_J_per_kg, _EH, system)}",
+        rf"v_1 \approx v_f(T_1) = {_q(liquid.v_m3_per_kg, 'specific_volume', system)}",
+        rf"s_1 = s(p_1,\ T_1) = {_q(s1.s_J_per_kg_K, _ES, system)}",
+    ]
+    clauses.append(
+        f"para que la bomba no cavite, el condensado sale subenfriado {sub:.3g} K por debajo de "
+        "la temperatura de saturación"
+    )
+    text = (
+        f"{_cap(' y, '.join(clauses))} (Cengel §10-5). Es líquido comprimido: h, v y s casi no "
+        "dependen de la presión y se aproximan con los del líquido saturado a la misma "
+        "temperatura (vademecum §13); con la ecuación de estado, h(p₁, T₁) da casi lo mismo."
+    )
+    return ProcedureStep(title="Estado 1: salida del condensador", text=text, latex=tuple(lines))
 
 
 def _pump_step(
@@ -125,8 +278,13 @@ def _pump_step(
     title: str,
     label: str,
     destination: str,
+    pressure: str | None = None,
 ) -> ProcedureStep:
-    """Bomba i → o: w ≈ v·Δp (líquido incompresible), h_s = h(p, s) y el estado real."""
+    """Bomba i → o: w ≈ v·Δp (líquido incompresible), h_s = h(p, s) y el estado real.
+
+    ``pressure`` es el renglón que explica la presión de salida cuando la bomba
+    tiene que compensar caídas de presión (ciclo real, Cengel §10-5).
+    """
     s_in, s_out = result.states[i], result.states[o]
     a, b = i + 1, o + 1
     eta = result.inputs.eta_pump
@@ -143,6 +301,7 @@ def _pump_step(
     w_ps = h_out_s - s_in.h_J_per_kg
     w = s_out.h_J_per_kg - s_in.h_J_per_kg
     lines = [
+        *(() if pressure is None else (pressure,)),
         latex_chain(
             r"w_{B,s}",
             rf"v_{_ix(a)}\,(p_{_ix(b)} - p_{_ix(a)})",
@@ -254,15 +413,16 @@ def _turbine_step(
         how = (
             f"A p = {_bar(s_out.P_Pa)} la entropía s{_sub(a)} cae dentro de la campana: el estado "
             f"isoentrópico {b}s es vapor húmedo y su título sale de la regla de la palanca, "
-            "con s_fg = s_g − s_f y h_fg = h_g − h_f de la tabla de saturación (vademecum §12)."
+            "con s_fg = s_g − s_f y h_fg = h_g − h_f de "
+            f"{_cite(_read(result, 'sat'), 'vademecum §12')}."
         )
     else:
         lines.append(
             latex_chain(rf"h_{{{b}s}}", rf"h(p_{{{b}}},\ s_{{{b}s}})", _q(h_out_s, _EH, system))
         )
         how = (
-            f"A p = {_bar(s_out.P_Pa)} el estado isoentrópico {b}s sigue sobrecalentado: se lee "
-            "en la tabla de vapor sobrecalentado (Cengel A-6), interpolando."
+            f"A p = {_bar(s_out.P_Pa)} el estado isoentrópico {b}s sigue sobrecalentado: "
+            f"{_lookup(result, 'superheated', interpolate=True)}."
         )
     if eta == 1.0:
         lines.append(rf"h_{{{b}}} = h_{{{b}s}} = {_q(s_out.h_J_per_kg, _EH, system)}")
@@ -340,9 +500,18 @@ def _power_step(result: RankineResult, system: UnitSystem) -> ProcedureStep:
                     _q(y * result.m_dot_kg_s, "mass_flow", system),
                 )
             )
+        boiler = _of(_boiler(result))
         text += (
-            " Las energías son por kilogramo de vapor que pasa por la caldera, así que se "
-            "multiplican por el caudal de la caldera; cada extracción es y·ṁ."
+            f" Las energías son por kilogramo de vapor que pasa por {_the(_boiler(result))}, así "
+            f"que se multiplican por el caudal {boiler}; cada extracción es y·ṁ."
+        )
+    if result.q_loss_J_per_kg > 0.0:
+        lines.append(
+            latex_chain(
+                r"\dot{Q}_{\text{pérd}}",
+                r"\dot{m}\,q_{\text{pérd}}",
+                _q(result.Q_loss_W, "power", system),
+            )
         )
     return ProcedureStep(title="Caudal y potencias", text=text, latex=tuple(lines))
 
@@ -369,29 +538,30 @@ def _simple_steps(result: RankineResult, system: UnitSystem) -> list[ProcedureSt
             system,
             title="1 → 2: bomba",
             label="bomba",
-            destination="la presión de la caldera",
+            destination=f"la presión {_of(_boiler(result))}",
         )
     )
 
-    # 2 → 3 — caldera.
+    # 2 → 3 — caldera (o evaporador).
     inlet_txt = (
         "vapor saturado seco (x₃ = 1)"
         if inputs.T_turbine_in_K is None
         else f"vapor a {_degC(s3.T_K)}"
     )
+    boiler = _boiler(result)
     steps.append(
         ProcedureStep(
-            title="2 → 3: caldera",
+            title=f"2 → 3: {boiler}",
             text=(
-                f"La caldera calienta el agua a p constante ({_bar(s3.P_Pa)}) hasta {inlet_txt}; "
-                "h₃ y s₃ se leen en la tabla de vapor (Cengel A-6). Balance de sistema abierto "
-                "sin trabajo (vademecum §3.3):"
+                f"{_cap(_the(boiler))} calienta {_fluid(result)} a p constante ({_bar(s3.P_Pa)}) "
+                f"hasta {inlet_txt}; h₃ y s₃ {_lookup(result, 'vapor', plural=True)}. Balance de "
+                "sistema abierto sin trabajo (vademecum §3.3):"
             ),
             latex=(
                 rf"h_3 = {_q(s3.h_J_per_kg, _EH, system)}",
                 rf"s_3 = {_q(s3.s_J_per_kg_K, _ES, system)}",
                 latex_chain(
-                    r"q_{\mathrm{cald}}",
+                    _q_boiler(result),
                     "h_3 - h_2",
                     _diff(s3.h_J_per_kg, s2.h_J_per_kg, _EH, system),
                     _q(s3.h_J_per_kg - s2.h_J_per_kg, _EH, system),
@@ -412,7 +582,7 @@ def _simple_steps(result: RankineResult, system: UnitSystem) -> list[ProcedureSt
             ProcedureStep(
                 title="4 → 5: recalentador",
                 text=(
-                    f"El vapor vuelve a la caldera y se recalienta a p constante "
+                    f"El vapor vuelve {_to(boiler)} y se recalienta a p constante "
                     f"({_bar(s4.P_Pa)}) hasta {_degC(s5.T_K)}:"
                 ),
                 latex=(
@@ -458,7 +628,7 @@ def _simple_steps(result: RankineResult, system: UnitSystem) -> list[ProcedureSt
 
     # Balance y rendimiento.
     w_t = " + ".join(rf"w_{{T,{i + 1}{o + 1}}}" for i, o in result.turbine_pairs)
-    q_h = r"q_{\mathrm{cald}} + q_{\mathrm{rec}}" if result.has_reheat else r"q_{\mathrm{cald}}"
+    q_h = rf"{_q_boiler(result)} + q_{{\mathrm{{rec}}}}" if result.has_reheat else _q_boiler(result)
     steps.append(
         _balance_step(
             result,
@@ -501,6 +671,7 @@ def _balance_step(
                 rf"{latex_paren(_n(result.w_pump_J_per_kg, _EH, system))}",
                 _q(result.w_net_J_per_kg, _EH, system),
             ),
+            *_first_law_lines(result, system),
             latex_chain(
                 r"\eta",
                 r"\frac{w_{\mathrm{neto}}}{q_H}",
@@ -513,6 +684,25 @@ def _balance_step(
                 r"\frac{w_B}{w_T}",
                 rf"{latex_number(result.back_work_ratio * 100, 3)}\,\%",
             ),
+        ),
+    )
+
+
+def _first_law_lines(result: RankineResult, system: UnitSystem) -> tuple[str, ...]:
+    """Con cañerías, el primer principio incluye el calor que pierden (Cengel §10-5)."""
+    if result.q_loss_J_per_kg <= 0.0:
+        return ()
+    return (
+        latex_chain(
+            r"w_{\mathrm{neto}}",
+            r"q_H - q_C - q_{\text{pérd}}",
+            _wrap(
+                rf"{_n(result.q_in_J_per_kg, _EH, system)} - "
+                rf"{latex_paren(_n(result.q_out_J_per_kg, _EH, system))}",
+                "-",
+                latex_paren(_n(result.q_loss_J_per_kg, _EH, system)),
+            ),
+            _q(result.w_net_J_per_kg, _EH, system),
         ),
     )
 
@@ -530,11 +720,21 @@ def _carnot_step(
         "lo que mejora el ciclo (Cengel §10-4)."
     )
     if result.has_heaters:
+        arrives = (
+            "el agua llega más caliente a la caldera"
+            if result.inputs.fluid == _WATER
+            else f"el líquido llega más caliente {_to(_boiler(result))}"
+        )
         text += (
-            " La regeneración sube T̄_H porque el agua llega más caliente a la caldera "
+            f" La regeneración sube T̄_H porque {arrives} "
             "(Cengel §10-6). Pero η queda por debajo de 1 − T_C/T̄_H: en los calentadores se "
             "mezclan o intercambian calor corrientes a distinta temperatura, y eso genera "
             "entropía."
+        )
+    elif result.has_recuperator:
+        text += (
+            " El recuperador sube T̄_H (el líquido llega precalentado al evaporador) sin sacar "
+            "vapor de la turbina."
         )
     if not isinstance(delta_s, str):
         terms = list(delta_s)
@@ -633,6 +833,14 @@ def _times_n(result: RankineResult, flow: Flow, expr: str) -> str:
     return rf"{latex_number(_flow_value(result, flow), 5)}{op}{expr}"
 
 
+def _rows(lhs: str, terms: Sequence[str], value: str) -> str:
+    """``lhs = t₁ + t₂ …`` con un término (ya con números) por renglón y el valor."""
+    rows = [rf"{lhs} &= {terms[0]}"]
+    rows += [rf"&\quad + {t}" for t in terms[1:]]
+    rows.append(rf"&= {value}")
+    return r"\begin{aligned}" + r" \\ ".join(rows) + r"\end{aligned}"
+
+
 def _sum_lines(lhs: str, terms: Sequence[str], numbers: Sequence[str], value: str) -> str:
     """``lhs = t₁ + t₂ …`` con un término por renglón, después los números y el valor."""
     rows = [rf"{lhs} &= {terms[0]}"]
@@ -652,17 +860,76 @@ def _state_lines(result: RankineResult, i: int, system: UnitSystem) -> tuple[str
     )
 
 
-def _destination(result: RankineResult, comp: CycleComponent) -> str:
-    """A qué presión lleva el líquido cada bomba (para el texto)."""
-    out = result.states[comp.port("out").state]
+def _line_path(result: RankineResult, state: int) -> tuple[CycleComponent, list[tuple[str, float]]]:
+    """Sigue la línea de agua desde ``state`` hasta el próximo abierto o la caldera.
+
+    Devuelve ese componente y las caídas de presión del camino (nombre, Δp):
+    los cerrados por los que pasa el agua, la cañería de alimentación, la
+    caldera y la cañería de vapor (Cengel §10-5).
+    """
+    inputs = result.inputs
+    line_kinds = ("open_heater", "closed_heater", "mixer", "recuperator", "pipe", "boiler")
+    consumers = {
+        p.state: c
+        for c in result.components
+        if c.kind in line_kinds
+        for p in c.ports
+        if p.role in ("in", "fw_in")
+    }
+    drops: list[tuple[str, float]] = []
+    while True:
+        comp = consumers[state]
+        if comp.kind == "open_heater":
+            return comp, drops
+        if comp.kind == "boiler":
+            drops.append((_the(comp.label), inputs.losses.dp_boiler_Pa))
+            if inputs.losses.steam_pipe is not None:
+                drops.append(("la cañería de vapor", inputs.losses.steam_pipe.dp_Pa))
+            return comp, drops
+        if comp.kind == "closed_heater":
+            assert comp.heater is not None
+            drops.append((f"el {comp.label}", inputs.heaters[comp.heater].dp_Pa))
+            state = comp.port("fw_out").state
+        elif comp.kind == "pipe":
+            pipe = inputs.losses.feed_pipe
+            drops.append(("la cañería de alimentación", 0.0 if pipe is None else pipe.dp_Pa))
+            state = comp.port("out").state
+        elif comp.kind == "recuperator":
+            state = comp.port("fw_out").state
+        else:  # cámara de mezcla
+            state = comp.port("out").state
+
+
+def _destination(
+    result: RankineResult, comp: CycleComponent, system: UnitSystem
+) -> tuple[str, str | None]:
+    """A qué presión lleva el líquido cada bomba (para el texto) y, si tiene que
+    compensar caídas de presión, el renglón p_sal = p_destino + ΣΔp."""
+    out_i = comp.port("out").state
+    out = result.states[out_i]
     if comp.heater is not None:
-        return f"la presión de la línea de agua de alimentación ({_bar(out.P_Pa)})"
-    for other in result.components:
-        if other.kind == "open_heater" and math.isclose(
-            result.states[other.port("out").state].P_Pa, out.P_Pa, rel_tol=1e-9
-        ):
-            return f"la presión del {other.label} ({_bar(out.P_Pa)})"
-    return f"la presión de la caldera ({_bar(out.P_Pa)})"
+        return f"la presión de la línea de agua de alimentación ({_bar(out.P_Pa)})", None
+    target, path = _line_path(result, out_i)
+    drops = [(name, dp) for name, dp in path if dp > 0.0]
+    assert result.layout is not None
+    if target.kind == "open_heater":
+        ref = target.port("out").state
+        base = f"la presión del {target.label}"
+    else:
+        ref = result.layout.turbine_inlet
+        base = "la presión de entrada a la turbina" if drops else f"la presión {_of(target.label)}"
+    if not drops:
+        return f"{base} ({_bar(out.P_Pa)})", None
+    names = [name for name, _ in drops]
+    listed = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]
+    total = sum(dp for _, dp in drops)
+    line = latex_chain(
+        f"p_{_ix(out_i + 1)}",
+        rf"p_{_ix(ref + 1)} + \sum \Delta p",
+        rf"{_n(result.states[ref].P_Pa, 'pressure', system)} + {_n(total, 'pressure', system)}",
+        _q(out.P_Pa, "pressure", system),
+    )
+    return f"{base} más las caídas de presión en {listed} ({_bar(out.P_Pa)})", line
 
 
 def _open_heater_state(
@@ -675,7 +942,7 @@ def _open_heater_state(
         title=f"Estado {i + 1}: salida del {comp.label}",
         text=(
             f"Del calentador abierto sale líquido saturado a la presión de extracción, "
-            f"{_bar(s.P_Pa)} (Cengel §10-6): se lee en la tabla de saturación."
+            f"{_bar(s.P_Pa)} (Cengel §10-6): {_lookup(result, 'sat')}."
         ),
         latex=(
             rf"T_{k} = T_{{\mathrm{{sat}}}}(p_{k}) = {_q(s.T_K, 'temperature', system)}",
@@ -689,16 +956,28 @@ def _open_heater_state(
 def _closed_heater_states(
     result: RankineResult, comp: CycleComponent, system: UnitSystem
 ) -> ProcedureStep:
-    """Salida del agua (líquido comprimido a T_sat − TTD) y drenaje (líquido saturado)."""
+    """Salida del agua (líquido comprimido a T_sat − TTD) y drenaje (líquido saturado,
+    o subenfriado a T_entrada + DCA si tiene subenfriador)."""
     assert comp.heater is not None
-    ttd = result.inputs.heaters[comp.heater].ttd_K
-    out_i, drain_i = comp.port("fw_out").state, comp.port("drain_out").state
-    bleed_i = comp.port("bleed").state
-    out, drain = result.states[out_i], result.states[drain_i]
-    o, d, b = _ix(out_i + 1), _ix(drain_i + 1), _ix(bleed_i + 1)
+    heater = result.inputs.heaters[comp.heater]
+    ttd = heater.ttd_K
+    in_i, out_i = comp.port("fw_in").state, comp.port("fw_out").state
+    drain_i, bleed_i = comp.port("drain_out").state, comp.port("bleed").state
+    water_in, out, drain = result.states[in_i], result.states[out_i], result.states[drain_i]
+    i_, o, d, b = _ix(in_i + 1), _ix(out_i + 1), _ix(drain_i + 1), _ix(bleed_i + 1)
     h_f_T = saturation_at_temperature(out.fluid, out.T_K).liquid.h_J_per_kg
     ttd_tex = "" if ttd == 0.0 else r" - \mathrm{TTD}"
-    lines = [
+    lines: list[str] = []
+    if heater.dp_Pa > 0.0:
+        lines.append(
+            latex_chain(
+                f"p_{o}",
+                rf"p_{i_} - \Delta p",
+                _diff(water_in.P_Pa, heater.dp_Pa, "pressure", system),
+                _q(out.P_Pa, "pressure", system),
+            )
+        )
+    lines += [
         latex_chain(
             f"T_{o}",
             rf"T_{{\mathrm{{sat}}}}(p_{b}){ttd_tex}",
@@ -707,7 +986,19 @@ def _closed_heater_states(
         rf"h_{o} = h(p_{o},\ T_{o}) = {_q(out.h_J_per_kg, _EH, system)}",
     ]
     lines.append(rf"h_f(T_{o}) = {_q(h_f_T, _EH, system)}")
-    lines.append(rf"h_{d} = h_f(p_{b}) = {_q(drain.h_J_per_kg, _EH, system)}")
+    if heater.dca_K is None:
+        lines.append(rf"h_{d} = h_f(p_{b}) = {_q(drain.h_J_per_kg, _EH, system)}")
+    else:
+        lines.append(
+            latex_chain(
+                f"T_{d}",
+                rf"T_{i_} + \mathrm{{DCA}}",
+                rf"{_n(water_in.T_K, 'temperature', system)} + "
+                rf"{_n(heater.dca_K, 'temperature_difference', system)}",
+                _q(drain.T_K, "temperature", system),
+            )
+        )
+        lines.append(rf"h_{d} = h(p_{d},\ T_{d}) = {_q(drain.h_J_per_kg, _EH, system)}")
     for valve in result.components:
         if valve.kind == "valve" and valve.heater == comp.heater:
             v_i = valve.port("out").state
@@ -720,21 +1011,209 @@ def _closed_heater_states(
             break
     else:
         drain_txt = " El drenaje se bombea hacia adelante, a la línea de agua de alimentación."
+    water = result.inputs.fluid == _WATER
     approx = (
-        " Como el agua está a más presión, es líquido comprimido: h sale de la tabla de "
-        "líquido comprimido (Cengel A-7) y, aproximando, h ≈ h_f(T) (vademecum §13)."
+        f" Como {'el agua' if water else 'el líquido'} está a más presión, es líquido "
+        "comprimido: h sale de "
+        + ("la tabla de líquido comprimido (Cengel A-7)" if water else "la ecuación de estado")
+        + " y, aproximando, h ≈ h_f(T) (vademecum §13)."
     )
     ttd_txt = (
         f"a la temperatura de saturación de la extracción (T_sat a {_bar(drain.P_Pa)})"
         if ttd == 0.0
-        else f"a T_sat − TTD, con TTD = {ttd:g} K"
+        else f"a T_sat − TTD, con TTD = {ttd:g} K".replace("-", "−")
     )
+    if heater.dca_K is None:
+        condenses = (
+            f"y la extracción condensa y sale como líquido saturado a {_bar(drain.P_Pa)} (el "
+            "drenaje; Cengel §10-6)."
+        )
+    else:
+        condenses = (
+            "y la extracción condensa; con subenfriador de drenaje, el condensado se sigue "
+            "enfriando contra el agua que entra y sale a la temperatura de esa agua más el DCA "
+            f"(DCA = {heater.dca_K:g} K), como líquido comprimido a {_bar(drain.P_Pa)}."
+        )
+    extra = ""
+    if heater.dp_Pa > 0.0:
+        extra += f" En los tubos el agua pierde {_bar(heater.dp_Pa)} por fricción (Cengel §10-5)."
+    if heater.desuperheater:
+        extra += (
+            " Tiene desrecalentador: la extracción, sobrecalentada, se enfría primero hasta "
+            "vapor saturado calentando el agua que ya salió de la zona de condensación; por "
+            "eso el agua puede salir por encima de T_sat (TTD < 0)."
+        )
     return ProcedureStep(
         title=f"{comp.label[0].upper()}{comp.label[1:]}: estados {out_i + 1} y {drain_i + 1}",
         text=(
-            f"En el calentador cerrado el agua de alimentación sale {ttd_txt}, y la extracción "
-            f"condensa y sale como líquido saturado a {_bar(drain.P_Pa)} (el drenaje; Cengel "
-            f"§10-6).{approx}{drain_txt}"
+            f"En el calentador cerrado el agua de alimentación sale {ttd_txt}, {condenses}"
+            f"{extra}{approx}{drain_txt}"
+        ),
+        latex=tuple(lines),
+    )
+
+
+def _pipe_step(result: RankineResult, comp: CycleComponent, system: UnitSystem) -> ProcedureStep:
+    """Cañería con pérdida de carga y de calor (Cengel §10-5 y ejemplo 10-2)."""
+    assert result.layout is not None
+    i, o = comp.port("in").state, comp.port("out").state
+    s_in, s_out = result.states[i], result.states[o]
+    a, c = _ix(i + 1), _ix(o + 1)
+    feed = o == result.layout.boiler_in
+    pipe = result.inputs.losses.feed_pipe if feed else result.inputs.losses.steam_pipe
+    assert pipe is not None
+    p_kind: QuantityKind = "pressure"
+    dT: QuantityKind = "temperature_difference"
+    lines: list[str] = []
+    if feed:  # se conoce la entrada (sale de la bomba o del último calentador)
+        if pipe.dp_Pa > 0.0:
+            lines.append(
+                latex_chain(
+                    f"p_{c}",
+                    rf"p_{a} - \Delta p",
+                    _diff(s_in.P_Pa, pipe.dp_Pa, p_kind, system),
+                    _q(s_out.P_Pa, p_kind, system),
+                )
+            )
+        if pipe.dT_K > 0.0:
+            lines.append(
+                latex_chain(
+                    f"T_{c}",
+                    rf"T_{a} - \Delta T",
+                    rf"{_n(s_in.T_K, 'temperature', system)} - {_n(pipe.dT_K, dT, system)}",
+                    _q(s_out.T_K, "temperature", system),
+                )
+            )
+            lines.append(rf"h_{c} = h(p_{c},\ T_{c}) = {_q(s_out.h_J_per_kg, _EH, system)}")
+        else:
+            lines.append(rf"h_{c} = h_{a} = {_q(s_out.h_J_per_kg, _EH, system)}")
+        lines.append(rf"s_{c} = {_q(s_out.s_J_per_kg_K, _ES, system)}")
+        known, unknown = a, c
+        what = "el líquido"
+        where = f"hasta {_the(_boiler(result))}"
+    else:  # se conoce la salida (la entrada a la turbina)
+        if pipe.dp_Pa > 0.0:
+            lines.append(
+                latex_chain(
+                    f"p_{a}",
+                    rf"p_{c} + \Delta p",
+                    rf"{_n(s_out.P_Pa, p_kind, system)} + {_n(pipe.dp_Pa, p_kind, system)}",
+                    _q(s_in.P_Pa, p_kind, system),
+                )
+            )
+        if pipe.dT_K > 0.0:
+            lines.append(
+                latex_chain(
+                    f"T_{a}",
+                    rf"T_{c} + \Delta T",
+                    rf"{_n(s_out.T_K, 'temperature', system)} + {_n(pipe.dT_K, dT, system)}",
+                    _q(s_in.T_K, "temperature", system),
+                )
+            )
+            lines.append(rf"h_{a} = h(p_{a},\ T_{a}) = {_q(s_in.h_J_per_kg, _EH, system)}")
+        else:
+            lines.append(rf"h_{a} = h_{c} = {_q(s_in.h_J_per_kg, _EH, system)}")
+        lines.append(rf"s_{a} = {_q(s_in.s_J_per_kg_K, _ES, system)}")
+        known, unknown = c, a
+        what = "el vapor"
+        where = f"desde {_the(_boiler(result))} hasta la turbina"
+    del known, unknown
+    q_loss = s_in.h_J_per_kg - s_out.h_J_per_kg
+    lines.append(
+        latex_chain(
+            r"q_{\text{pérd}}",
+            rf"h_{a} - h_{c}",
+            _diff(s_in.h_J_per_kg, s_out.h_J_per_kg, _EH, system),
+            _q(q_loss, _EH, system),
+        )
+    )
+    parts = []
+    if pipe.dp_Pa > 0.0:
+        parts.append(f"pierde {_bar(pipe.dp_Pa)} de presión por la fricción")
+    if pipe.dT_K > 0.0:
+        parts.append(
+            f"se enfría {pipe.dT_K:.3g} K porque pierde calor hacia el ambiente, ya que la "
+            "aislación no es perfecta"
+        )
+    else:
+        parts.append("no pierde calor (cañería aislada: h constante)")
+    told = " y ".join(parts)
+    if not feed:
+        told += (
+            f". Por eso {_the(_boiler(result))} tiene que entregar el vapor más caliente y a más "
+            "presión que lo que pide la turbina"
+        )
+    return ProcedureStep(
+        title=f"{i + 1} → {o + 1}: {comp.label}",
+        text=f"En la cañería {where}, {what} {told} (Cengel §10-5):",
+        latex=tuple(lines),
+    )
+
+
+def _recuperator_step(
+    result: RankineResult, ci: int, flows: dict[tuple[int, int], Flow], system: UnitSystem
+) -> ProcedureStep:
+    """Recuperador del ORC: efectividad ε = q/q_máx (Cengel §9-9) y los dos estados."""
+    comp = result.components[ci]
+    assert result.inputs.recuperator is not None
+    eps = result.inputs.recuperator.effectiveness
+    cold_in, cold_out = comp.port("fw_in").state, comp.port("fw_out").state
+    hot_in, hot_out = comp.port("in").state, comp.port("out").state
+    st = result.states
+    fluid = result.inputs.fluid
+    h_hot_min = fluid_state_from_pair(fluid, "TP", t=st[cold_in].T_K, p=st[hot_out].P_Pa).h_J_per_kg
+    h_cold_max = fluid_state_from_pair(
+        fluid, "TP", t=st[hot_in].T_K, p=st[cold_out].P_Pa
+    ).h_J_per_kg
+    q_hot = st[hot_in].h_J_per_kg - h_hot_min
+    q_cold = h_cold_max - st[cold_in].h_J_per_kg
+    q = st[cold_out].h_J_per_kg - st[cold_in].h_J_per_kg
+    ci_, co, hi, ho = (_ix(s + 1) for s in (cold_in, cold_out, hot_in, hot_out))
+    hot_limits = q_hot <= q_cold
+    lines = [
+        latex_chain(
+            r"q_{\text{máx},c}",
+            rf"h_{hi} - h(p_{ho},\ T_{ci_})",
+            _q(q_hot, _EH, system),
+        ),
+        latex_chain(
+            r"q_{\text{máx},f}",
+            rf"h(p_{co},\ T_{hi}) - h_{ci_}",
+            _q(q_cold, _EH, system),
+        ),
+        latex_chain(
+            r"q",
+            r"\varepsilon\,q_{\text{máx}}",
+            rf"{latex_number(eps, 4)}\cdot {_n(min(q_hot, q_cold), _EH, system)}",
+            _q(q, _EH, system),
+        ),
+        latex_chain(
+            f"h_{co}",
+            f"h_{ci_} + q",
+            rf"{_n(st[cold_in].h_J_per_kg, _EH, system)} + {_n(q, _EH, system)}",
+            _q(st[cold_out].h_J_per_kg, _EH, system),
+        ),
+        latex_chain(
+            f"h_{ho}",
+            f"h_{hi} - q",
+            _diff(st[hot_in].h_J_per_kg, q, _EH, system),
+            _q(st[hot_out].h_J_per_kg, _EH, system),
+        ),
+        rf"T_{co} = {_q(st[cold_out].T_K, 'temperature', system)}",
+        rf"s_{co} = {_q(st[cold_out].s_J_per_kg_K, _ES, system)}",
+        rf"T_{ho} = {_q(st[hot_out].T_K, 'temperature', system)}",
+    ]
+    del flows
+    side = "el vapor" if hot_limits else "el líquido"
+    return ProcedureStep(
+        title=f"Recuperador: estados {cold_out + 1} y {hot_out + 1}",
+        text=(
+            "El escape de la turbina sale sobrecalentado y, en el recuperador, le pasa calor al "
+            f"líquido que va {_to(_boiler(result))}. Lo más que podría pasar, q_máx, es lo que "
+            "daría el lado que menos puede entregar si llegara a la temperatura de entrada del "
+            f"otro: acá limita {side}. Con la efectividad ε = q/q_máx sale el calor q, y con el "
+            "balance (sin calor ni trabajo, el mismo caudal de los dos lados) los dos estados "
+            "(Cengel §9-9 usa la misma idea para el regenerador del ciclo Brayton):"
         ),
         latex=tuple(lines),
     )
@@ -747,10 +1226,27 @@ def _equation(lhs: str, rhs: str, *, split: bool) -> str:
     return rf"\begin{{aligned}}&{lhs} \\ &\quad = {rhs}\end{{aligned}}"
 
 
-def _heater_balance(
-    result: RankineResult, ci: int, flows: dict[tuple[int, int], Flow], system: UnitSystem
-) -> ProcedureStep:
-    """Balance de energía de un calentador y su fracción de extracción, despejada."""
+@dataclass
+class _HeaterParts:
+    """Piezas del balance de un calentador: ecuación, Δh y caudales (Cengel §10-6)."""
+
+    comp: CycleComponent
+    y: str
+    lhs: str
+    rhs: str
+    split: bool
+    text: str
+    water: tuple[float, str, int, int]
+    ext: tuple[float, str, int, int]
+    dren: tuple[float, str, int, int] | None
+    F: Flow
+    D: Flow
+    forward: bool
+
+
+def _heater_parts(
+    result: RankineResult, ci: int, flows: dict[tuple[int, int], Flow]
+) -> _HeaterParts:
     comp = result.components[ci]
     assert comp.heater is not None and result.layout is not None
     k = comp.heater
@@ -768,7 +1264,6 @@ def _heater_balance(
     drains = comp.ports_with("drain_in")
     drain_in = drains[0].state if drains else None
     D: Flow = flows[(ci, roles.index("drain_in"))] if drains else {}
-    lines: list[str] = []
     if comp.kind == "open_heater":
         fw, out = comp.port("fw_in").state, comp.port("out").state
         out_flow = flow("out")
@@ -776,11 +1271,8 @@ def _heater_balance(
         if drains:
             lhs += f" + {_times(result, D, H(drain_in))}"  # type: ignore[arg-type]
         lhs += f" + {_times(result, flow('fw_in'), H(fw))}"
-        lines.append(
-            _equation(
-                lhs, _times(result, out_flow, H(out)), split=bool(drains) or out_flow != {None: 1}
-            )
-        )
+        rhs = _times(result, out_flow, H(out))
+        split = bool(drains) or out_flow != {None: 1}
         water = (h[out] - h[fw], rf"{H(out)} - {H(fw)}", out, fw)
         ext = (h[bleed] - h[fw], rf"{H(bleed)} - {H(fw)}", bleed, fw)
         dren = (h[drain_in] - h[fw], rf"{H(drain_in)} - {H(fw)}", drain_in, fw) if drains else None
@@ -797,13 +1289,12 @@ def _heater_balance(
                 "caldera: lo extraído para los calentadores de mayor presión se suma más "
                 "adelante."
             )
-        text += " De ahí sale la fracción de extracción:"
         forward = False
     else:
         fw_in, fw_out = comp.port("fw_in").state, comp.port("fw_out").state
         d_out = comp.port("drain_out").state
         F = flow("fw_in")
-        forward = result.layout.drain_forward and k == len(result.inputs.heaters) - 1
+        forward = k in result.layout.forward_drains
         water = (h[fw_out] - h[fw_in], rf"{H(fw_out)} - {H(fw_in)}", fw_out, fw_in)
         ext = (h[bleed] - h[d_out], rf"{H(bleed)} - {H(d_out)}", bleed, d_out)
         dren = (
@@ -814,49 +1305,96 @@ def _heater_balance(
         lhs = f"{y}\\,({ext[1]})"
         if drains:
             lhs += f" + {_times(result, D, '(' + dren[1] + ')')}"  # type: ignore[index]
-        lines.append(
-            _equation(
-                lhs, _times(result, F, "(" + water[1] + ")"), split=bool(drains) or len(F) > 2
-            )
-        )
+        rhs = _times(result, F, "(" + water[1] + ")")
+        split = bool(drains) or len(F) > 2
         text = (
             f"Balance de energía del {comp.label}: lo que cede la extracción al condensar"
             + (" (y el drenaje que llega del calentador de mayor presión)" if drains else "")
             + " lo recibe el agua de alimentación, que pasa por los tubos"
             + (
                 f" (todo el caudal menos {_y_text(result, k)}, que se bombea aparte)."
-                if forward
+                if forward and F == {None: 1, k: -1}
                 else "."
             )
         )
-    lines.append(
-        latex_chain(
-            r"\Delta h_{\mathrm{agua}}",
-            water[1],
-            _diff(h[water[2]], h[water[3]], _EH, system),
-            _q(water[0], _EH, system),
-        )
-    )
-    lines.append(
-        latex_chain(
-            r"\Delta h_{\mathrm{ext}}",
-            ext[1],
-            _diff(h[ext[2]], h[ext[3]], _EH, system),
-            _q(ext[0], _EH, system),
-        )
-    )
-    if dren is not None:
+    return _HeaterParts(comp, y, lhs, rhs, split, text, water, ext, dren, F, D, forward)
+
+
+def _delta_lines(parts: _HeaterParts, h: list[float], system: UnitSystem) -> list[str]:
+    """Δh del agua, de la extracción y del drenaje que llega."""
+    lines = []
+    for name, item in (("agua", parts.water), ("ext", parts.ext), ("dren", parts.dren)):
+        if item is None:
+            continue
         lines.append(
             latex_chain(
-                r"\Delta h_{\mathrm{dren}}",
-                dren[1],
-                _diff(h[dren[2]], h[dren[3]], _EH, system),  # type: ignore[index]
-                _q(dren[0], _EH, system),
+                rf"\Delta h_{{\mathrm{{{name}}}}}",
+                item[1],
+                _diff(h[item[2]], h[item[3]], _EH, system),
+                _q(item[0], _EH, system),
             )
         )
+    return lines
+
+
+def _desuperheater_lines(
+    result: RankineResult, parts: _HeaterParts, system: UnitSystem
+) -> tuple[list[str], str]:
+    """Con desrecalentador: a qué temperatura sale el agua de la zona de condensación.
+
+    La zona de desrecalentamiento le da al agua y·(h_ext − h_g): el agua entra
+    a esa zona a T_z = T(p, h_sal − y·(h_ext − h_g)/F), que tiene que quedar por
+    debajo de T_sat (si no, el calentador no podría funcionar).
+    """
+    comp = parts.comp
+    assert comp.heater is not None
+    if comp.kind != "closed_heater" or not result.inputs.heaters[comp.heater].desuperheater:
+        return [], ""
+    st = result.states
+    bleed, out = comp.port("bleed").state, comp.port("fw_out").state
+    sat = saturation_at_pressure(st[bleed].fluid, st[bleed].P_Pa)
+    y_val = result.extraction_fractions[comp.heater]
+    f_val = _flow_value(result, parts.F)
+    h_z = st[out].h_J_per_kg - y_val * (st[bleed].h_J_per_kg - sat.vapor.h_J_per_kg) / f_val
+    T_z = fluid_state_from_pair(st[out].fluid, "PH", p=st[out].P_Pa, h=h_z).T_K
+    b, o = _ix(bleed + 1), _ix(out + 1)
+    y = parts.y
+    num = rf"{y}\,(h_{b} - h_g)"
+    sym = rf"h_{o} - {num}" if parts.F == {None: 1} else rf"h_{o} - \frac{{{num}}}{{F}}"
+    lines = [
+        rf"h_g(p_{b}) = {_q(sat.vapor.h_J_per_kg, _EH, system)}",
+        latex_chain("h_z", sym, _q(h_z, _EH, system)),
+        latex_chain("T_z", rf"T(p_{o},\ h_z)", _q(T_z, "temperature", system)),
+    ]
+    text = (
+        " En la zona de desrecalentamiento la extracción baja hasta vapor saturado (h_g) y le "
+        f"da al agua {_y_text(result, comp.heater)}·(h_ext − h_g): el agua sale de la zona de "
+        "condensación a T_z = "
+        f"{_degC(T_z)}, por debajo de T_sat = {_degC(sat.T_sat_K)}, y el desrecalentador la "
+        f"termina de calentar hasta {_degC(st[out].T_K)}."
+    )
+    return lines, text
+
+
+def _heater_balance(
+    result: RankineResult, ci: int, flows: dict[tuple[int, int], Flow], system: UnitSystem
+) -> ProcedureStep:
+    """Balance de energía de un calentador y su fracción de extracción, despejada."""
+    parts = _heater_parts(result, ci, flows)
+    comp = parts.comp
+    assert comp.heater is not None
+    k = comp.heater
+    y = parts.y
+    h = [s.h_J_per_kg for s in result.states]
+    water, ext, dren, F, D = parts.water, parts.ext, parts.dren, parts.F, parts.D
+    text = parts.text
+    if comp.kind == "open_heater":
+        text += " De ahí sale la fracción de extracción:"
+    lines: list[str] = [_equation(parts.lhs, parts.rhs, split=parts.split)]
+    lines += _delta_lines(parts, h, system)
     value = result.extraction_fractions[k]
     n_water, n_ext = _n(water[0], _EH, system), _n(ext[0], _EH, system)
-    if forward:
+    if parts.forward:
         lines.append(
             latex_chain(
                 y,
@@ -898,16 +1436,161 @@ def _heater_balance(
                     latex_number(value, 5),
                 )
             )
-    if F != {None: 1} and not forward and comp.kind == "closed_heater":
+    if F != {None: 1} and not parts.forward and comp.kind == "closed_heater":
         text += (
             f" Por los tubos del {comp.label} pasa {_flow_text(result, F)} del caudal de la "
             "caldera: lo que se extrajo para los calentadores de mayor presión no pasa por acá."
         )
+    zone_lines, zone_text = _desuperheater_lines(result, parts, system)
     return ProcedureStep(
         title=f"{comp.label[0].upper()}{comp.label[1:]}: fracción de extracción {y}",
-        text=text,
-        latex=tuple(lines),
+        text=text + zone_text,
+        latex=(*lines, *zone_lines),
     )
+
+
+def _coupled(result: RankineResult) -> bool:
+    """Un drenaje bombeado que vuelve a la línea antes de otro calentador acopla las fracciones."""
+    assert result.layout is not None
+    top = len(result.inputs.heaters) - 1
+    return any(i != top for i in result.layout.forward_drains)
+
+
+def _balance_check(
+    result: RankineResult, ci: int, flows: dict[tuple[int, int], Flow], system: UnitSystem
+) -> ProcedureStep:
+    """Verificación de un balance con las fracciones ya resueltas (sistema acoplado)."""
+    parts = _heater_parts(result, ci, flows)
+    comp = parts.comp
+    h = [s.h_J_per_kg for s in result.states]
+    lines = _delta_lines(parts, h, system)
+    ys = result.extraction_fractions
+    assert comp.heater is not None
+    y_val = ys[comp.heater]
+    if comp.kind == "open_heater":
+        roles = [p.role for p in comp.ports]
+        fw, out = comp.port("fw_in").state, comp.port("out").state
+        f_in = flows[(ci, roles.index("fw_in"))]
+        f_out = flows[(ci, roles.index("out"))]
+        bleed = comp.port("bleed").state
+        drains = comp.ports_with("drain_in")
+        e_in = y_val * h[bleed] + _flow_value(result, f_in) * h[fw]
+        in_terms = [rf"{latex_number(y_val, 5)}\cdot {_n(h[bleed], _EH, system)}"]
+        if drains:
+            d = drains[0].state
+            e_in += _flow_value(result, parts.D) * h[d]
+            in_terms.append(_times_n(result, parts.D, _n(h[d], _EH, system)))
+        in_terms.append(_times_n(result, f_in, _n(h[fw], _EH, system)))
+        e_out = _flow_value(result, f_out) * h[out]
+        lines += [
+            _rows(r"E_{\mathrm{entra}}", in_terms, _q(e_in, _EH, system)),
+            latex_chain(
+                r"E_{\mathrm{sale}}",
+                _times(result, f_out, f"h_{_ix(out + 1)}"),
+                *(
+                    ()
+                    if f_out == {None: 1}
+                    else (_times_n(result, f_out, _n(h[out], _EH, system)),)
+                ),
+                _q(e_out, _EH, system),
+            ),
+        ]
+        text = (
+            f"Con las fracciones resueltas, lo que entra al {comp.label} (extracción, agua y "
+            "drenajes) es lo que sale: el balance cierra."
+        )
+    else:
+        gives = y_val * parts.ext[0]
+        gives_terms = [rf"{latex_number(y_val, 5)}\cdot {_n(parts.ext[0], _EH, system)}"]
+        if parts.dren is not None:
+            gives += _flow_value(result, parts.D) * parts.dren[0]
+            gives_terms.append(_times_n(result, parts.D, _n(parts.dren[0], _EH, system)))
+        takes = _flow_value(result, parts.F) * parts.water[0]
+        water_sym = _times(result, parts.F, r"\Delta h_{\mathrm{agua}}")
+        lines += [
+            _rows(r"q_{\mathrm{cede}}", gives_terms, _q(gives, _EH, system)),
+            latex_chain(
+                r"q_{\mathrm{recibe}}",
+                water_sym,
+                *(
+                    ()
+                    if parts.F == {None: 1}
+                    else (_times_n(result, parts.F, _n(parts.water[0], _EH, system)),)
+                ),
+                _q(takes, _EH, system),
+            ),
+        ]
+        text = (
+            f"Con las fracciones resueltas, lo que cede la extracción (y el drenaje que llega) "
+            f"en el {comp.label} es lo que recibe el agua de alimentación: el balance cierra."
+        )
+    zone_lines, zone_text = _desuperheater_lines(result, parts, system)
+    return ProcedureStep(
+        title=f"{comp.label[0].upper()}{comp.label[1:]}: verificación del balance",
+        text=text + zone_text,
+        latex=(*lines, *zone_lines),
+    )
+
+
+def _coupled_balance_steps(
+    result: RankineResult, flows: dict[tuple[int, int], Flow], system: UnitSystem
+) -> list[ProcedureStep]:
+    """Fracciones acopladas por un drenaje bombeado intermedio: sistema, solución y verificación."""
+    comps = result.components
+    heaters = sorted(
+        (ci for ci, c in enumerate(comps) if c.kind in ("open_heater", "closed_heater")),
+        key=lambda ci: -(comps[ci].heater or 0),
+    )
+    mixers = [cj for cj, c in enumerate(comps) if c.kind == "mixer"]
+    equations = []
+    for ci in heaters:
+        parts = _heater_parts(result, ci, flows)
+        equations.append(_equation(parts.lhs, parts.rhs, split=True))
+    for cj in mixers:
+        comp = comps[cj]
+        roles = [p.role for p in comp.ports]
+        fw, dr, out = (comp.port(r).state for r in ("fw_in", "drain_in", "out"))
+        f_fw, f_dr = flows[(cj, roles.index("fw_in"))], flows[(cj, roles.index("drain_in"))]
+        f_out = flows[(cj, roles.index("out"))]
+        equations.append(
+            _equation(
+                _times(result, f_out, f"h_{_ix(out + 1)}"),
+                rf"{_times(result, f_fw, f'h_{_ix(fw + 1)}')} + "
+                rf"{_times(result, f_dr, f'h_{_ix(dr + 1)}')}",
+                split=True,
+            )
+        )
+    names = [comps[cj].label for cj in mixers]
+    unknowns = [_y_text(result, k) for k in range(len(result.inputs.heaters))]
+    unknowns += [f"h{_sub(comps[cj].port('out').state + 1)}" for cj in mixers]
+    unknowns_txt = ", ".join(unknowns[:-1]) + " y " + unknowns[-1]
+    steps = [
+        ProcedureStep(
+            title="Fracciones de extracción: un sistema acoplado",
+            text=(
+                "Hay un drenaje bombeado que vuelve a la línea antes de otro calentador: la "
+                f"entalpía que sale de la {' y de la '.join(names)} depende de la fracción de "
+                "extracción de abajo, y entra al calentador de arriba. Por eso las fracciones no "
+                "se despejan de a una: los balances de energía de los calentadores y de la "
+                f"mezcla forman un sistema con las incógnitas {unknowns_txt}, que se resuelve "
+                "todo junto (TESPy lo hace con el método de Newton):"
+            ),
+            latex=tuple(equations),
+        ),
+        ProcedureStep(
+            title="Solución del sistema",
+            text="Las fracciones de extracción que cumplen todos los balances a la vez:",
+            latex=tuple(
+                rf"{_y(result, k)} = {latex_number(y, 5)}"
+                for k, y in reversed(list(enumerate(result.extraction_fractions)))
+            ),
+        ),
+    ]
+    for cj in mixers:
+        steps.append(_mixer_step(result, cj, flows, system))
+    for ci in heaters:
+        steps.append(_balance_check(result, ci, flows, system))
+    return steps
 
 
 def _mixer_step(
@@ -941,7 +1624,7 @@ def _mixer_step(
 def _heat_and_work_steps(
     result: RankineResult, flows: dict[tuple[int, int], Flow], system: UnitSystem
 ) -> list[ProcedureStep]:
-    """q_H, q_C, w_T y w_B por kilogramo de vapor en la caldera (Cengel §10-6)."""
+    """q_H, q_C, q_pérd, w_T y w_B por kilogramo de vapor en la caldera (Cengel §10-6)."""
     h = [s.h_J_per_kg for s in result.states]
 
     def terms(kinds: tuple[str, ...], sign: int) -> tuple[list[str], list[str]]:
@@ -964,28 +1647,47 @@ def _heat_and_work_steps(
     steps: list[ProcedureStep] = []
     q_sym, q_num = terms(("boiler", "reheater"), +1)
     c_sym, c_num = terms(("condenser",), -1)
-    steps.append(
-        ProcedureStep(
-            title="Calor recibido y cedido",
-            text=(
-                "Por kilogramo de vapor que pasa por la caldera: cada corriente pesa según su "
-                "fracción del caudal"
-                + (
-                    " (por el recalentador pasa lo que no se extrajo antes)"
-                    if result.has_reheat
-                    else ""
-                )
-                + ". El condensador recibe el vapor que llegó al final de la turbina"
-                + (" y los drenajes en cascada." if len(c_sym) > 1 else ".")
-            ),
-            latex=(
-                _sum_lines("q_H", q_sym, q_num, _q(result.q_in_J_per_kg, _EH, system)),
-                _sum_lines("q_C", c_sym, c_num, _q(result.q_out_J_per_kg, _EH, system)),
-            ),
+    boiler = _boiler(result)
+    if result.has_heaters:
+        text = (
+            f"Por kilogramo de vapor que pasa por {_the(boiler)}: cada corriente pesa según su "
+            "fracción del caudal"
+            + (
+                " (por el recalentador pasa lo que no se extrajo antes)"
+                if result.has_reheat
+                else ""
+            )
+            + ". El condensador recibe el vapor que llegó al final de la turbina"
+            + (" y los drenajes en cascada." if len(c_sym) > 1 else ".")
         )
-    )
+    else:
+        text = (
+            f"El calor entra en {_the(boiler)}"
+            + (" y en el recalentador" if result.has_reheat else "")
+            + " y sale en el condensador."
+        )
+        if result.has_recuperator:
+            text += (
+                " El recuperador no aparece: su calor es interno (pasa del escape de la turbina "
+                "al líquido)."
+            )
+    latex = [
+        _sum_lines("q_H", q_sym, q_num, _q(result.q_in_J_per_kg, _EH, system)),
+        _sum_lines("q_C", c_sym, c_num, _q(result.q_out_J_per_kg, _EH, system)),
+    ]
+    if result.of_kind("pipe"):
+        l_sym, l_num = terms(("pipe",), -1)
+        latex.append(
+            _sum_lines(r"q_{\text{pérd}}", l_sym, l_num, _q(result.q_loss_J_per_kg, _EH, system))
+        )
+        text += (
+            " Las cañerías pierden q_pérd hacia el ambiente: ese calor no llega ni a la turbina "
+            "ni al condensador (Cengel §10-5)."
+        )
+    steps.append(ProcedureStep(title="Calor recibido y cedido", text=text, latex=tuple(latex)))
     t_sym, t_num = terms(("turbine",), -1)
     p_sym, p_num = terms(("pump",), +1)
+    losses = result.q_loss_J_per_kg > 0.0
     steps.append(
         _balance_step(
             result,
@@ -997,21 +1699,25 @@ def _heat_and_work_steps(
             text=(
                 "Cada tramo de turbina y cada bomba pesa según el caudal que pasa por él. El "
                 "trabajo neto es lo que dan las turbinas menos lo que consumen las bombas, y "
-                "también el calor recibido menos el cedido (primer principio). El rendimiento "
-                "es η = W/Q_H = 1 − Q_C/Q_H (vademecum §9.2)."
+                "también el calor recibido menos el cedido"
+                + (" y el perdido en las cañerías" if losses else "")
+                + " (primer principio). El rendimiento es η = W/Q_H"
+                + ("" if losses else " = 1 − Q_C/Q_H")
+                + " (vademecum §9.2)."
             ),
         )
     )
     return steps
 
 
-def _regenerative_steps(result: RankineResult, system: UnitSystem) -> list[ProcedureStep]:
-    """Procedimiento con calentadores de agua de alimentación (Cengel §10-6)."""
+def _cycle_steps(result: RankineResult, system: UnitSystem) -> list[ProcedureStep]:
+    """Procedimiento general: regeneración (Cengel §10-6), ciclo real (§10-5) y recuperador."""
     layout = result.layout
     assert layout is not None
     flows = port_flows(layout)
     comps = result.components
     st = result.states
+    boiler = _boiler(result)
     steps: list[ProcedureStep] = [_condenser_outlet_step(result, system)]
 
     # 1. Línea de agua de alimentación: los estados que se leen en las tablas.
@@ -1020,6 +1726,7 @@ def _regenerative_steps(result: RankineResult, system: UnitSystem) -> list[Proce
     for comp in comps:
         if comp.kind == "pump":
             i, o = comp.port("in").state, comp.port("out").state
+            destination, pressure = _destination(result, comp, system)
             steps.append(
                 _pump_step(
                     result,
@@ -1029,15 +1736,18 @@ def _regenerative_steps(result: RankineResult, system: UnitSystem) -> list[Proce
                     system,
                     title=f"{i + 1} → {o + 1}: {comp.label}",
                     label=comp.label,
-                    destination=_destination(result, comp),
+                    destination=destination,
+                    pressure=pressure,
                 )
             )
         elif comp.kind == "open_heater":
             steps.append(_open_heater_state(result, comp, system))
         elif comp.kind == "closed_heater":
             steps.append(_closed_heater_states(result, comp, system))
+        elif comp.kind == "pipe" and comp.port("out").state == layout.boiler_in:
+            steps.append(_pipe_step(result, comp, system))
 
-    # 2. Camino del vapor: entrada a la turbina, tramos y recalentador.
+    # 2. Camino del vapor: entrada a la turbina, cañería, tramos y recalentador.
     i_in = layout.turbine_inlet
     s_in = st[i_in]
     inlet_txt = (
@@ -1045,13 +1755,17 @@ def _regenerative_steps(result: RankineResult, system: UnitSystem) -> list[Proce
         if result.inputs.T_turbine_in_K is None
         else f"vapor a {_degC(s_in.T_K)} y {_bar(s_in.P_Pa)}"
     )
+    steam_pipes = [c for c in comps if c.kind == "pipe" and c.port("in").state == layout.boiler_out]
+    source = "Llega a la turbina" if steam_pipes else f"Sale {_of(boiler)}"
     steps.append(
         ProcedureStep(
             title=f"Estado {i_in + 1}: {layout.labels[i_in]}",
-            text=f"Sale de la caldera {inlet_txt}: h y s de la tabla de vapor (Cengel A-6).",
+            text=f"{source} {inlet_txt}: h y s de {_read(result, 'vapor')}.",
             latex=_state_lines(result, i_in, system),
         )
     )
+    for pipe in steam_pipes:
+        steps.append(_pipe_step(result, pipe, system))
     turbines = [c for c in comps if c.kind == "turbine"]
     casing_in: dict[str, int] = {}
     for c in turbines:
@@ -1066,12 +1780,18 @@ def _regenerative_steps(result: RankineResult, system: UnitSystem) -> list[Proce
     for comp in comps:
         if comp.kind == "reheater":
             i, o = comp.port("in").state, comp.port("out").state
+            dp = result.inputs.losses.dp_reheater_Pa
+            pressure_txt = (
+                f"a p constante ({_bar(st[i].P_Pa)})"
+                if dp == 0.0
+                else f"perdiendo {_bar(dp)} de presión (de {_bar(st[i].P_Pa)} a {_bar(st[o].P_Pa)})"
+            )
             steps.append(
                 ProcedureStep(
                     title=f"{i + 1} → {o + 1}: recalentador",
                     text=(
-                        f"El vapor que sigue vuelve a la caldera y se recalienta a p constante "
-                        f"({_bar(st[i].P_Pa)}) hasta {_degC(st[o].T_K)}:"
+                        f"El vapor que sigue vuelve {_to(boiler)} y se recalienta "
+                        f"{pressure_txt} hasta {_degC(st[o].T_K)}:"
                     ),
                     latex=_state_lines(result, o, system),
                 )
@@ -1098,17 +1818,23 @@ def _regenerative_steps(result: RankineResult, system: UnitSystem) -> list[Proce
                     note=note,
                 )
             )
+    for ci, comp in enumerate(comps):
+        if comp.kind == "recuperator":
+            steps.append(_recuperator_step(result, ci, flows, system))
 
     # 3. Fracciones de extracción, de mayor a menor presión, y la mezcla.
-    heaters = sorted(
-        (ci for ci, c in enumerate(comps) if c.kind in ("open_heater", "closed_heater")),
-        key=lambda ci: -(comps[ci].heater or 0),
-    )
-    for ci in heaters:
-        steps.append(_heater_balance(result, ci, flows, system))
-        for cj, other in enumerate(comps):
-            if other.kind == "mixer" and other.heater == comps[ci].heater:
-                steps.append(_mixer_step(result, cj, flows, system))
+    if result.has_heaters and _coupled(result):
+        steps.extend(_coupled_balance_steps(result, flows, system))
+    else:
+        heaters = sorted(
+            (ci for ci, c in enumerate(comps) if c.kind in ("open_heater", "closed_heater")),
+            key=lambda ci: -(comps[ci].heater or 0),
+        )
+        for ci in heaters:
+            steps.append(_heater_balance(result, ci, flows, system))
+            for cj, other in enumerate(comps):
+                if other.kind == "mixer" and other.heater == comps[ci].heater:
+                    steps.append(_mixer_step(result, cj, flows, system))
 
     # 4. Calores, trabajos y rendimiento.
     steps.extend(_heat_and_work_steps(result, flows, system))
@@ -1167,12 +1893,12 @@ def rankine_steps(
 ) -> list[ProcedureStep]:
     """Procedimiento estado por estado, como se resuelve con las tablas (Cengel cap. 10).
 
-    Sin calentadores, el de la Fase 3.1a (§10-2 a §10-5); con calentadores,
-    el regenerativo (§10-6). Con ``cooling`` se suma el agua de enfriamiento.
+    Sin calentadores, pérdidas ni recuperador, el de la Fase 3.1a (§10-2 a
+    §10-4); si no, el general: regenerativo (§10-6), ciclo real (§10-5) y
+    recuperador del ORC. Con ``cooling`` se suma el agua de enfriamiento.
     """
-    steps = (
-        _regenerative_steps(result, system) if result.has_heaters else _simple_steps(result, system)
-    )
+    plain = not (result.has_heaters or result.has_losses or result.has_recuperator)
+    steps = _simple_steps(result, system) if plain else _cycle_steps(result, system)
     if cooling is not None:
         steps.append(cooling_water_step(cooling, system))
     return steps

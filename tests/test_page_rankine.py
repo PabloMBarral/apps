@@ -1,4 +1,4 @@
-"""Tests de la página de Rankine con ``streamlit.testing`` (AppTest) — Fase 3.1a."""
+"""Tests de la página de Rankine con ``streamlit.testing`` (AppTest) — Fases 3.1a a 3.1c."""
 
 from __future__ import annotations
 
@@ -172,7 +172,7 @@ def test_cengel_10_6_shows_the_book_note_and_the_mixing_chamber() -> None:
     procedure = next(e for e in at.expander if "Procedimiento" in e.label)
     titles = " ".join(md.value for md in procedure.markdown)
     assert "cámara de mezcla" in titles and "fracción de extracción" in titles
-    assert at.checkbox(key=f"rk_fwd_{_I_10_6}_2").value is True
+    assert at.checkbox(key=f"rk_h1_fwd_{_I_10_6}_2").value is True
 
 
 @pytest.mark.parametrize("n", [1, 2, 3])
@@ -187,13 +187,13 @@ def test_regeneration_with_one_two_or_three_heaters(n: int) -> None:
     assert all(0 < float(y) < 1 for y in table["y = ṁext/ṁ"])
 
 
-def test_closed_top_heater_offers_the_forward_drain() -> None:
+def test_closed_heater_offers_the_forward_drain() -> None:
     at = _new_app()
     at.checkbox(key="rk_regen_0").check().run()
     at.radio(key="rk_nheat_0").set_value(2).run()
-    assert not any(c.key == "rk_fwd_0_2" for c in at.checkbox)
+    assert not any((c.key or "").startswith("rk_h1_fwd_0") for c in at.checkbox)  # abierto
     at.radio(key="rk_h1_kind_0_2").set_value("Cerrado").run()
-    at.checkbox(key="rk_fwd_0_2").check().run()
+    at.checkbox(key="rk_h1_fwd_0_2").check().run()
     at.button(key="rk_btn").click().run()
     _no_problems(at)
     assert any("cámara de mezcla" in label for label in _states(at))
@@ -225,3 +225,87 @@ def test_extraction_sweep_draws_the_charts() -> None:
     at.button(key="rk_sweep_btn").click().run()
     _no_problems(at)
     assert len(at.get("plotly_chart")) >= 3  # diagrama + η + y
+
+
+# ---------------------------------------------------------------------
+# Ciclo real, calentadores reales y ORC (Fase 3.1c)
+# ---------------------------------------------------------------------
+
+_I_10_2 = next(i for i, k in enumerate(EXAMPLES) if k.startswith("Cengel 10-2"))
+_I_REAL = next(i for i, k in enumerate(EXAMPLES) if k.startswith("Calentadores reales"))
+_I_R245 = next(i for i, k in enumerate(EXAMPLES) if k.startswith("ORC con R-245fa"))
+
+
+def _titles(at: AppTest) -> str:
+    procedure = next(e for e in at.expander if "Procedimiento" in e.label)
+    return " ".join(md.value for md in procedure.markdown)
+
+
+def test_cengel_10_2_real_cycle() -> None:
+    at = _example(_new_app(), _I_10_2)
+    _no_problems(at)
+    assert float(_metric(at, "η térmico [%]")) == pytest.approx(36.10, abs=0.01)
+    assert len(_states(at)) == 6
+    labels = _labels(at)
+    assert any(lab.startswith("Presión de entrada a la turbina p₅") for lab in labels)
+    assert at.checkbox(key=f"rk_loss_{_I_10_2}").value is True
+    assert any("36,1 %" in c.value for c in at.caption)
+    assert "cañería de alimentación" in _titles(at)
+
+
+def test_losses_checkbox_adds_the_pipes() -> None:
+    at = _new_app()
+    at.checkbox(key="rk_loss_0").check().run()
+    at.button(key="rk_btn").click().run()
+    _no_problems(at)
+    states = _states(at)
+    assert len(states) == 6  # 10-1 con cañerías: 1 … 6, como Cengel 10-2
+    assert states[2].startswith("3 (entrada a la caldera")
+    assert any("q_pérd" in c.value for c in at.caption)
+
+
+def test_real_heaters_example() -> None:
+    at = _example(_new_app(), _I_REAL)
+    _no_problems(at)
+    assert at.checkbox(key=f"rk_h2_ds_{_I_REAL}_3").value is True
+    assert at.checkbox(key=f"rk_h2_sc_{_I_REAL}_3").value is True
+    assert at.checkbox(key=f"rk_h0_fwd_{_I_REAL}_3").value is True
+    titles = _titles(at)
+    assert "sistema acoplado" in titles and "verificación del balance" in titles
+
+
+def test_desuperheater_allows_a_negative_ttd() -> None:
+    at = _new_app()
+    at.checkbox(key="rk_regen_0").check().run()
+    at.radio(key="rk_h0_kind_0_1").set_value("Cerrado").run()
+    at.number_input(key="rk_h0_ttd_0_1@Técnico").set_value(-2.0).run()
+    at.button(key="rk_btn").click().run()
+    assert at.error and "sin desrecalentador" in at.error[0].value
+
+
+def test_orc_example_draws_the_fluid_diagram() -> None:
+    at = _example(_new_app(), _I_R245)
+    _no_problems(at)
+    assert at.selectbox(key=f"rk_fluid_{_I_R245}").value == "R245fa"
+    assert len(_states(at)) == 6  # con recuperador
+    assert any("fluido seco" in i.value for i in at.info)
+    assert "Recuperador" in _titles(at)
+
+
+def test_changing_the_fluid_loads_its_defaults() -> None:
+    at = _new_app()
+    at.selectbox(key="rk_fluid_0").set_value("Toluene").run()
+    assert at.number_input(key="rk_p_hi_0_Toluene@Técnico").value > 0
+    assert at.checkbox(key="rk_rec_0_Toluene").value is True  # fluido seco
+    at.button(key="rk_btn").click().run()
+    _no_problems(at)
+    assert any("Tolueno" in i.value for i in at.info)
+    assert not any(c.key == "rk_rec_0" for c in at.checkbox)  # el agua no tiene recuperador
+
+
+def test_recuperator_sweep() -> None:
+    at = _example(_new_app(), _I_R245)
+    at.selectbox(key="rk_sweep_param").set_value("Efectividad del recuperador").run()
+    at.button(key="rk_sweep_btn").click().run()
+    _no_problems(at)
+    assert len(at.get("plotly_chart")) >= 2  # diagrama + η

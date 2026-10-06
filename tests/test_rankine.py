@@ -215,7 +215,8 @@ def test_every_example_solves_without_warnings(name: str) -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         r = solve_rankine(RANKINE_EXAMPLES[name])
-    assert 0.2 < r.eta_th < 0.5
+    # Los ORC rinden menos (Fase 3.1c: de 8 % a 30 %).
+    assert (0.05 if r.inputs.fluid != "Water" else 0.2) < r.eta_th < 0.5
 
 
 # ---------------------------------------------------------------------

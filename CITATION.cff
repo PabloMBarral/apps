@@ -32,7 +32,7 @@ keywords:
   - fluprodia
   - iso-6976
 license: MIT
-version: "0.12.0"
+version: "0.13.0"
 date-released: "2026-10-05"
 references:
   - type: article
