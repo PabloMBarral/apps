@@ -29,6 +29,7 @@ from core.cycles.gas_turbine import (
     GasTurbineResult,
     Stage,
     gas_turbine_exergy,
+    of_component,
 )
 from core.cycles.hrsg_procedure import factor_times_diff, gas_composition_lines
 from core.cycles.rankine_procedure import _diff, _n, _q, _wrap
@@ -1105,7 +1106,7 @@ def _exergy_steps(result: GasTurbineResult, system: UnitSystem) -> list[Procedur
         text=(
             "Lo que entra sale como trabajo, se destruye o se pierde (vademecum §11.9): el "
             "balance cierra. El rendimiento exergético compara el trabajo con la exergía que entra "
-            f"(§11.10). La parte más grande es la de {biggest.name} "
+            f"(§11.10). La parte más grande es la {of_component(biggest.name)} "
             f"({biggest.x_J_per_kg / ex.x_in_J_per_kg * 100:.3g} % de lo que entra)"
             + (
                 ": la combustión es muy irreversible, porque el combustible se quema con un salto "

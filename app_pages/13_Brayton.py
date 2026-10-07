@@ -38,6 +38,7 @@ from core.cycles.gas_turbine import (
     gas_turbine_tespy,
     gas_turbine_to_dict,
     improvement_comparison,
+    of_component,
     solve_gas_turbine,
 )
 from core.cycles.gas_turbine_procedure import gas_turbine_steps
@@ -745,7 +746,7 @@ def _render_exergy(result: GasTurbineResult, system: UnitSystem) -> None:
         (i for i in x.items if i.kind == "destruida"), key=lambda i: i.x_J_per_kg, default=None
     )
     biggest = (
-        f" La mayor destrucción es la de {destroyed.name}: "
+        f" La mayor destrucción es la {of_component(destroyed.name)}: "
         + (
             "quemar el combustible con un salto de temperatura enorme es muy irreversible."
             if destroyed.name.startswith("cámara")

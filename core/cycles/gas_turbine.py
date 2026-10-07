@@ -91,6 +91,7 @@ __all__ = [
     "gas_turbine_tespy",
     "gas_turbine_to_dict",
     "improvement_comparison",
+    "of_component",
     "solve_gas_turbine",
     "stage_names",
     "validate_gas_turbine_inputs",
@@ -244,6 +245,11 @@ def from_brayton(inputs: BraytonInputs) -> GasTurbineInputs:
         fuel=inputs.fuel,
         m_air_kg_s=inputs.m_air_kg_s,
     )
+
+
+def of_component(name: str) -> str:
+    """«del compresor», «de la cámara de combustión»: el nombre con su artículo."""
+    return f"de la {name}" if name.startswith(("cámara", "turbina")) else f"del {name}"
 
 
 def stage_names(kind: Literal["compresor", "turbina"], count: int) -> list[str]:

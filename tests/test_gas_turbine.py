@@ -36,6 +36,7 @@ from core.cycles.gas_turbine import (
     gas_turbine_tespy,
     gas_turbine_to_dict,
     improvement_comparison,
+    of_component,
     solve_gas_turbine,
     stage_names,
 )
@@ -152,6 +153,9 @@ def test_stage_names() -> None:
     assert stage_names("compresor", 2) == ["compresor de baja", "compresor de alta"]
     assert stage_names("turbina", 3) == ["turbina de alta", "turbina de media", "turbina de baja"]
     assert stage_names("turbina", 4) == [f"turbina {k}" for k in (1, 2, 3, 4)]
+    assert of_component("escape") == "del escape"
+    assert of_component("cámara de recalentamiento") == "de la cámara de recalentamiento"
+    assert of_component("turbina de baja") == "de la turbina de baja"
 
 
 @pytest.mark.parametrize(
