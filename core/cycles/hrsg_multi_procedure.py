@@ -258,9 +258,9 @@ def _flow_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Procedure
             title=f"{_title(lv)}: caudal de vapor (gases {a} → {p})",
             text=(
                 f"Los gases llegan a T_{a} y salen del evaporador a T_{p} = T_sat + pinch. En "
-                f"ese tramo {devices}. El recalentador lleva el mismo vapor (vuelve de la turbina "
-                "de alta), así que cada kilogramo recibe su calor en la caldera, de 2 al estado "
-                f"{top}, más el del recalentamiento, de RF a RC:"
+                f"ese tramo {devices}: su calor es Q̇_tramo. El recalentador lleva el mismo vapor "
+                "(vuelve de la turbina de alta), así que cada kilogramo recibe su calor en la "
+                f"caldera, de 2 al estado {top}, más el del recalentamiento, de RF a RC:"
             ),
             latex=(
                 r"\begin{aligned}"
@@ -444,9 +444,15 @@ def _coupled_flow_step(result: MultiHRSGResult, system: UnitSystem) -> Procedure
 
 
 def _q_top(level: LevelResult, reheat: bool = False) -> str:
-    """Símbolo del calor del tramo hasta el pinch: SH (+ RH) + EV, o EV, del nivel."""
-    parts = (["SH"] if level.level.superheated else []) + (["RH"] if reheat else []) + ["EV"]
-    return rf"\dot{{Q}}_{{\mathrm{{{'+'.join(parts)}}}{_sub(level)}}}"
+    """Símbolo del calor del tramo hasta el pinch: SH + EV, o EV, del nivel.
+
+    Con recalentador (SH, RH y EV) es el «tramo» del nivel: el símbolo largo no
+    entraba en el ancho de un celular.
+    """
+    if reheat:
+        return rf"\dot{{Q}}_{{\mathrm{{tramo}}{_sub(level)}}}"
+    what = r"\mathrm{SH+EV}" if level.level.superheated else r"\mathrm{EV}"
+    return rf"\dot{{Q}}_{{{what}{_sub(level)}}}"
 
 
 def _gas_out_lines(

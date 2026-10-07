@@ -421,3 +421,48 @@ def test_export(system: str) -> None:
     assert len(data["ciclo_de_vapor"]["estados"]) == len(r.steam.states)
     assert data["resultados"]["rendimiento_ciclo_combinado"] == pytest.approx(r.eta_th)
     assert "recalentador" in data["resultados"]["exergia_ciclo_de_fondo"]["destruida"]
+
+
+# ---------------------------------------------------------------------
+# Procedimiento
+# ---------------------------------------------------------------------
+
+PROCEDURE_CASES = {
+    "3PRH": THREE,
+    "3PRH con desaireador y Baumann": replace(WITH_DA, baumann_alpha=1.0),
+    "2P": TWO,
+    "1PRH con desaireador": COMBINED_MULTI_EXAMPLES[EX_1PRH],
+    "1P sin recalentamiento": replace(THREE, levels=THREE.levels[:1], reheat=None),
+}
+
+
+@pytest.mark.parametrize("system", ["SI", "Técnico", "Inglés"])
+@pytest.mark.parametrize("name", list(PROCEDURE_CASES))
+def test_procedure(name: str, system: str) -> None:
+    from core.cycles.combined_multi_procedure import combined_multi_sections
+
+    r = _solve(PROCEDURE_CASES[name])
+    sections = combined_multi_sections(r, system)
+    assert [title for title, _ in sections] == [
+        "Turbina de gas",
+        "Caldera de recuperación",
+        "Ciclo de vapor",
+        "Ciclo combinado",
+    ]
+    steam = dict(sections)["Ciclo de vapor"]
+    titles = [s.title for s in steam]
+    cyc = r.steam
+    for t in cyc.turbines:
+        assert f"{t.name[0].upper()}{t.name[1:]} ({t.inlet + 1} → {t.outlet + 1})" in titles
+    assert sum(t.startswith("Mezcla con el vapor") for t in titles) == len(cyc.admissions)
+    assert ("Balance del desaireador" in titles) == (cyc.deaerator is not None)
+    assert any(t.startswith("Recalentador (") for t in titles) == (cyc.hot_reheat is not None)
+    baumann = any(r"\bar{y}" in tex for s in steam for tex in s.latex)
+    assert baumann == any(t.wet is not None for t in cyc.turbines)
+    for _, steps in sections:
+        for step in steps:
+            for tex in step.latex:
+                assert tex.count("{") == tex.count("}"), (step.title, tex)
+                assert "- -" not in tex and "+ -" not in tex
+    combined = dict(sections)["Ciclo combinado"]
+    assert [s.title for s in combined][-1] == "Exergía del ciclo de fondo"
