@@ -1642,7 +1642,11 @@ def gas_turbine_to_dict(result: GasTurbineResult, system: UnitSystem) -> dict[st
     eh: QuantityKind = "specific_enthalpy"
     exergy = gas_turbine_exergy(result)
     return {
-        "modelo": "aire estándar" if fuel is None else f"combustión de {fuel.name}",
+        "modelo": (
+            "aire estándar"
+            if fuel is None
+            else f"combustión de {'metano' if fuel.name == 'methane' else fuel.name}"
+        ),
         "configuracion": gi.configuration,
         "relacion_de_presiones": gi.pressure_ratio,
         "etapas_de_compresion": gi.compressor_stages,
