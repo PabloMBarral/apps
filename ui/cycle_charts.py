@@ -12,6 +12,9 @@
 - :func:`render_steam_cycle_diagram`, :func:`bottoming_exergy_figure` y
   :func:`configuration_figure`: el ciclo combinado de varias presiones, con
   recalentamiento (Fase 3.6).
+- :func:`gas_turbine_cycle_figure`, :func:`improvement_figure` y
+  :func:`gas_turbine_exergy_figure`: la turbina de gas con interenfriamiento,
+  recalentamiento y regenerador (Fase 3.7).
 
 Los colores de las exergías (útil, destruida, perdida) y de la comparación de
 configuraciones son los tres primeros de la paleta de referencia validada para
@@ -25,10 +28,17 @@ está en ``core/``.
 from __future__ import annotations
 
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from core.cycles.brayton import BraytonResult, brayton_ts_lines
 from core.cycles.combined import CombinedResult
 from core.cycles.combined_multi import BottomingExergy, ConfigurationRow, MultiCombinedResult
+from core.cycles.gas_turbine import (
+    GasTurbineExergy,
+    GasTurbineResult,
+    ImprovementRow,
+    gas_turbine_lines,
+)
 from core.cycles.hrsg import HRSGResult, TQProfile
 from core.cycles.hrsg_multi import HRSGExergy, MultiHRSGResult, MultiTQProfile
 from core.cycles.rankine import RankineResult, rankine_labeled_states, rankine_segments
@@ -52,7 +62,10 @@ __all__ = [
     "energy_sankey_figure",
     "exergy_sections_figure",
     "exergy_split_figure",
+    "gas_turbine_cycle_figure",
+    "gas_turbine_exergy_figure",
     "gas_turbine_ts_figure",
+    "improvement_figure",
     "multi_tq_figure",
     "render_rankine_diagram",
     "render_steam_cycle_diagram",
@@ -849,6 +862,236 @@ def configuration_figure(rows: list[ConfigurationRow]) -> go.Figure:
         xaxis_title="η ciclo combinado [%]",
         yaxis={"autorange": "reversed"},
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        separators=". ",
+    )
+    return fig
+
+
+# ---------------------------------------------------------------------
+# Turbina de gas con etapas y regenerador (Fase 3.7)
+# ---------------------------------------------------------------------
+
+#: Estilo de cada proceso del T–s: (leyenda, estilo de la línea). Los tres colores
+#: son los primeros de la paleta validada para daltonismo; el resto, grises con trazo.
+_GT_STYLES: dict[str, tuple[str, dict[str, object]]] = {
+    "isobar": ("", {"color": "#c8c8c8", "width": 1}),
+    "heat": ("cámaras", {"color": _DESTROYED, "width": 3}),
+    "cooling": ("interenfriamiento", {"color": _USEFUL, "width": 3}),
+    "regenerator": ("regenerador", {"color": _LOST, "width": 3}),
+    "isentropic": ("isoentrópicas", {"color": "#555555", "width": 1.5, "dash": "dash"}),
+    "actual": ("procesos reales", {"color": "#555555", "width": 2, "dash": "dot"}),
+    "composition": ("", {"color": "#999999", "width": 1.5, "dash": "dot"}),
+    "exhaust": ("escape → ambiente", {"color": "#999999", "width": 2, "dash": "dot"}),
+}
+
+
+def _gt_label_positions(result: GasTurbineResult) -> dict[int, str]:
+    """Dónde va el rótulo de cada estado del T–s, según su papel en el ciclo."""
+    pos: dict[int, str] = {}
+    for c in result.compressors:
+        pos[c.inlet] = "bottom center"
+        pos[c.outlet_s] = "top left"
+        pos[c.outlet] = "top right"
+    for t in result.turbines:
+        pos[t.inlet] = "top center"
+        pos[t.outlet_s] = "bottom left"
+        pos[t.outlet] = "bottom right"
+    rg = result.regenerator
+    if rg is not None:
+        pos[rg.air_out] = "middle left"
+        pos[rg.gas_out] = "middle right"
+    return pos
+
+
+def gas_turbine_cycle_figure(result: GasTurbineResult, system: UnitSystem) -> go.Figure:
+    """La turbina de gas con etapas y regenerador en un T–s (entropías absolutas).
+
+    Las cámaras en naranja, los interenfriadores en azul y el regenerador en
+    aguamarina; las isoentrópicas rayadas y las compresiones y expansiones reales
+    punteadas (solo de referencia). Las isobaras de referencia (p₁ y la descarga
+    del compresor) van en gris, sin leyenda: la leyenda corta deja más lugar al
+    diagrama en un celular. Los estados con la numeración de Cengel.
+    """
+
+    def T(value_K: float) -> float:
+        return convert_from_si(value_K, "temperature", system)
+
+    def s(value: float) -> float:
+        return convert_from_si(value, "specific_entropy", system)
+
+    T_unit = unit_label("temperature", system)
+    s_unit = unit_label("specific_entropy", system)
+    p_unit = unit_label("pressure", system)
+    hover = f"s = %{{x:.4g}} {s_unit}<br>T = %{{y:.1f}} {T_unit}"
+    fig = go.Figure()
+    shown: set[str] = set()
+    for line in gas_turbine_lines(result):
+        name, style = _GT_STYLES[line.kind]
+        p = line.p_Pa[0]
+        fig.add_trace(
+            go.Scatter(
+                x=[s(v) for v in line.s_J_per_kg_K],
+                y=[T(v) for v in line.T_K],
+                mode="lines",
+                name=name,
+                legendgroup=line.kind,
+                showlegend=bool(name) and line.kind not in shown,
+                line=style,
+                hovertemplate=hover
+                + f"<extra>{line.medium}, p = {_value(p, 'pressure', system, 4)} {p_unit}</extra>",
+            )
+        )
+        shown.add(line.kind)
+    positions = _gt_label_positions(result)
+    states = list(enumerate(result.states))
+    fig.add_trace(
+        go.Scatter(
+            x=[s(st.s_J_per_kg_K) for _, st in states],
+            y=[T(st.T_K) for _, st in states],
+            mode="markers+text",
+            text=[st.label for _, st in states],
+            textposition=[positions.get(i, "top center") for i, _ in states],
+            textfont={"size": 13},
+            marker={"color": "#333333", "size": 8},
+            customdata=[st.description for _, st in states],
+            showlegend=False,
+            hovertemplate=hover + "<extra>%{text}: %{customdata}</extra>",
+        )
+    )
+    fig.update_layout(
+        height=460,
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        xaxis_title=f"s [{s_unit}]",
+        yaxis_title=f"T [{T_unit}]",
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        separators=". ",
+    )
+    return fig
+
+
+_IMPROVEMENT_SHORT = {
+    "Simple": "simple",
+    "Con regenerador": "+ regenerador",
+    "Interenfriamiento y recalentamiento": "+ IC + RH",
+    "Interenfriamiento, recalentamiento y regenerador": "+ IC + RH + reg.",
+}
+
+
+def _improvement_label(label: str) -> str:
+    if label in _IMPROVEMENT_SHORT:
+        return _IMPROVEMENT_SHORT[label]
+    if label.startswith("Con interenfriamiento"):
+        return "+ IC"
+    if label.startswith("Con recalentamiento"):
+        return "+ RH"
+    return label
+
+
+def improvement_figure(rows: list[ImprovementRow], system: UnitSystem) -> go.Figure:
+    """η y w_neto de cada configuración: dos paneles de puntos, la de los datos resaltada.
+
+    Dos magnitudes con distintas unidades van en dos paneles (nunca en un eje
+    doble). Las configuraciones que no tienen sentido físico no se dibujan.
+    """
+    ok = [r for r in rows if r.result is not None]
+    labels = [_improvement_label(r.label) for r in ok]
+    e_unit = unit_label("specific_enthalpy", system)
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        shared_yaxes=True,
+        horizontal_spacing=0.06,
+        subplot_titles=("η [%]", f"w_neto [{e_unit}]"),
+    )
+    etas = [r.result.eta_th * 100 for r in ok]  # type: ignore[union-attr]
+    works = [
+        convert_from_si(r.result.w_net_J_per_kg, "specific_enthalpy", system)  # type: ignore[union-attr]
+        for r in ok
+    ]
+    current = [r.current for r in ok]
+    for col, values, fmt in ((1, etas, ".1f"), (2, works, ".4g")):
+        for highlight, name, color, symbol in (
+            (False, "otras configuraciones", _USEFUL, "circle"),
+            (True, "la de tus datos", _DESTROYED, "diamond"),
+        ):
+            sel = [k for k, c in enumerate(current) if c == highlight]
+            fig.add_trace(
+                go.Scatter(
+                    x=[values[k] for k in sel],
+                    y=[labels[k] for k in sel],
+                    mode="markers+text",
+                    text=[format(values[k], fmt) for k in sel],
+                    textposition="middle right",
+                    textfont={"size": 11},
+                    name=name,
+                    legendgroup=name,
+                    showlegend=col == 1 and bool(sel),
+                    marker={"color": color, "size": 11, "symbol": symbol},
+                    hovertemplate="%{y}: %{x:" + fmt + "}<extra></extra>",
+                    cliponaxis=False,
+                ),
+                row=1,
+                col=col,
+            )
+    for col, values in ((1, etas), (2, works)):
+        lo, hi = min(values), max(values)
+        pad = 0.08 * (hi - lo or 1.0)
+        fig.update_xaxes(range=[lo - pad, hi + 3.5 * pad], row=1, col=col)
+    fig.update_yaxes(categoryorder="array", categoryarray=labels, autorange="reversed")
+    fig.update_layout(
+        height=110 + 34 * len(labels),
+        margin={"l": 10, "r": 10, "t": 50, "b": 10},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.12, "x": 0},
+        separators=". ",
+    )
+    return fig
+
+
+def gas_turbine_exergy_figure(exergy: GasTurbineExergy, system: UnitSystem) -> go.Figure:
+    """Barras horizontales: a dónde va la exergía que entra (% de la del combustible o calor)."""
+    x_in = exergy.x_in_J_per_kg
+    unit = unit_label("specific_enthalpy", system)
+    rows = [(i.name, i.x_J_per_kg, i.kind) for i in exergy.items if i.x_J_per_kg > 0.0]
+    order = [name for name, _, _ in rows]
+    fig = go.Figure()
+    lost = (
+        "se va (escape e interenfriadores)"
+        if any(name.startswith("interenfriador") for name, _, _ in rows)
+        else "se va con el escape"
+    )
+    for group, color, legend in (
+        ("útil", _USEFUL, "trabajo neto"),
+        ("destruida", _DESTROYED, "destruida (T₀·S_gen)"),
+        ("perdida", _LOST, lost),
+    ):
+        sel = [r for r in rows if r[2] == group]
+        if not sel:
+            continue
+        fig.add_trace(
+            go.Bar(
+                orientation="h",
+                y=[name for name, _, _ in sel],
+                x=[value / x_in * 100 for _, value, _ in sel],
+                name=legend,
+                marker={"color": color, "cornerradius": 4},
+                text=[f"{value / x_in * 100:.1f} %" for _, value, _ in sel],
+                textposition="outside",
+                cliponaxis=False,
+                customdata=[
+                    [name, _value(value, "specific_enthalpy", system)] for name, value, _ in sel
+                ],
+                hovertemplate=f"%{{customdata[0]}}: %{{customdata[1]}} {unit} (%{{x:.1f}} %)"
+                "<extra></extra>",
+            )
+        )
+    top = max(value for _, value, _ in rows) / x_in * 100
+    fig.update_layout(
+        height=110 + 26 * len(rows),
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        xaxis={"title": "% de la exergía que entra", "range": [0, 1.25 * top]},
+        yaxis={"categoryorder": "array", "categoryarray": order, "autorange": "reversed"},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        bargap=0.3,
         separators=". ",
     )
     return fig

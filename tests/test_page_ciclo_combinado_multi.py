@@ -219,3 +219,13 @@ def test_one_pressure_without_reheat_is_the_fase_3_4_page() -> None:
     assert "ṁ vapor [kg/s]" in labels
     assert at.radio(key="cc_levels").value == "1 presión"
     assert at.checkbox(key="cc_reheat").value is False
+
+
+def test_ambient_below_zero() -> None:
+    """Hasta la 0.18.0, con el ambiente bajo cero la exergía del ciclo de fondo fallaba."""
+    name = NAMES[0]
+    at = _app(3, True)
+    at.number_input(key=f"{_prefix(name)}_T1@Técnico").set_value(-10.0).run()
+    at.button(key="cc_btn").click().run()
+    _no_problems(at)
+    assert any(md.value.startswith("#### Exergía del ciclo de fondo") for md in at.markdown)

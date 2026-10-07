@@ -84,6 +84,24 @@ def test_temperature_range_depends_on_the_components() -> None:
     assert AIR_TECHNICAL.T_from_h(AIR_TECHNICAL.h(250.0)) == pytest.approx(250.0, abs=1e-6)
 
 
+def test_gases_with_water_below_its_triple_point() -> None:
+    """Bajo 0,01 °C el agua sigue como gas ideal con c_p constante (Fase 3.7).
+
+    CoolProp no evalúa el agua por debajo de su punto triple; hace falta para el
+    estado muerto de la exergía de los gases con el ambiente bajo cero.
+    """
+    wet = FlueGas.from_fractions(exhaust_composition(3.0))
+    T_m = wet.T_min_K
+    assert wet.h(T_m - 1e-7) == pytest.approx(wet.h(T_m), abs=1e-3)
+    assert wet.s(T_m - 1e-7, 1e5) == pytest.approx(wet.s(T_m, 1e5), abs=1e-6)
+    # c_p casi constante entre −20 y 0 °C: la extrapolación sigue la pendiente del límite.
+    assert wet.h(T_m) - wet.h(253.15) == pytest.approx(wet.cp(T_m) * (T_m - 253.15), rel=2e-3)
+    assert wet.s0(253.15) < wet.s0(T_m)
+    assert ideal_gas._ideal_gas("H2O", (250.0,), "cp")[0] == pytest.approx(
+        ideal_gas._ideal_gas("H2O", (T_m,), "cp")[0]
+    )
+
+
 def test_combustion_products_generalize_the_methane_preset() -> None:
     for lam in (1.0, 1.5, 3.0):
         gas, n_air = combustion_products(AIR_TECHNICAL, (1.0, 4.0, 0.0, 0.0), lam)

@@ -488,7 +488,11 @@ def gas_turbine_to_dict(gt: BraytonResult, system: UnitSystem) -> dict[str, Any]
     gi = gt.inputs
     fuel = gi.fuel
     return {
-        "modelo": "aire estándar" if fuel is None else f"combustión de {fuel.name}",
+        "modelo": (
+            "aire estándar"
+            if fuel is None
+            else f"combustión de {'metano' if fuel.name == 'methane' else fuel.name}"
+        ),
         "relacion_de_presiones": gi.pressure_ratio,
         "rendimiento_compresor": gi.eta_compressor,
         "rendimiento_turbina": gi.eta_turbine,
