@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.18.0"
+PAGE_VERSION = "0.19.0"
 
 
 def _home_page() -> None:

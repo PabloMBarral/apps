@@ -256,6 +256,31 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   turbinas, mezclas, bombas, condensador y chimenea). Con una presión y sin
   recalentar coincide exactamente con la Fase 3.4; una red de TESPy de todo
   el lado agua–vapor da lo mismo al 0,2 %. _Fase 3.6 cerrada._
+- ✅ **Turbina de gas: ciclo Brayton con interenfriamiento,
+  recalentamiento y regenerador** (página propia, `/Brayton`): la turbina
+  de gas del ciclo combinado con las tres mejoras de Cengel §9-9 y §9-10.
+  **Compresión en etapas** con interenfriamiento (relaciones de presión
+  iguales, el mínimo trabajo del vademecum §6.3, o presiones a elección),
+  **expansión en etapas** con recalentamiento (con metano, una segunda
+  cámara que quema en los gases: *combustión secuencial*; con aire
+  estándar, un intercambiador) y **regenerador** con efectividad ε (la de
+  Cengel §9-9; con combustión, la temperatura del aire se itera), con
+  pérdidas de carga en cámaras, interenfriadores y regenerador. Estados
+  numerados como Cengel (1–4, 1–6 con regenerador, 1–10 con dos etapas).
+  Muestra η, el trabajo neto por kg de aire, la relación de trabajo de
+  retroceso, el **T–s** con todas las etapas, las tablas de estados y de
+  componentes, **«¿Cuánto ganás con cada mejora?»** (la misma turbina
+  simple, con regenerador, con interenfriamiento, con recalentamiento y con
+  todo: sin regenerador, interenfriar y recalentar suben el trabajo pero
+  bajan el rendimiento) y la **exergía destruida en cada componente** (la
+  del combustible ≈ PCI, vademecum §16.13). Procedimiento con las tablas de
+  gas ideal, control con TESPy, export y barridos (r_p, TIT, temperatura
+  ambiente, ε, la presión intermedia con su óptimo en √(p₁·p₂) y la
+  cantidad de etapas, que con todo ideal tiende al ciclo de Ericsson).
+  Reproduce los ejemplos 9-5 a 9-8 de Cengel (9-7: η = 36,9 %; 9-8:
+  r_bw = 0,304 y η = 35,8 %, y 69,6 % con regenerador ideal); con una etapa
+  y sin regenerador es idéntica a la turbina de la Fase 3.4, y TESPy da lo
+  mismo dentro de 0,05 puntos de rendimiento. _Fase 3.7 cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -264,10 +289,11 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
 ### En desarrollo (roadmap)
 - **Ciclo combinado (continuación)**: secciones intercaladas en la HRSG,
   quemadores suplementarios, pérdidas de carga, recirculación del
-  precalentador y la exergía de toda la planta (con la del combustible).
-- **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
-  Brayton con regeneración, interenfriamiento y recalentamiento (página
-  propia, sobre la turbina de gas del ciclo combinado), cogeneración.
+  precalentador, la turbina de gas con etapas (combustión secuencial) en el
+  ciclo combinado y la exergía de toda la planta (con la química del
+  combustible).
+- **Ciclos termodinámicos**: cogeneración, refrigeración de álabes de la
+  turbina de gas, turbinas de propulsión.
 - **Psicrometría** y procesos HVAC sobre carta psicrométrica interactiva.
 - **Estequiometría** de combustión: combustibles puros y mezclas,
   exceso de aire, composición de humos en base seca y húmeda,
@@ -334,6 +360,8 @@ apps/
 │   │   ├── hrsg_multi_procedure.py  # su procedimiento nivel por nivel
 │   │   ├── brayton.py            # turbina de gas (gases ideales; TESPy de control)
 │   │   ├── brayton_procedure.py  # su procedimiento con la función s°
+│   │   ├── gas_turbine.py        # Brayton con interenfriamiento, recalentamiento y regenerador
+│   │   ├── gas_turbine_procedure.py  # su procedimiento, con la exergía por componente
 │   │   ├── combined.py           # ciclo combinado: turbina de gas + HRSG + Rankine
 │   │   ├── combined_procedure.py # su procedimiento por partes
 │   │   ├── combined_multi.py     # ciclo combinado de 2 y 3 presiones con recalentamiento
@@ -356,7 +384,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.18.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.19.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---

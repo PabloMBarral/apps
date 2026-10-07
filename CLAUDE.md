@@ -79,6 +79,11 @@ apps/
 │   │                          # (selector), Baumann, T–s con admisiones,
 │   │                          # comparación de configuraciones, exergía del
 │   │                          # ciclo de fondo, TESPy del lado agua–vapor.
+│   ├── 13_Brayton.py          # ✅ Fase 3.7 — Turbina de gas con interenfriamiento,
+│   │                          # recalentamiento (combustión secuencial) y
+│   │                          # regenerador: T–s con las etapas, estados y
+│   │                          # componentes, «¿Cuánto ganás con cada mejora?»,
+│   │                          # exergía por componente, TESPy, barridos.
 │   └── 99_Acerca.py           # Créditos, licencias, citas
 ├── core/                      # Lógica pura, sin dependencia de Streamlit
 │   ├── __init__.py
@@ -124,6 +129,8 @@ apps/
 │   │                          # s(T, p) absoluta (NIST-JANAF), T_isentropic, T_from_h;
 │   │                          # AIR_DRY / AIR_TECHNICAL, exhaust_composition(λ),
 │   │                          # combustion_products(aire, átomos, λ).
+│   │                          # Fase 3.7: bajo la T mínima de CoolProp (el agua
+│   │                          # bajo 0,01 °C), gas ideal con c_p constante.
 │   ├── exergy.py              # Exergía física y química
 │   ├── combustion/
 │   │   ├── __init__.py
@@ -201,8 +208,18 @@ apps/
 │   │   │                      # configuration_comparison, bottoming_exergy,
 │   │   │                      # notas, ejemplos, barridos, export y
 │   │   │                      # combined_multi_tespy (control).
-│   │   └── combined_multi_procedure.py # ✅ Fase 3.6 — combined_multi_sections:
-│   │                          # TG, HRSG (RH y 2×2), ciclo de vapor y acople.
+│   │   ├── combined_multi_procedure.py # ✅ Fase 3.6 — combined_multi_sections:
+│   │   │                      # TG, HRSG (RH y 2×2), ciclo de vapor y acople.
+│   │   ├── gas_turbine.py     # ✅ Fase 3.7 — GasTurbineInputs (etapas, T_intercool_K,
+│   │   │                      # T_reheat_K, regenerator, Δp, presiones intermedias,
+│   │   │                      # W_net_W) / solve_gas_turbine / GasTurbineResult
+│   │   │                      # (CycleState numerados como Cengel, Stage, Intercooler,
+│   │   │                      # Combustor, Regenerator), from_brayton (= 3.4),
+│   │   │                      # gas_turbine_exergy, improvement_comparison, notas,
+│   │   │                      # ejemplos, barridos, gas_turbine_lines (T–s), export y
+│   │   │                      # gas_turbine_tespy (control).
+│   │   └── gas_turbine_procedure.py # ✅ Fase 3.7 — gas_turbine_steps: presiones,
+│   │                          # etapas, cámaras, regenerador, rendimiento y exergía.
 │   └── plots.py               # fluprodia + matplotlib helpers
 ├── ui/                        # Helpers de UI que sí importan Streamlit
 │   ├── branding.py            # Bloque de créditos compartido (sidebar)
@@ -220,6 +237,8 @@ apps/
 │                              # Fase 3.6: el RH en el T–Q,
 │                              # render_steam_cycle_diagram,
 │                              # bottoming_exergy_figure y configuration_figure.
+│                              # Fase 3.7: gas_turbine_cycle_figure,
+│                              # improvement_figure y gas_turbine_exergy_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
@@ -654,6 +673,62 @@ Notas de la Fase 3.6 (ciclo combinado de dos y tres presiones con recalentamient
 - LaTeX: 4007 expresiones distintas, KaTeX estricto, máx. 320 px. Con RH el
   calor del tramo de alta es `\dot{Q}_{\mathrm{tramo},A}` (`SH+RH+EV` no
   entraba).
+
+Notas de la Fase 3.7 (turbina de gas con interenfriamiento, recalentamiento y regenerador):
+
+- `core/cycles/gas_turbine.py` generaliza `brayton.py`, que sigue siendo la
+  turbina del ciclo combinado: `from_brayton` + una etapa y sin regenerador
+  dan idéntico (test a 1e-12). Con aire estándar los estados de la turbina se
+  rotulan «aire» (la 3.4 decía «gases»).
+- Etapas: sin presiones dadas, la misma relación en cada etapa, compensando
+  las Δp de interenfriadores y cámaras (`_compressor_pressures`,
+  `_turbine_pressures`); es el mínimo trabajo del vademecum §6.3
+  (p_x = √(p₁p₂)). `r_p` es la del compresor completo; la turbina descarga a
+  p₁/(1 − Δp_reg) con regenerador.
+- Recalentamiento con combustible = segunda cámara que quema en los gases
+  (combustión secuencial): (1 + F_ant)·h_ent + f·PCI = (1 + F)·h_g(T); la
+  composición sale de `combustion_products` con el F acumulado (λ = f_t/F,
+  con λ ≥ 1; si no alcanza el O₂, error que nombra la cámara).
+- Regenerador: ε de Cengel §9-9 con las entalpías del aire
+  (h₅ = h₂ + ε·(h_a(T₄) − h₂)); con combustión T₄ depende de f y f de T₅: punto
+  fijo acelerado con la secante (con aire estándar converge en una vuelta).
+  T₄ ≤ T₂ es error («el regenerador no sirve»). En TESPy, `HeatExchanger` con
+  `eff_cold` = ε; con ε = 1 TESPy termina en status 1, así que el control lo
+  explica (el núcleo sí acepta ε = 1, el 9-8 b de Cengel).
+- Numeración de Cengel: 1–4; 1–6 con regenerador y una etapa (5 y 6 son sus
+  salidas, figura 9-38); con etapas, en el sentido del flujo (1–10 en el 9-8,
+  figura 9-43). El 9-8 a) del libro numera como si hubiera regenerador; acá,
+  sin regenerador, va de 1 a 8.
+- Exergía (`gas_turbine_exergy`): T₀ = T ambiente; la del combustible ≈ PCI
+  (vademecum §16.13), así que η_II = η; con aire estándar entra Q·(1 − T₀/T)
+  con T la salida de cada calentador. ψ de cada estado contra la misma mezcla
+  a T₀ y p₀. Compresores, turbinas y regenerador: T₀·S_gen; cada cámara, el
+  resto de su balance; interenfriadores y escape, «perdida». Cierra a 1e-9.
+- `ideal_gas`: bajo la T mínima de CoolProp (el agua bajo 0,01 °C) cada
+  componente sigue como gas ideal con c_p constante. Hace falta para el estado
+  muerto con ambiente bajo cero; arregló también la exergía del ciclo
+  combinado, que hasta la 0.18.0 fallaba con un error crudo de CoolProp.
+- TESPy de control (`gas_turbine_tespy`): `Compressor` por etapa,
+  `SimpleHeatExchanger` en los interenfriadores (T de salida en la entrada de
+  la etapa siguiente), `HeatExchanger` regenerador, `DiabaticCombustionChamber`
+  en cada cámara (p de cada recalentamiento fijada en su entrada) y `Turbine`
+  por etapa. Hacen falta `T0`/`p0` en la entrada de cada cámara: sin ellos,
+  con aire técnico y tres etapas, Newton termina en status 99. Coincide dentro
+  de 0,05 puntos de η, 0,3 % en f y 2 K en el escape; 0,1–0,7 s.
+- Página: botón «Calcular» (keys `bt_{ejemplo}_…`; las presiones a elección,
+  `…_pic{n}_{k}` y `…_prh{n}_{k}`); la comparación de mejoras usa ε = 0,80 si
+  los datos no tienen regenerador y dos etapas si tienen una. Gráficos con la
+  paleta validada (cámaras naranja, interenfriamiento azul, regenerador
+  aguamarina); la comparación es un gráfico de puntos en dos paneles (η y
+  w_neto: nunca un eje doble); el T–s lleva una leyenda corta y sin las
+  isobaras (a 390 px ocupaba cinco renglones).
+- LaTeX: 3299 expresiones distintas (procedimiento y teoría), KaTeX
+  estricto, máx. 316 px. Corta con números negativos (`_wrap_wide`, s° bajo
+  25 °C en Inglés); el regenerador como Cengel (q_reg,máx, q_reg =
+  ε·q_reg,máx, h₅ = h₂ + q_reg); el recalentamiento calcula Δh antes de f (un
+  `\\` dentro de `\frac` no es válido); la exergía de cada cámara, un término
+  por renglón; los subíndices por componente (x_{d,C1}, x_{d,\text{cám}},
+  x_{d,\text{RH}}).
 
 ### Citas y licencias
 

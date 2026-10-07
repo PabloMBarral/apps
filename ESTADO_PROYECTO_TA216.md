@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.18.0` — Fase 3.6 cerrada (2026-10-07).
+> **Versión actual**: `0.19.0` — Fase 3.7 cerrada (2026-10-07).
 
 ---
 
@@ -814,6 +814,80 @@
     scroll ni desborde.
 - **Dependencias**: ninguna nueva.
 
+### Fase 3.7 — Turbina de gas: Brayton con interenfriamiento, recalentamiento y regenerador
+- **Versión**: `0.19.0` (2026-10-07). Rama `claude/water-state-analyzer-f4fiev`
+  («sí, mergeá y seguí con todo»: el plan se mandó y se implementó sin esperar,
+  como en las fases anteriores).
+- **Scope**:
+  - **`core/cycles/gas_turbine.py`** (nuevo): generaliza la turbina de gas de la
+    Fase 3.4 (que sigue siendo la del ciclo combinado) con las tres mejoras de
+    Cengel §9-9 y §9-10: **compresión en etapas con interenfriamiento**
+    (relaciones iguales, el mínimo trabajo del vademecum §6.3, o presiones a
+    elección), **expansión en etapas con recalentamiento** (con metano, una
+    segunda cámara que quema en los gases: combustión secuencial, con la
+    composición por el F acumulado; con aire estándar, un intercambiador) y
+    **regenerador** con la efectividad de Cengel (con combustión, T₅ se itera
+    con la secante). Pérdidas de carga en cámaras, interenfriadores y
+    regenerador; tamaño por caudal o por potencia neta. Estados con la
+    numeración de Cengel (1–4, 1–6 con regenerador, en el sentido del flujo con
+    etapas) y su descripción. `from_brayton` (la 3.4, idéntica a 1e-12),
+    `gas_turbine_exergy` (combustible ≈ PCI, vademecum §16.13),
+    `improvement_comparison` (simple, regenerador, interenfriamiento,
+    recalentamiento y combinaciones), notas, nueve ejemplos, barridos (r_p,
+    TIT, ε, T ambiente, presión intermedia y cantidad de etapas), líneas del
+    T–s, export y `gas_turbine_tespy` (control).
+  - **`core/cycles/gas_turbine_procedure.py`** (nuevo): presiones de cada
+    etapa, compresores con la función s°, interenfriadores, cámaras (y el
+    recalentamiento con Δh, f_j, F y λ) seguidas de su turbina, el regenerador
+    después de la turbina (como el 9-7), el rendimiento (con Carnot si están
+    las tres mejoras), las potencias y la exergía por componente con su balance.
+  - **Página `/Brayton`** (nueva, «Brayton» en el menú, antes de HRSG): datos
+    por bloques (turbina, interenfriamiento, recalentamiento, regenerador,
+    tamaño), botón «Calcular», métricas (η, w_neto, r_bw, Ẇ, escape, λ), notas,
+    T–s con todas las etapas, tablas de estados y de componentes, **«¿Cuánto
+    ganás con cada mejora?»** (tabla y gráfico de puntos en dos paneles, η y
+    w_neto), **exergía por componente** (barras), procedimiento, control con
+    TESPy, export, barridos y teoría.
+  - **Arreglo** (`core/ideal_gas.py`): bajo la T mínima de CoolProp (el agua
+    bajo 0,01 °C) cada componente sigue como gas ideal con c_p constante. Con
+    el ambiente bajo cero, la exergía del ciclo combinado de la 0.18.0 fallaba
+    con un error crudo de CoolProp.
+- **Validación** (aire estándar, tabla A-17):
+
+  | Caso | App | Cengel |
+  |---|---|---|
+  | 9-5: Brayton ideal, r_p 8 | η 42,54 %, r_bw 0,402 | 42,6 %, 0,403 |
+  | 9-6: real (η_C 0,80, η_T 0,85) | η 26,61 %, r_bw 0,592 | 26,6 %, 0,592 |
+  | 9-7: regenerador ε = 0,80 | η 36,88 %, q_reg 220,4 kJ/kg | 36,9 %, 220,0 kJ/kg |
+  | 9-8: 2 + 2 etapas | η 35,73 %, r_bw 0,304 | 35,8 %, 0,304 |
+  | 9-8: con regenerador ideal | η 69,58 % | 69,6 % |
+
+  - Con una etapa y sin regenerador = la turbina de la Fase 3.4 (combustión y
+    aire estándar), a 1e-12.
+  - **TESPy** en diez configuraciones (aire estándar y metano, etapas,
+    regenerador, combustión secuencial, aire técnico): dentro de 0,05 puntos de
+    η, 0,3 % en f y 2,5 K en el escape.
+  - Balances de energía, masa y exergía: cierran a 1e-9.
+  - Barridos: p_x óptima = √(p₁p₂); con regenerador, η máximo a r_p ≈ 4,5 y el
+    corte en T₄ = T₂; con todo ideal, de 59,8 % (1 etapa) a 75,3 % (8 etapas)
+    contra 76,9 % de Carnot (Ericsson).
+- **Mensajes al alumno**: etapas fuera de rango, presiones intermedias que no
+  crecen o no bajan, interenfriamiento que no enfría, recalentamiento que no
+  calienta, efectividad fuera de (0, 1], regenerador que no sirve (T₄ ≤ T₂),
+  λ < 1 en una cámara de recalentamiento (la nombra), TIT por debajo del aire
+  que llega a la cámara.
+- **Tests**: de 2404 a 2576 passed (10 skipped), sin warnings.
+  - `tests/test_gas_turbine.py` (100), `tests/test_gas_turbine_procedure.py`
+    (37), `tests/test_page_brayton.py` (31, AppTest), más la exergía bajo cero
+    (`test_ideal_gas.py`, `test_combined_multi.py` y
+    `test_page_ciclo_combinado_multi.py`).
+  - LaTeX: 3299 expresiones distintas validan con KaTeX estricto y entran en
+    316 px como máximo en los tres sistemas.
+  - Smoke test en Chromium a 1280 y 390 px: los nueve casos (siete ejemplos,
+    la secuencial en SI y el 9-8 b en Inglés), con el procedimiento, la teoría
+    y TESPy abiertos; sin ecuaciones con scroll ni desborde.
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
@@ -842,10 +916,11 @@
   pérdidas de carga (HRSG y recalentador), recirculación del precalentador
   por el punto de rocío, y la exergía de toda la planta con la química del
   combustible (en la página de Exergía).
-- **Fase 3.x** — Brayton con regeneración, interenfriamiento y
-  recalentamiento (página propia sobre `core/cycles/brayton.py`); exergía
-  de los ciclos de potencia. Evaluar `tespy.tools.get_plotting_data` para
-  los diagramas (hoy el ciclo se dibuja con
+- **Turbina de gas (continuación)**: refrigeración de álabes con aire del
+  compresor, pérdidas mecánicas y del generador, la turbina con etapas
+  (combustión secuencial) en el ciclo combinado, inyección de vapor o de
+  agua, turbinas de propulsión (Cengel §9-11). Evaluar
+  `tespy.tools.get_plotting_data` para los diagramas del Rankine (hoy con
   `core.diagrams.segments_overlays`).
 - **Refrigeración (continuación)**: ciclo transcrítico de CO₂,
   intercambiador líquido–vapor, economizador cerrado (subenfriador),
