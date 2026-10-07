@@ -107,11 +107,40 @@ def _T_min_species(species: str) -> float:
     return fluid_limits(_COOLPROP_NAMES[species]).T_min_K + 0.01
 
 
+@cache
+def _at_minimum(species: str) -> tuple[float, float, float]:
+    """h, s y c_p de gas ideal del componente a su temperatura mínima (1 Pa)."""
+    state = CoolProp.AbstractState("HEOS", _COOLPROP_NAMES[species])
+    state.update(CoolProp.PT_INPUTS, _P_IDEAL_PA, _T_min_species(species))
+    return state.hmass(), state.smass(), state.cpmass()
+
+
+def _below_minimum(species: str, T: float, what: Literal["h", "cp", "s"]) -> float:
+    """Gas ideal por debajo de la temperatura mínima de CoolProp, con c_p constante.
+
+    CoolProp no evalúa el agua por debajo de su punto triple (0,01 °C). Como gas
+    ideal, su c_p casi no cambia ahí (1,86 kJ/(kg·K)): h = h_mín + c_p·(T − T_mín)
+    y s = s_mín + c_p·ln(T/T_mín). Hace falta para el estado muerto de la
+    exergía de los gases con un ambiente bajo cero.
+    """
+    h_m, s_m, cp_m = _at_minimum(species)
+    T_m = _T_min_species(species)
+    if what == "h":
+        return h_m + cp_m * (T - T_m)
+    if what == "s":
+        return s_m + cp_m * math.log(T / T_m)
+    return cp_m
+
+
 def _ideal_gas(species: str, temps: Sequence[float], what: Literal["h", "cp", "s"]) -> np.ndarray:
     """h, c_p o s de gas ideal (J/kg, J/(kg·K)) de un componente a varias temperaturas."""
     state = CoolProp.AbstractState("HEOS", _COOLPROP_NAMES[species])
+    T_min = _T_min_species(species)
     out = np.empty(len(temps))
     for k, T in enumerate(temps):
+        if T < T_min:
+            out[k] = _below_minimum(species, float(T), what)
+            continue
         state.update(CoolProp.PT_INPUTS, _P_IDEAL_PA, float(T))
         out[k] = state.hmass() if what == "h" else state.cpmass() if what == "cp" else state.smass()
     return out

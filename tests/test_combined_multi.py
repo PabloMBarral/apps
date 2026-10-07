@@ -466,3 +466,12 @@ def test_procedure(name: str, system: str) -> None:
                 assert "- -" not in tex and "+ -" not in tex
     combined = dict(sections)["Ciclo combinado"]
     assert [s.title for s in combined][-1] == "Exergía del ciclo de fondo"
+
+
+def test_bottoming_exergy_with_an_ambient_below_zero() -> None:
+    """Hasta la 0.18.0, con el ambiente bajo cero CoolProp no evaluaba el agua de los gases."""
+    gt = replace(THREE.gas_turbine, T_amb_K=263.15)
+    r = solve_combined_multi(replace(THREE, gas_turbine=gt))
+    e = bottoming_exergy(r)
+    assert abs(e.residual_W) < 1e-9 * e.X_gas_in_W
+    assert 0.5 < e.efficiency < 0.8
