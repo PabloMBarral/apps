@@ -674,13 +674,13 @@
 ## Pendientes / próximas fases
 
 - **Detectado en Fase 1.7, sin resolver**:
-  - En sistema SI (J/kg con ×10ⁿ) algunas sustituciones siguen siendo más
-    anchas que el celular (regla de la palanca, h₂ de Isoentrópicos: hasta
-    475 px; en Rankine, la h de la turbina real, la bomba de los ORC y las
-    sumas del ciclo regenerativo: ≤ 393 px) y se deslizan;
-    en Inglés, 5 apenas pasadas (≤ 339 px). Se resolvería mostrando las
-    energías en kJ/kg dentro del SI o con otro formato de número (decisión
-    del autor: hoy el SI es J/kg).
+  - ~~Ecuaciones más anchas que el celular en SI~~ (resuelto después de la
+    0.16.0, con el OK del autor): en el Rankine, Propiedades e
+    Isoentrópicos, una resta con números ×10ⁿ (o negativos) con un factor
+    delante pasa el segundo número a otro renglón. Ahora entran en 324 px
+    las 4309 expresiones distintas del Rankine (máx. 316 px en SI), las
+    1097 de las páginas 1–4 y las 129 de Isoentrópicos; Técnico e Inglés del
+    Rankine quedan idénticos.
   - Pseudo-puros con T y (s o v): dentro de la campana CoolProp los
     resuelve a una sola presión entre la de burbuja y la de rocío (es su
     modelo; el título no coincide con la palanca a T constante), y justo

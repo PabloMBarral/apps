@@ -14,10 +14,10 @@ igualdad por renglón) para que entren en el ancho de un celular.
 from __future__ import annotations
 
 from core.cycles.hrsg import HRSGResult
-from core.cycles.rankine_procedure import _bar, _diff, _n, _q, _wrap
+from core.cycles.rankine_procedure import _bar, _diff, _factor_diff, _n, _q, _wrap
 from core.fluids import saturation_at_temperature
 from core.ideal_gas import R_U, FlueGas, molar_mass
-from core.latex import latex_chain, latex_number, latex_paren
+from core.latex import latex_chain, latex_number
 from core.state_report import ProcedureStep
 from core.units_system import QuantityKind, UnitSystem
 
@@ -47,11 +47,7 @@ def times_diff(
 
 def factor_times_diff(factor: str, a_si: float, b_si: float, system: UnitSystem) -> str:
     r"""Como :func:`times_diff`, con el factor ya escrito en LaTeX (p. ej. ``1 + f``)."""
-    diff = _diff(a_si, b_si, _EH, system)
-    if r"\times" not in diff:
-        return rf"{factor}\,({diff})"
-    b = latex_paren(_n(b_si, _EH, system))
-    return rf"{factor}\,({_n(a_si, _EH, system)} \\ &\quad - {b})"
+    return _factor_diff(factor, a_si, b_si, _EH, system)
 
 
 def _molar_unit(system: UnitSystem) -> str:

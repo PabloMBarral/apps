@@ -13,7 +13,24 @@ import pytest
 from core.fluids import state_from_pair
 from core.interpolation import bilinear, linear_from_table
 from core.isentropic import isentropic_steps, pump_direct, suggested_device_inputs
-from core.latex import latex_chain, latex_paren
+from core.latex import latex_chain, latex_is_wide, latex_paren
+
+
+def test_wide_numbers_are_the_si_powers_and_the_negatives() -> None:
+    # Los que alargan un renglón en el celular: ×10ⁿ (J/kg y Pa en SI) y negativos.
+    assert latex_is_wide(r"3.5831\times 10^{6}", "1.9")
+    assert latex_is_wide("2706.2", "-0.049779")
+    assert not latex_is_wide("2706.2", "503.81", "0.5")
+    assert not latex_is_wide()
+
+
+def test_si_pump_and_lever_rule_split_the_subtraction() -> None:
+    """Agua líquida bombeada en SI: h₂ = h₁ + (h₂s − h₁)/η_s con ×10ⁿ pasa a dos renglones."""
+    state_in = state_from_pair("Water", "PX", p=10e3, x=0.0)
+    result = pump_direct(fluid="Water", state_in=state_in, p_out_Pa=15e6, eta_s=0.85)
+    tex = isentropic_steps(result, "SI").substituted_latex
+    assert r"h_2 &= 1.9181\times 10^{5} \\ &\quad + \dfrac" in tex
+    assert r"h_2 &= 191.81 + \dfrac" in isentropic_steps(result, "Técnico").substituted_latex
 
 
 class TestLatexChain:

@@ -275,8 +275,12 @@ Notas de la Fase 1.7:
   separados o en un `aligned`. Los negativos después de un signo, con
   `latex_paren`. Medir el ancho real renderizando con KaTeX en un
   navegador (p. ej. Chromium con Playwright) en los tres sistemas de
-  unidades; en SI, los números con ×10ⁿ J/kg pueden quedar más anchos
-  (se deslizan).
+  unidades. En SI los números llevan ×10ⁿ (J/kg, Pa): una resta con un
+  factor delante (η, v, la fracción y, x de la palanca) pasa el segundo
+  número a otro renglón (`_factor_diff` del Rankine, `times_diff` de la
+  HRSG, `latex_is_wide` en Propiedades e Isoentrópicos, que también corta
+  con negativos). Desde la 0.17.0 todas las páginas entran en 324 px en
+  los tres sistemas (un test lo vigila en el Rankine).
 - **Isolíneas de fluprodia**: `set_isolines` interpreta los valores en
   las unidades activas del diagrama (`set_unit_system`). Generarlas en
   las unidades de cada sistema (`core.diagrams._isoline_grid(fluid,
@@ -529,8 +533,8 @@ Notas de la Fase 3.4 (turbina de gas y ciclo combinado de una presión):
 - Procedimiento con la notación de Cengel (s°₁, s°₂s; s°_g,3 para los
   gases). En SI la turbina calcula primero Δh_s y w_T usa
   `factor_times_diff`: máximo 306 px en los tres sistemas (2592
-  ecuaciones). Los pasos del Rankine en SI se siguen deslizando (hasta
-  384 px), igual que en /Rankine.
+  ecuaciones). Hasta la 0.16.0 los pasos del Rankine en SI se
+  deslizaban (hasta 393 px); desde la 0.17.0 también entran.
 - `ui/cycle_charts.py` junta los gráficos de los ciclos: /HRSG y /Rankine
   importan de ahí el T–Q y el diagrama del Rankine, sin cambios visibles.
 
