@@ -88,9 +88,13 @@ def gas_composition_lines(gas: FlueGas, system: UnitSystem) -> list[str]:
 
 
 def _composition_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
+    return gas_composition_step(result.inputs.gas, system)
+
+
+def gas_composition_step(gas: FlueGas, system: UnitSystem) -> ProcedureStep:
     """Masa molar, fracciones másicas y R de la mezcla (vademecum §5)."""
     english = system == "Inglés"
-    lines = gas_composition_lines(result.inputs.gas, system)
+    lines = gas_composition_lines(gas, system)
     return ProcedureStep(
         title="Composición de los gases",
         text=(
@@ -448,8 +452,12 @@ def _total_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
 
 
 def _dew_point_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep | None:
-    gas = result.inputs.gas
-    dew = result.dew_point_K
+    return dew_point_step(result.inputs.gas, system)
+
+
+def dew_point_step(gas: FlueGas, system: UnitSystem) -> ProcedureStep | None:
+    """Presión parcial del vapor de agua y punto de rocío de los gases (vademecum §5.3)."""
+    dew = gas.dew_point_K
     if dew is None:
         return None
     y_w = gas.mole_fractions["H2O"]
