@@ -35,7 +35,7 @@ keywords:
   - gas-turbine
   - combined-cycle
 license: MIT
-version: "0.17.0"
+version: "0.18.0"
 date-released: "2026-10-07"
 references:
   - type: article

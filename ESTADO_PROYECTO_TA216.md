@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.17.0` — Fase 3.5 cerrada (2026-10-07).
+> **Versión actual**: `0.18.0` — Fase 3.6 cerrada (2026-10-07).
 
 ---
 
@@ -735,6 +735,85 @@
     abiertos; sin ecuaciones con scroll ni desborde.
 - **Dependencias**: ninguna nueva.
 
+### Fase 3.6 — Ciclo combinado de dos y tres presiones con recalentamiento
+- **Versión**: `0.18.0` (2026-10-07). Rama `claude/water-state-analyzer-f4fiev`
+  (plan enviado y aprobado: «dale mergea y seguí»; la regla de Baumann va
+  apagada por defecto, como se propuso).
+- **Scope**:
+  - **`core/cycles/hrsg_multi.py`**: recalentador opcional (`Reheater`) **en
+    paralelo** con el sobrecalentador de alta (los dos bancos ven los gases de
+    entrada y salen a una T común). Con tres niveles el vapor de media se suma
+    al recalentamiento frío y los caudales de alta y media salen de un
+    **sistema lineal de 2×2** (`reheat_system`, Cramer). T–Q con los dos
+    bancos en el mismo tramo, exergía por banco, validaciones que nombran el
+    recalentador y rendimiento de las bombas entre niveles (`eta_pump`). Sin
+    recalentador, idéntico a la 0.17.0.
+  - **`core/cycles/combined_multi.py`** (nuevo): turbina de gas + HRSG en
+    cascada + **turbina de vapor con admisiones** (el vapor de cada nivel se
+    mezcla a la presión de su domo), recalentamiento, desaireador opcional y
+    **regla de Baumann** (η_húmedo = η_T·(1 − α·ȳ) en la parte húmeda).
+    Estados numerados como Cengel (1–4, 1–6 con recalentamiento, 1–7 con
+    desaireador). `configuration_comparison` (1/2/3 presiones, con y sin
+    recalentamiento, con η_T constante y con Baumann), `bottoming_exergy`
+    (exergía del ciclo de fondo por componente), notas, siete ejemplos (uno o
+    dos por combinación), barridos (presiones de alta, media, baja y de
+    recalentamiento, T de recalentamiento, pinch, r_p y TIT), export y
+    `combined_multi_tespy` (control con TESPy de todo el lado agua–vapor).
+  - **`core/cycles/combined_multi_procedure.py`**: por partes (turbina de gas,
+    HRSG con el recalentador y el 2×2, ciclo de vapor con cada turbina, las
+    mezclas, el recalentador, Baumann, el desaireador, el condensador y las
+    potencias; el acople, el rendimiento de Kehlhofer, el balance de energía y
+    la exergía del ciclo de fondo).
+  - **Página `/Ciclo_Combinado`**: radio **«Niveles de presión»** y casilla
+    **«Recalentamiento»**; con una presión y sin recalentar, la 0.17.0 sin
+    cambios. Si no: un bloque por nivel, el recalentamiento, la casilla de
+    Baumann; métricas por nivel y el título a la salida de la turbina,
+    Sankey, T–s de la TG, T–Q con el recalentador, **T–s del ciclo de vapor
+    con las admisiones**, tablas de estados y de turbinas, **«¿Cuánto ganás
+    con más presiones y recalentamiento?»** (tabla y gráfico de puntos),
+    **exergía del ciclo de fondo** (barras), procedimiento, control con TESPy
+    (turbina de gas y lado agua–vapor), export, barridos (η y título) y
+    teoría.
+  - Gráficos de exergía y de la comparación con la paleta de referencia
+    validada para daltonismo (también en /HRSG: el verde y el naranja de las
+    barras de la 0.17.0 no se distinguían con protanopía).
+- **Validación** (turbina de gas moderna, escape a 675 °C; alta 120 bar y
+  565 °C, media 25 bar y baja 4 bar saturadas, recalentamiento a 565 °C,
+  pinch 8 K, condensador 0,06 bar, η_T 0,90, η_B 0,80, sin desaireador):
+
+  | Configuración | η_CC | η_CC con Baumann | x salida | Chimenea | Ẇ_TV / Ẋ_gases |
+  |---|---|---|---|---|---|
+  | 1 presión | 61,60 % | 61,32 % | 0,852 | 103 °C | 69,3 % |
+  | 1 presión + RH | 61,11 % | 61,15 % | 0,948 | 150 °C | 67,6 % |
+  | 2 presiones | 62,52 % | 61,90 % | 0,843 | 67 °C | 72,6 % |
+  | 2 presiones + RH | 62,63 % | 62,56 % | 0,924 | 77 °C | 73,0 % |
+  | 3 presiones | 62,78 % | 62,10 % | 0,837 | 67 °C | 73,5 % |
+  | 3 presiones + RH | 62,94 % | 62,89 % | 0,932 | 79 °C | 74,1 % |
+
+  - Una presión sin recalentar = el ciclo de la Fase 3.4 (con el Rankine de
+    TESPy) a 1e-9, con y sin desaireador.
+  - **TESPy** de todo el lado agua–vapor (banco paralelo con `Splitter` +
+    `Merge` de gases): al 0,2 % en caudales, 0,02 % en Ẇ_TV y 0,1 K en la
+    chimenea, en 11 configuraciones (con desaireador, Baumann, media y baja
+    sobrecalentadas, alta saturada).
+  - Recorrido del vapor a mano con PropsSI (1e-9), el 2×2 con numpy (1e-7) y
+    los balances de energía, masa y exergía (cierran a ~1e-7 W).
+- **Mensajes al alumno**: recalentamiento fuera de rango o a otra presión que
+  la de media, recalentador que no calienta o más caliente que los gases,
+  cruce en el banco paralelo, desaireador que calienta más que el
+  economizador de baja o justo en una admisión, factor de Baumann, con el
+  nombre de la parte.
+- **Tests**: de 2253 a 2404 passed (10 skipped), sin warnings.
+  - `tests/test_combined_multi.py` (101), `tests/test_page_ciclo_combinado_multi.py`
+    (26, AppTest) y 24 nuevos en `tests/test_hrsg_multi.py`.
+  - LaTeX: 4007 expresiones distintas validan con KaTeX estricto y entran en
+    320 px como máximo en los tres sistemas.
+  - Smoke test en Chromium a 1280 y 390 px: una presión (la 0.17.0), las
+    cinco combinaciones nuevas y tres presiones con recalentamiento en SI,
+    con el procedimiento, la teoría y el diagrama abiertos; sin ecuaciones con
+    scroll ni desborde.
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
@@ -754,16 +833,15 @@
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
-- **Fase 3.6 — Ciclo combinado de dos y tres presiones** con
-  recalentamiento, sobre la HRSG en cascada: una turbina de vapor con
-  varias admisiones (el vapor de media y de baja entra a la turbina) y el
-  recalentador en paralelo con el sobrecalentador de alta.
 - **HRSG (continuación)**: secciones intercaladas o en paralelo
   (economizadores partidos), quemadores suplementarios, pérdidas de carga y
   purga, diseño de las superficies (UA, NTU), condensación ácida.
 - **Ciclo combinado (continuación)**: aire húmedo, gas natural con otros
   componentes en la página (el núcleo ya los acepta), generador y pérdidas
-  mecánicas, cogeneración.
+  mecánicas, cogeneración; con varias presiones, el diseño por chimenea,
+  pérdidas de carga (HRSG y recalentador), recirculación del precalentador
+  por el punto de rocío, y la exergía de toda la planta con la química del
+  combustible (en la página de Exergía).
 - **Fase 3.x** — Brayton con regeneración, interenfriamiento y
   recalentamiento (página propia sobre `core/cycles/brayton.py`); exergía
   de los ciclos de potencia. Evaluar `tespy.tools.get_plotting_data` para
