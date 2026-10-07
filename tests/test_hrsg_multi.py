@@ -23,6 +23,7 @@ from core.cycles.hrsg_multi import (
     MULTI_HRSG_EXAMPLE_NOTES,
     MULTI_HRSG_EXAMPLES,
     MultiHRSGInputs,
+    Reheater,
     default_multi_sweep_values,
     from_single,
     hrsg_exergy,
@@ -31,6 +32,7 @@ from core.cycles.hrsg_multi import (
     multi_hrsg_sweep,
     multi_hrsg_to_dict,
     multi_tq_profile,
+    reheat_system,
     solve_multi_hrsg,
 )
 from core.cycles.hrsg_multi_procedure import multi_hrsg_steps
@@ -397,3 +399,237 @@ def test_export_and_procedure(name: str, system: str) -> None:
     latex = [t for s in steps for t in s.latex]
     assert all(t.count("{") == t.count("}") for t in latex)
     assert not any("- -" in t or "+ -" in t for t in latex)
+
+
+# ---------------------------------------------------------------------
+# Recalentador en paralelo con el sobrecalentador de alta (Fase 3.6)
+# ---------------------------------------------------------------------
+
+MODERN = MULTI_HRSG_EXAMPLES[EX_MODERN]
+T_RH = 565.0 + C
+
+
+def _cold_reheat(p_high: float, T_high: float, p_rh: float, eta: float = 0.9) -> float:
+    """La salida de la turbina de alta (η_T desde su entrada), con PropsSI."""
+    h1 = PropsSI("H", "T", T_high, "P", p_high, "Water")
+    s1 = PropsSI("S", "T", T_high, "P", p_high, "Water")
+    return h1 - eta * (h1 - PropsSI("H", "P", p_rh, "S", s1, "Water"))
+
+
+H_COLD = _cold_reheat(120e5, 565.0 + C, 25e5)
+REHEAT_CASES = {
+    "3PRH": replace(MODERN, reheat=Reheater(25e5, T_RH, H_COLD, joins_middle=True)),
+    "2PRH": replace(MULTI_HRSG_EXAMPLES[EX_MODERN_2P], reheat=Reheater(25e5, T_RH, H_COLD)),
+    "1PRH": replace(MODERN, levels=MODERN.levels[:1], reheat=Reheater(25e5, T_RH, H_COLD)),
+}
+
+
+def _hand_reheat(inputs: MultiHRSGInputs) -> dict[str, list[float] | float]:
+    """La cascada con recalentador a mano: el 2×2 de alta y media con numpy, o la alta sola."""
+    import numpy as np
+
+    w = inputs.gas.mass_fractions
+
+    def h_g(T: float) -> float:
+        return sum(
+            wi
+            * (
+                PropsSI("H", "T", T, "P", 1.0, COOLPROP[s])
+                - PropsSI("H", "T", 298.15, "P", 1.0, COOLPROP[s])
+            )
+            for s, wi in w.items()
+            if wi > 0
+        )
+
+    rh = inputs.reheat
+    assert rh is not None
+    m_g, levels = inputs.m_gas_kg_s, inputs.levels
+    n = len(levels)
+    st = []
+    for i, lv in enumerate(levels):
+        p = lv.p_Pa
+        T_sat = PropsSI("T", "P", p, "Q", 0, "Water")
+        if i == n - 1:
+            h_in = PropsSI("H", "T", inputs.T_feedwater_K, "P", p, "Water")
+        else:
+            s_f = PropsSI("S", "P", levels[i + 1].p_Pa, "Q", 0, "Water")
+            h_in = PropsSI("H", "P", p, "S", s_f, "Water")
+        top = (
+            PropsSI("H", "P", p, "Q", 1, "Water")
+            if lv.T_steam_K is None
+            else PropsSI("H", "T", lv.T_steam_K, "P", p, "Water")
+        )
+        st.append(
+            {
+                "in": h_in,
+                "eco": PropsSI("H", "T", T_sat - lv.approach_K, "P", p, "Water"),
+                "f": PropsSI("H", "P", p, "Q", 0, "Water"),
+                "top": top,
+                "hp": h_g(T_sat + lv.pinch_K),
+            }
+        )
+    h_rc = PropsSI("H", "T", rh.T_K, "P", rh.p_Pa, "Water")
+    h_in_gas = h_g(inputs.T_gas_in_K)
+    A = st[0]
+    if rh.joins_middle:
+        M = st[1]
+        a = np.array(
+            [
+                [(A["top"] - A["eco"]) + (h_rc - rh.h_cold_J_per_kg), h_rc - M["top"]],
+                [(M["f"] - M["eco"]) + (A["eco"] - A["in"]), M["top"] - M["eco"]],
+            ]
+        )
+        b = np.array([m_g * (h_in_gas - A["hp"]), m_g * (A["hp"] - M["hp"])])
+        flows = list(np.linalg.solve(a, b))
+    else:
+        flows = [m_g * (h_in_gas - A["hp"]) / ((A["top"] - A["eco"]) + (h_rc - rh.h_cold_J_per_kg))]
+    # los gases a la salida de cada economizador, en orden
+    h = A["hp"] - flows[0] * (A["eco"] - A["in"]) / m_g
+    m_up = flows[0]
+    for i in range(1, n):
+        L = st[i]
+        if i >= len(flows):
+            flows.append((m_g * (h - L["hp"]) - m_up * (L["f"] - L["eco"])) / (L["top"] - L["eco"]))
+        m_up += flows[i]
+        h = L["hp"] - m_up * (L["eco"] - L["in"]) / m_g
+    T_stack = brentq(lambda T: h_g(T) - h, 274.0, 1500.0)
+    return {"m": flows, "T_stack": T_stack}
+
+
+@pytest.mark.parametrize("name", list(REHEAT_CASES))
+def test_reheat_matches_the_hand_calculation(name: str) -> None:
+    inputs = REHEAT_CASES[name]
+    result = solve_multi_hrsg(inputs)
+    ref = _hand_reheat(inputs)
+    assert [lv.m_steam_kg_s for lv in result.levels] == pytest.approx(ref["m"], rel=1e-7)
+    assert result.T_stack_K == pytest.approx(ref["T_stack"], abs=1e-4)
+    rh = result.reheat
+    assert rh is not None
+    if inputs.reheat.joins_middle:  # el RH lleva la alta y la media, mezcladas antes de entrar
+        m_A, m_M = result.levels[0].m_steam_kg_s, result.levels[1].m_steam_kg_s
+        assert rh.m_kg_s == pytest.approx(m_A + m_M)
+        h_mix = (m_A * H_COLD + m_M * result.levels[1].h_steam_J_per_kg) / (m_A + m_M)
+        assert rh.inlet.h_J_per_kg == pytest.approx(h_mix, rel=1e-12)
+        sys_ = reheat_system(inputs, [lv.water for lv in result.levels], rh.cold, rh.hot)
+        assert sys_.solution == pytest.approx((m_A, m_M), rel=1e-12)
+    else:
+        assert rh.m_kg_s == pytest.approx(result.levels[0].m_steam_kg_s)
+        assert rh.inlet == rh.cold
+
+
+@pytest.mark.parametrize("name", list(REHEAT_CASES))
+def test_reheat_balances_and_parallel_banks(name: str) -> None:
+    result = solve_multi_hrsg(REHEAT_CASES[name])
+    gas, m_g = result.inputs.gas, result.inputs.m_gas_kg_s
+    flows = result._flows()
+    # cada sección, con su parte de los gases; los dos bancos comparten los puntos de los gases
+    for f in flows:
+        s = f.section
+        q_gas = f.gas_share * m_g * (gas.h(s.T_gas_in_K) - gas.h(s.T_gas_out_K))
+        assert s.Q_W == pytest.approx(q_gas, rel=1e-6)
+        q_water = sum(m * (b.h_J_per_kg - a.h_J_per_kg) for m, a, b in f.streams)
+        assert s.Q_W == pytest.approx(q_water, rel=1e-9)
+    sh, rh = flows[0], flows[1]
+    assert (sh.kind, rh.kind) == ("sobrecalentador", "recalentador")
+    assert sh.gas_share + rh.gas_share == pytest.approx(1.0)
+    assert (sh.section.T_gas_in_K, sh.section.T_gas_out_K) == (
+        rh.section.T_gas_in_K,
+        rh.section.T_gas_out_K,
+    )
+    assert sum(s.Q_W for s in result.sections) == pytest.approx(result.Q_W, rel=1e-9)
+    # exergía: cierra y cada banco destruye algo
+    x = hrsg_exergy(result)
+    assert x.X_gas_in_W == pytest.approx(x.X_water_W + x.X_destroyed_W + x.X_stack_W, rel=1e-9)
+    assert all(d > 0.0 for _, d in x.destroyed_W)
+    assert "recalentador" in dict(x.destroyed_W)
+    # T–Q: el SH y el RH ocupan el mismo tramo de Q; el mínimo ΔT sigue siendo el pinch
+    prof = multi_tq_profile(result)
+    sh_seg = next(s for s in prof.segments if s.kind == "sobrecalentador" and s.level == 0)
+    rh_seg = next(s for s in prof.segments if s.kind == "recalentador")
+    assert (sh_seg.Q_W[0], sh_seg.Q_W[-1]) == pytest.approx((rh_seg.Q_W[0], rh_seg.Q_W[-1]))
+    assert sh_seg.Q_W[-1] == pytest.approx(result.Q_W, rel=1e-9)
+    assert prof.min_dT_K == pytest.approx(min(lv.pinch_K for lv in result.inputs.levels))
+    assert len(prof.boundaries_W) == len(result.sections) - 2  # una frontera por tramo
+
+
+def test_reheat_none_keeps_the_boiler() -> None:
+    for inputs in MULTI_HRSG_EXAMPLES.values():
+        assert solve_multi_hrsg(replace(inputs, reheat=None)) == solve_multi_hrsg(inputs)
+        assert solve_multi_hrsg(inputs).reheat is None
+
+
+def test_reheat_takes_hot_heat_from_the_high_level() -> None:
+    """El RH se lleva calor de la zona caliente: menos vapor de alta y más de media y baja."""
+    plain = solve_multi_hrsg(MODERN)
+    rh = solve_multi_hrsg(REHEAT_CASES["3PRH"])
+    assert rh.levels[0].m_steam_kg_s < plain.levels[0].m_steam_kg_s
+    assert rh.levels[1].m_steam_kg_s > plain.levels[1].m_steam_kg_s
+    assert rh.levels[2].m_steam_kg_s > plain.levels[2].m_steam_kg_s
+
+
+@pytest.mark.parametrize(
+    ("inputs", "match"),
+    [
+        (replace(MODERN, reheat=Reheater(130e5, T_RH, H_COLD)), "por debajo de la de alta"),
+        (
+            replace(MULTI_HRSG_EXAMPLES[EX_MODERN_2P], reheat=Reheater(25e5, T_RH, H_COLD, True)),
+            "con tres niveles",
+        ),
+        (replace(MODERN, reheat=Reheater(20e5, T_RH, H_COLD, True)), "a la presión de media"),
+        (replace(MODERN, reheat=Reheater(25e5, 650.0 + C, H_COLD)), "más caliente que los gases"),
+        (replace(MODERN, reheat=Reheater(25e5, 300.0 + C, H_COLD)), "tiene que ser mayor"),
+        (
+            replace(
+                MODERN,
+                levels=MODERN.levels[:1],
+                reheat=Reheater(90e5, T_RH, _cold_reheat(120e5, 565.0 + C, 90e5)),
+            ),
+            "cruce de temperaturas",
+        ),
+    ],
+    ids=[
+        "p_RH > alta",
+        "media con 2 niveles",
+        "p_RH ≠ media",
+        "RH > gases",
+        "RH no calienta",
+        "cruce en el RH",
+    ],
+)
+def test_reheat_invalid_data_are_explained(inputs: MultiHRSGInputs, match: str) -> None:
+    with pytest.raises(ValueError, match=match) as exc:
+        solve_multi_hrsg(inputs)
+    assert str(exc.value).startswith("Recalentador:")
+
+
+@pytest.mark.parametrize("system", ["SI", "Técnico", "Inglés"])
+@pytest.mark.parametrize("name", list(REHEAT_CASES))
+def test_reheat_procedure_and_export(name: str, system: str) -> None:
+    result = solve_multi_hrsg(REHEAT_CASES[name])
+    steps = multi_hrsg_steps(result, system)
+    titles = [s.title for s in steps]
+    assert any(t.startswith("Recalentador: estados del vapor") for t in titles)
+    assert ("Niveles de alta y de media: caudales" in " ".join(titles)) == (name == "3PRH")
+    for step in steps:
+        for tex in step.latex:
+            assert tex.count("{") == tex.count("}")
+            assert "- -" not in tex and "+ -" not in tex
+    data = multi_hrsg_to_dict(result, system)
+    json.dumps(data)
+    assert data["resultados"]["recalentador"]["caudal"]["valor"] > 0.0
+
+
+def test_pump_efficiency_between_levels() -> None:
+    """Con η_B < 1 la bomba entre niveles gasta W_s/η_B y entrega el agua más caliente."""
+    ideal = solve_multi_hrsg(THREE)
+    real = solve_multi_hrsg(replace(THREE, eta_pump=0.8))
+    for a, b in zip(ideal.levels[:-1], real.levels[:-1], strict=True):
+        assert b.w_pump_J_per_kg == pytest.approx(a.w_pump_J_per_kg / 0.8, rel=1e-9)
+        assert b.water[0].T_K > a.water[0].T_K
+    assert real.W_pumps_W == pytest.approx(
+        sum(lv.m_water_kg_s * lv.w_pump_J_per_kg for lv in real.levels)
+    )
+    steps = multi_hrsg_steps(real, "Técnico")
+    assert any("h_{1s,A}" in tex for s in steps for tex in s.latex)
+    with pytest.raises(ValueError, match="rendimiento de las bombas"):
+        solve_multi_hrsg(replace(THREE, eta_pump=0.0))
