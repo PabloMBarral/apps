@@ -36,6 +36,7 @@ from core.diagrams import (
     DiagramSpec,
     DiagramType,
     ProcessOverlay,
+    _join_with_gaps,
     isentropic_process,
     segments_overlays,
 )
@@ -704,22 +705,27 @@ def render_steam_cycle_diagram(
         DiagramPoint(state=s, label=str(k + 1), color=_GAS_COLOR) for k, s in enumerate(states)
     ]
     if result.inputs.steam.eta_turbine < 1.0:
-        for t in cyc.turbines:
-            start = cyc.states[t.inlet]
-            overlays.append(
-                ProcessOverlay(
-                    name=f"{t.inlet + 1} → {t.outlet + 1}s (isoentrópica de referencia)",
-                    color=_GREEN,
-                    dash="dash",
-                    coords_si=isentropic_process(
-                        diagram,
-                        spec,
-                        s_J_per_kg_K=start.s_J_per_kg_K,
-                        p_start_Pa=start.P_Pa,
-                        p_end_Pa=cyc.states[t.outlet].P_Pa,
-                    ),
-                )
+        # Las isoentrópicas de todas las turbinas en una sola entrada de la leyenda: en un
+        # celular, una por turbina ocupaba media figura.
+        chunks = [
+            isentropic_process(
+                diagram,
+                spec,
+                s_J_per_kg_K=cyc.states[t.inlet].s_J_per_kg_K,
+                p_start_Pa=cyc.states[t.inlet].P_Pa,
+                p_end_Pa=cyc.states[t.outlet].P_Pa,
             )
+            for t in cyc.turbines
+        ]
+        overlays.append(
+            ProcessOverlay(
+                name="expansiones isoentrópicas de referencia",
+                color=_GREEN,
+                dash="dash",
+                coords_si=_join_with_gaps(chunks),
+            )
+        )
+        for t in cyc.turbines:
             points.append(
                 DiagramPoint(
                     state=t.outlet_s.to_state_point(), label=f"{t.outlet + 1}s", color=_GREEN
