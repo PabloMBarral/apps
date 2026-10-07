@@ -22,13 +22,21 @@ salen de un balance por nivel, de alta a baja: el tramo de los gases desde
 que llegan al nivel hasta su pinch calienta el vapor del nivel (sobre-
 calentador y evaporador) y, en el domo, lleva de T_sat − approach a T_sat el
 agua que sigue hacia los niveles de más presión. Las bombas entre niveles
-quedan fuera de la caldera y se toman isoentrópicas.
+quedan fuera de la caldera; se toman isoentrópicas salvo que se dé su
+rendimiento (en el ciclo combinado, el de las bombas del ciclo de vapor).
 
 **Exergía** (con T₀ = la temperatura de referencia, 15 °C): de la exergía que
 traen los gases, una parte gana el agua, otra se destruye en la transferencia
 de calor con diferencia de temperatura (T₀·S_gen de cada sección) y otra se
 va por la chimenea. Más niveles acercan la curva del agua a la de los gases:
 menos destrucción y una chimenea más fría.
+
+**Recalentador** (Fase 3.6, opcional): el vapor que vuelve de la turbina de
+alta se recalienta en un banco **en paralelo con el sobrecalentador de alta**:
+los dos ven los gases de entrada y los dejan a una temperatura común (equivale a
+repartir los gases entre los dos bancos). Con tres niveles, el vapor de media se
+suma al recalentamiento frío antes del recalentador; entonces los caudales de
+alta y de media salen de un sistema lineal de 2×2.
 
 Los gases, como mezcla de gases ideales (:mod:`core.ideal_gas`); el agua y el
 vapor, con IAPWS-95. Los tests lo comparan con una red de TESPy. Todo en SI.
@@ -62,6 +70,9 @@ __all__ = [
     "MultiSweepPoint",
     "MultiTQProfile",
     "PressureLevel",
+    "ReheatResult",
+    "ReheatSystem",
+    "Reheater",
     "TQSegment",
     "default_multi_sweep_values",
     "from_single",
@@ -72,6 +83,7 @@ __all__ = [
     "multi_hrsg_sweep",
     "multi_hrsg_to_dict",
     "multi_tq_profile",
+    "reheat_system",
     "solve_multi_hrsg",
     "validate_multi_hrsg_inputs",
 ]
@@ -113,13 +125,31 @@ class PressureLevel:
 
 
 @dataclass(frozen=True)
+class Reheater:
+    """Recalentador en paralelo con el sobrecalentador de alta, en SI.
+
+    El vapor vuelve de la turbina de alta a ``p_Pa`` con entalpía
+    ``h_cold_J_per_kg`` (el recalentamiento frío) y sale a ``T_K``. Con
+    ``joins_middle`` (tres niveles, ``p_Pa`` = la presión de media) el vapor de
+    media se suma al recalentamiento frío antes de entrar al recalentador.
+    """
+
+    p_Pa: float
+    T_K: float
+    h_cold_J_per_kg: float
+    joins_middle: bool = False
+
+
+@dataclass(frozen=True)
 class MultiHRSGInputs:
     """Datos de la HRSG de varias presiones, en SI.
 
     ``levels`` va de mayor a menor presión (1 a 3 niveles). El agua de
     alimentación entra al economizador del nivel de menor presión. ``T_ref_K``
     es la temperatura hasta la que se cuenta el calor disponible en los gases
-    y la del ambiente para la exergía (15 °C).
+    y la del ambiente para la exergía (15 °C). ``reheat`` es el recalentador
+    (``None``: sin recalentamiento, como en la Fase 3.5) y ``eta_pump`` el
+    rendimiento isoentrópico de las bombas entre niveles (1: isoentrópicas).
     """
 
     T_gas_in_K: float
@@ -128,6 +158,8 @@ class MultiHRSGInputs:
     levels: tuple[PressureLevel, ...]
     T_feedwater_K: float
     T_ref_K: float = 288.15
+    reheat: Reheater | None = None
+    eta_pump: float = 1.0
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -160,8 +192,8 @@ class LevelResult:
     pasa por su economizador: el vapor de este nivel más el de los de mayor
     presión. ``T_gas_K``: los gases al llegar al nivel, tras el sobrecalentador
     (si hay), a la salida del evaporador (el pinch) y tras el economizador.
-    ``w_pump_J_per_kg`` es el trabajo (isoentrópico) de la bomba que alimenta
-    este nivel (0 en el de menor presión).
+    ``w_pump_J_per_kg`` es el trabajo de la bomba que alimenta este nivel (0 en
+    el de menor presión).
     """
 
     name: str
@@ -196,13 +228,44 @@ class LevelResult:
 
 
 @dataclass(frozen=True)
+class ReheatResult:
+    """El recalentador resuelto (SI).
+
+    ``cold`` es el recalentamiento frío (la salida de la turbina de alta),
+    ``inlet`` la entrada al recalentador (la mezcla con el vapor de media, si se
+    suma) y ``hot`` el recalentamiento caliente. ``m_kg_s`` es el caudal que lo
+    atraviesa y ``m_middle_kg_s`` el vapor de media que se le suma.
+    """
+
+    reheater: Reheater
+    m_kg_s: float
+    m_middle_kg_s: float
+    cold: FluidState
+    inlet: FluidState
+    hot: FluidState
+
+    @property
+    def Q_W(self) -> float:
+        return self.m_kg_s * (self.hot.h_J_per_kg - self.inlet.h_J_per_kg)
+
+
+SectionKind = Literal["sobrecalentador", "recalentador", "evaporador", "economizador"]
+
+
+@dataclass(frozen=True)
 class _SectionFlows:
-    """Una sección con sus corrientes de agua (caudal, entrada, salida) para los balances."""
+    """Una sección con sus corrientes de agua (caudal, entrada, salida) para los balances.
+
+    ``gas_share`` es la parte de los gases que pasa por la sección: 1, salvo en los
+    bancos en paralelo (sobrecalentador de alta y recalentador), donde es su parte
+    del calor del tramo (los dos dejan los gases a la misma temperatura).
+    """
 
     section: HRSGSection
     level: int
-    kind: Literal["sobrecalentador", "evaporador", "economizador"]
+    kind: SectionKind
     streams: tuple[tuple[float, FluidState, FluidState], ...]
+    gas_share: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -211,6 +274,7 @@ class MultiHRSGResult:
 
     inputs: MultiHRSGInputs
     levels: tuple[LevelResult, ...]
+    reheat: ReheatResult | None = None
 
     @property
     def T_stack_K(self) -> float:
@@ -240,19 +304,39 @@ class MultiHRSGResult:
 
         El evaporador incluye el calentamiento en el domo, de la salida del
         economizador a T_sat, del agua del nivel y de la que sigue hacia los de
-        mayor presión; sus tubos ven agua a T_sat (su ΔT frío es el pinch).
+        mayor presión; sus tubos ven agua a T_sat (su ΔT frío es el pinch). Con
+        recalentador, el sobrecalentador de alta y el recalentador son dos bancos
+        en paralelo entre los mismos puntos de los gases.
         """
         out: list[_SectionFlows] = []
+        rh = self.reheat
         for i, lv in enumerate(self.levels):
             w = lv.water
             of = _of(lv.name)
             T = lv.T_gas_K
             k = 0
+            q_sh = 0.0
             if lv.level.superheated:
-                q = lv.m_steam_kg_s * (w[4].h_J_per_kg - w[3].h_J_per_kg)
-                sec = HRSGSection(f"sobrecalentador{of}", q, T[0], T[1], w[3].T_K, w[4].T_K)
+                q_sh = lv.m_steam_kg_s * (w[4].h_J_per_kg - w[3].h_J_per_kg)
+            q_par = q_sh + (rh.Q_W if i == 0 and rh is not None else 0.0)
+            if lv.level.superheated:
+                sec = HRSGSection(f"sobrecalentador{of}", q_sh, T[0], T[1], w[3].T_K, w[4].T_K)
                 out.append(
-                    _SectionFlows(sec, i, "sobrecalentador", ((lv.m_steam_kg_s, w[3], w[4]),))
+                    _SectionFlows(
+                        sec,
+                        i,
+                        "sobrecalentador",
+                        ((lv.m_steam_kg_s, w[3], w[4]),),
+                        q_sh / q_par,
+                    )
+                )
+                k = 1
+            if i == 0 and rh is not None:
+                sec = HRSGSection("recalentador", rh.Q_W, T[0], T[1], rh.inlet.T_K, rh.hot.T_K)
+                out.append(
+                    _SectionFlows(
+                        sec, i, "recalentador", ((rh.m_kg_s, rh.inlet, rh.hot),), rh.Q_W / q_par
+                    )
                 )
                 k = 1
             streams: tuple[tuple[float, FluidState, FluidState], ...] = (
@@ -291,7 +375,7 @@ class MultiHRSGResult:
 
     @property
     def W_pumps_W(self) -> float:
-        """Potencia de las bombas entre niveles (isoentrópicas; fuera de la caldera)."""
+        """Potencia de las bombas entre niveles (fuera de la caldera)."""
         return sum(lv.m_water_kg_s * lv.w_pump_J_per_kg for lv in self.levels)
 
     @property
@@ -330,6 +414,8 @@ def validate_multi_hrsg_inputs(inputs: MultiHRSGInputs) -> None:
         raise ValueError("El agua de alimentación tiene que estar por encima de 0 °C.")
     if not inputs.T_ref_K > 0.0:
         raise ValueError("La temperatura de referencia tiene que ser absoluta positiva.")
+    if not 0.0 < inputs.eta_pump <= 1.0:
+        raise ValueError("El rendimiento de las bombas tiene que estar entre 0 y 1.")
     lim = fluid_limits(Water)
     names = inputs.names
     for name, lv in zip(names, inputs.levels, strict=True):
@@ -389,6 +475,61 @@ def validate_multi_hrsg_inputs(inputs: MultiHRSGInputs) -> None:
             f"que la salida del economizador{_of(names[-1])}, T_sat − approach = "
             f"{_degC(T_eco_low)}: si no, no hay nada que calentar en ese economizador."
         )
+    if inputs.reheat is not None:
+        _validate_reheat(inputs)
+
+
+def _validate_reheat(inputs: MultiHRSGInputs) -> None:
+    """El recalentador: presión, temperatura y de dónde viene el vapor."""
+    rh = inputs.reheat
+    assert rh is not None
+    high = inputs.levels[0]
+    lim = fluid_limits(Water)
+    p = rh.p_Pa
+    if not lim.P_triple_Pa < p < high.p_Pa:
+        raise ValueError(
+            f"Recalentador: la presión de recalentamiento ({_bar(p)}) tiene que estar por debajo "
+            f"de la de alta ({_bar(high.p_Pa)}): el vapor vuelve de la turbina de alta, después "
+            "de expandirse."
+        )
+    if rh.joins_middle:
+        if len(inputs.levels) != 3:
+            raise ValueError(
+                "Recalentador: el vapor de media solo se puede sumar al recalentamiento con tres "
+                "niveles de presión."
+            )
+        middle = inputs.levels[1]
+        if not math.isclose(p, middle.p_Pa, rel_tol=1e-9):
+            raise ValueError(
+                f"Recalentador: para sumarle el vapor de media, el recalentamiento tiene que ser "
+                f"a la presión de media ({_bar(middle.p_Pa)}), no a {_bar(p)}."
+            )
+    if not (math.isfinite(rh.h_cold_J_per_kg) and math.isfinite(rh.T_K)):
+        raise ValueError("Recalentador: faltan la entalpía de entrada o la temperatura de salida.")
+    try:
+        cold = fluid_state_from_pair(Water, "PH", p=p, h=rh.h_cold_J_per_kg)
+    except ValueError as exc:
+        raise ValueError(
+            f"Recalentador: el vapor que vuelve de la turbina no tiene un estado válido ({exc})."
+        ) from exc
+    if rh.T_K >= inputs.T_gas_in_K:
+        raise ValueError(
+            f"Recalentador: el vapor recalentado ({_degC(rh.T_K)}) no puede salir más caliente "
+            f"que los gases que entran a la caldera ({_degC(inputs.T_gas_in_K)})."
+        )
+    if rh.T_K <= cold.T_K + 0.01:
+        raise ValueError(
+            f"Recalentador: el vapor vuelve de la turbina de alta a {_degC(cold.T_K)}; para "
+            f"recalentarlo, la temperatura de salida ({_degC(rh.T_K)}) tiene que ser mayor."
+        )
+    if rh.joins_middle:
+        middle = inputs.levels[1]
+        T_mid = middle.T_steam_K if middle.T_steam_K is not None else _T_sat(middle.p_Pa)
+        if rh.T_K <= T_mid + 0.01:
+            raise ValueError(
+                f"Recalentador: el vapor de media ({_degC(T_mid)}) se suma al recalentamiento; la "
+                f"temperatura de salida ({_degC(rh.T_K)}) tiene que ser mayor."
+            )
 
 
 # ---------------------------------------------------------------------
@@ -423,6 +564,10 @@ def solve_multi_hrsg(inputs: MultiHRSGInputs) -> MultiHRSGResult:
     2. El economizador calienta ṁ_i + Ṁ_arriba de la entrada a T_sat − approach;
        los gases salen de él hacia el nivel siguiente (o a la chimenea).
 
+    Con recalentador, el tramo del nivel de alta suma su calor: con el vapor de
+    media sumado al recalentamiento, los balances de alta y de media forman un
+    sistema lineal en (ṁ_A, ṁ_M) (:func:`reheat_system`).
+
     Raises
     ------
     ValueError
@@ -445,15 +590,29 @@ def solve_multi_hrsg(inputs: MultiHRSGInputs) -> MultiHRSGResult:
         else:
             below = fluid_state_from_pair(Water, "PX", p=inputs.levels[i + 1].p_Pa, x=0.0)
             pumped = fluid_state_from_pair(Water, "PS", p=level.p_Pa, s=below.s_J_per_kg_K)
+            if inputs.eta_pump != 1.0:
+                h_real = below.h_J_per_kg + (pumped.h_J_per_kg - below.h_J_per_kg) / inputs.eta_pump
+                pumped = fluid_state_from_pair(Water, "PH", p=level.p_Pa, h=h_real)
             inlets.append(pumped)
             pumps.append(pumped.h_J_per_kg - below.h_J_per_kg)
+    waters = [_level_water(level, inlets[i]) for i, level in enumerate(inputs.levels)]
+    reheat = inputs.reheat
+    rh_cold = rh_hot = None
+    if reheat is not None:
+        rh_cold = fluid_state_from_pair(Water, "PH", p=reheat.p_Pa, h=reheat.h_cold_J_per_kg)
+        rh_hot = fluid_state_from_pair(Water, "TP", t=reheat.T_K, p=reheat.p_Pa)
+    coupled = reheat is not None and reheat.joins_middle
+    if coupled:
+        system = reheat_system(inputs, waters, rh_cold, rh_hot)
+        m_coupled = system.solution
     T_g = inputs.T_gas_in_K
     h_g = gas.h(T_g)
     m_above = 0.0
+    m_rh = m_mid = 0.0
     levels: list[LevelResult] = []
     for i, (name, level) in enumerate(zip(names, inputs.levels, strict=True)):
         where = f"Nivel{_of(name)}: " if name else ""
-        water = _level_water(level, inlets[i])
+        water = waters[i]
         h = [s.h_J_per_kg for s in water]
         T_sat = water[2].T_K
         T_p = T_sat + level.pinch_K
@@ -476,7 +635,13 @@ def solve_multi_hrsg(inputs: MultiHRSGInputs) -> MultiHRSGResult:
                 )
             )
         h_p = gas.h(T_p)
-        m_s = (m_g * (h_g - h_p) - m_above * (h[2] - h[1])) / (h[-1] - h[1])
+        if coupled and i < 2:
+            m_s = m_coupled[i]
+        elif i == 0 and rh_hot is not None:
+            # alta con recalentador (sin la media): el RH lleva el mismo vapor
+            m_s = m_g * (h_g - h_p) / ((h[-1] - h[1]) + (rh_hot.h_J_per_kg - rh_cold.h_J_per_kg))
+        else:
+            m_s = (m_g * (h_g - h_p) - m_above * (h[2] - h[1])) / (h[-1] - h[1])
         if not m_s > 0.0:
             raise ValueError(
                 f"{where}los gases llegan a {_degC(T_g)}, pero hasta el pinch ({_degC(T_p)}) "
@@ -485,10 +650,30 @@ def solve_multi_hrsg(inputs: MultiHRSGInputs) -> MultiHRSGResult:
                 "presión o su pinch."
             )
         temps, enthalpies = [T_g], [h_g]
-        if level.T_steam_K is not None:
-            h_b = h_g - m_s * (h[4] - h[3]) / m_g
-            temps.append(gas.T_from_h(h_b))
+        q_first = m_s * (h[4] - h[3]) if level.T_steam_K is not None else 0.0
+        if i == 0 and rh_hot is not None:
+            m_mid = m_coupled[1] if coupled else 0.0
+            m_rh = m_s + m_mid
+            h_mid = waters[1][-1].h_J_per_kg if coupled else 0.0
+            q_first += m_s * (rh_hot.h_J_per_kg - rh_cold.h_J_per_kg) + m_mid * (
+                rh_hot.h_J_per_kg - h_mid
+            )
+        if q_first > 0.0:
+            h_b = h_g - q_first / m_g
+            T_b = gas.T_from_h(h_b)
+            temps.append(T_b)
             enthalpies.append(h_b)
+            if i == 0 and rh_hot is not None:
+                h_in_rh = (m_s * rh_cold.h_J_per_kg + m_mid * h_mid) / m_rh
+                T_in_rh = float(PropsSI("T", "P", reheat.p_Pa, "H", h_in_rh, Water))
+                if T_b <= T_in_rh:
+                    raise ValueError(
+                        f"Recalentador: los gases salen del tramo del sobrecalentador de alta y "
+                        f"el recalentador a {_degC(T_b)}, más fríos que el vapor que entra al "
+                        f"recalentador ({_degC(T_in_rh)}): hay un cruce de temperaturas. Bajá la "
+                        "presión de recalentamiento (el vapor vuelve más frío de la turbina) o "
+                        "la temperatura del vapor."
+                    )
         temps.append(T_p)
         enthalpies.append(h_p)
         m_water = m_above + m_s
@@ -520,7 +705,15 @@ def solve_multi_hrsg(inputs: MultiHRSGInputs) -> MultiHRSGResult:
             )
         )
         T_g, h_g, m_above = T_after, h_after, m_water
-    result = MultiHRSGResult(inputs=inputs, levels=tuple(levels))
+    rh_result = None
+    if reheat is not None:
+        h_in_rh = (
+            levels[0].m_steam_kg_s * rh_cold.h_J_per_kg
+            + (m_mid * waters[1][-1].h_J_per_kg if coupled else 0.0)
+        ) / m_rh
+        inlet = fluid_state_from_pair(Water, "PH", p=reheat.p_Pa, h=h_in_rh) if coupled else rh_cold
+        rh_result = ReheatResult(reheat, float(m_rh), float(m_mid), rh_cold, inlet, rh_hot)
+    result = MultiHRSGResult(inputs=inputs, levels=tuple(levels), reheat=rh_result)
     dew = gas.dew_point_K
     if dew is not None and result.T_stack_K < dew:
         raise ValueError(
@@ -539,6 +732,63 @@ def solve_multi_hrsg(inputs: MultiHRSGInputs) -> MultiHRSGResult:
     return result
 
 
+@dataclass(frozen=True)
+class ReheatSystem:
+    """Los balances de alta y de media acoplados por el recalentador (SI).
+
+    a11·ṁ_A + a12·ṁ_M = b1 (de la entrada de los gases al pinch de alta) y
+    a21·ṁ_A + a22·ṁ_M = b2 (del pinch de alta al de media, con el economizador
+    de alta y el domo de media), con
+
+    - a11 = (h_top,A − h_2,A) + (h_RH − h_frío), a12 = h_RH − h_top,M;
+    - a21 = (h_3,M − h_2,M) + (h_2,A − h_1,A), a22 = h_top,M − h_2,M;
+    - b1 = ṁ_g·[h_g(T_entrada) − h_g(T_pinch,A)] y b2 = ṁ_g·[h_g(T_pinch,A) − h_g(T_pinch,M)].
+    """
+
+    a11: float
+    a12: float
+    a21: float
+    a22: float
+    b1: float
+    b2: float
+
+    @property
+    def det(self) -> float:
+        return self.a11 * self.a22 - self.a12 * self.a21
+
+    @property
+    def solution(self) -> tuple[float, float]:
+        """(ṁ_A, ṁ_M) por la regla de Cramer."""
+        d = self.det
+        return (
+            (self.b1 * self.a22 - self.a12 * self.b2) / d,
+            (self.a11 * self.b2 - self.a21 * self.b1) / d,
+        )
+
+
+def reheat_system(
+    inputs: MultiHRSGInputs,
+    waters: Sequence[Sequence[FluidState]],
+    cold: FluidState,
+    hot: FluidState,
+) -> ReheatSystem:
+    """Arma el sistema 2×2 de alta y media con el recalentador (Kehlhofer et al., cap. 5)."""
+    gas, m_g = inputs.gas, inputs.m_gas_kg_s
+    hA = [s.h_J_per_kg for s in waters[0]]
+    hM = [s.h_J_per_kg for s in waters[1]]
+    high, middle = inputs.levels[0], inputs.levels[1]
+    h_pA = gas.h(waters[0][2].T_K + high.pinch_K)
+    h_pM = gas.h(waters[1][2].T_K + middle.pinch_K)
+    return ReheatSystem(
+        a11=(hA[-1] - hA[1]) + (hot.h_J_per_kg - cold.h_J_per_kg),
+        a12=hot.h_J_per_kg - hM[-1],
+        a21=(hM[2] - hM[1]) + (hA[1] - hA[0]),
+        a22=hM[-1] - hM[1],
+        b1=m_g * (gas.h(inputs.T_gas_in_K) - h_pA),
+        b2=m_g * (h_pA - h_pM),
+    )
+
+
 # ---------------------------------------------------------------------
 # Diagrama T–Q
 # ---------------------------------------------------------------------
@@ -546,10 +796,15 @@ def solve_multi_hrsg(inputs: MultiHRSGInputs) -> MultiHRSGResult:
 
 @dataclass(frozen=True)
 class TQSegment:
-    """Un tramo de la curva del agua: sección de un nivel (índice 0 = mayor presión)."""
+    """Un tramo de la curva del agua: sección de un nivel (índice 0 = mayor presión).
+
+    Los bancos en paralelo (sobrecalentador de alta y recalentador) ocupan los
+    dos todo el tramo de Q del paralelo: cada uno ve los gases entre los mismos
+    puntos.
+    """
 
     level: int
-    kind: Literal["sobrecalentador", "evaporador", "economizador"]
+    kind: SectionKind
     Q_W: tuple[float, ...]
     T_K: tuple[float, ...]
 
@@ -582,6 +837,9 @@ def multi_tq_profile(result: MultiHRSGResult, n: int = 40) -> MultiTQProfile:
     Los gases: Q(T) = ṁ_g·[h_g(T) − h_g(T_chimenea)]. El agua: cada sección en su
     tramo de Q, con T(p, h) de IAPWS-95; en cada evaporador, el agua sube
     vertical de T_sat − approach a T_sat al entrar (el domo) y sigue a T_sat.
+    Con recalentador, el sobrecalentador de alta y el recalentador se dibujan los
+    dos a lo largo de todo el tramo en paralelo (cada banco ve los gases de la
+    entrada a la salida del tramo, con su parte del caudal).
     """
     inputs = result.inputs
     gas, m_g = inputs.gas, inputs.m_gas_kg_s
@@ -592,23 +850,32 @@ def multi_tq_profile(result: MultiHRSGResult, n: int = 40) -> MultiTQProfile:
     segments: list[TQSegment] = []
     boundaries: list[float] = []
     Q0 = 0.0
+    group_start: float | None = None
     for flows in reversed(result._flows()):  # desde la chimenea
         lv = result.levels[flows.level]
         w = lv.water
-        p = lv.level.p_Pa
+        if flows.gas_share < 1.0:  # banco en paralelo: todos arrancan en el mismo Q
+            if group_start is None:
+                group_start = Q0
+            start = group_start
+        else:
+            group_start = None
+            start = Q0
+        span = flows.section.Q_W / flows.gas_share
         if flows.kind == "evaporador":
-            q_total = flows.section.Q_W
-            Qs = [Q0, Q0, Q0 + q_total]
+            Qs = [start, start, start + span]
             Ts = [w[1].T_K, w[2].T_K, w[2].T_K]
         else:
-            m, a, b = flows.streams[0]
+            _, a, b = flows.streams[0]
             hs = np.linspace(a.h_J_per_kg, b.h_J_per_kg, n)
-            Ts = _water_T(p, hs)
+            Ts = _water_T(a.P_Pa, hs)
             Ts[0], Ts[-1] = a.T_K, b.T_K
-            Qs = [Q0 + m * (hh - a.h_J_per_kg) for hh in hs]
+            dh = b.h_J_per_kg - a.h_J_per_kg
+            Qs = [start + span * (hh - a.h_J_per_kg) / dh for hh in hs]
         segments.append(TQSegment(flows.level, flows.kind, tuple(Qs), tuple(Ts)))
-        Q0 += flows.section.Q_W
-        boundaries.append(Q0)
+        Q0 = start + span
+        if not boundaries or boundaries[-1] != Q0:
+            boundaries.append(Q0)
     min_dT, min_Q = math.inf, 0.0
     for seg in segments:
         Ts = np.asarray(seg.T_K)
@@ -669,7 +936,7 @@ def hrsg_exergy(result: MultiHRSGResult) -> HRSGExergy:
 
     X_dest de cada sección = T₀·S_gen, con S_gen = Σ ṁ_agua·Δs_agua − ṁ_g·Δs_g
     (Cengel cap. 8: exergía destruida = T₀·S_gen). Los gases, a presión constante:
-    Δs_g = s°(T_sal) − s°(T_ent).
+    Δs_g = s°(T_sal) − s°(T_ent); en los bancos en paralelo, con su parte del caudal.
     """
     inputs = result.inputs
     gas, m_g, T0 = inputs.gas, inputs.m_gas_kg_s, inputs.T_ref_K
@@ -686,7 +953,7 @@ def hrsg_exergy(result: MultiHRSGResult) -> HRSGExergy:
         sec = flows.section
         dS_w = sum(m * (b.s_J_per_kg_K - a.s_J_per_kg_K) for m, a, b in flows.streams)
         dH_w = sum(m * (b.h_J_per_kg - a.h_J_per_kg) for m, a, b in flows.streams)
-        dS_g = m_g * (gas.s0(sec.T_gas_out_K) - gas.s0(sec.T_gas_in_K))
+        dS_g = flows.gas_share * m_g * (gas.s0(sec.T_gas_out_K) - gas.s0(sec.T_gas_in_K))
         X_water += dH_w - T0 * dS_w
         destroyed.append((sec.name, T0 * (dS_w + dS_g)))
     return HRSGExergy(T0, X_in, X_stack, X_water, tuple(destroyed))
@@ -713,8 +980,11 @@ def level_comparison(
         cases.append(("3 presiones", levels))
     out: list[tuple[str, MultiHRSGResult | None, str]] = []
     for label, lv in cases:
+        reheat = inputs.reheat
+        if reheat is not None and reheat.joins_middle and len(lv) < 3:
+            reheat = replace(reheat, joins_middle=False)
         try:
-            out.append((label, solve_multi_hrsg(replace(inputs, levels=lv)), ""))
+            out.append((label, solve_multi_hrsg(replace(inputs, levels=lv, reheat=reheat)), ""))
         except ValueError as exc:
             out.append((label, None, str(exc)))
     return out
@@ -988,6 +1258,21 @@ def multi_hrsg_to_dict(result: MultiHRSGResult, system: UnitSystem) -> dict[str,
                 }
                 for lv in result.levels
             },
+            "recalentador": (
+                None
+                if result.reheat is None
+                else {
+                    "p": _value(result.reheat.reheater.p_Pa, "pressure", system),
+                    "caudal": _value(result.reheat.m_kg_s, "mass_flow", system),
+                    "vapor_de_media_sumado": _value(
+                        result.reheat.m_middle_kg_s, "mass_flow", system
+                    ),
+                    "T_recalentamiento_frio": _value(result.reheat.cold.T_K, "temperature", system),
+                    "T_entrada": _value(result.reheat.inlet.T_K, "temperature", system),
+                    "T_salida": _value(result.reheat.hot.T_K, "temperature", system),
+                    "calor": _value(result.reheat.Q_W, "power", system),
+                }
+            ),
             "gases": {label: _value(T, "temperature", system) for label, T, _ in result.gas_points},
             "secciones": {
                 s.name: {

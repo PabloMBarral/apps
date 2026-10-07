@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.17.0"
+PAGE_VERSION = "0.18.0"
 
 
 def _home_page() -> None:
@@ -100,11 +100,13 @@ def _home_page() -> None:
         - ⚡ **Ciclo combinado** — turbina de gas (compresor, cámara de
           combustión con metano o aire estándar y turbina, con calores
           específicos variables y TESPy como control) + caldera de
-          recuperación de una presión + ciclo de vapor con desaireador:
+          recuperación de una, dos o tres presiones, con recalentamiento
+          si querés + ciclo de vapor con admisiones y desaireador:
           rendimiento de cada parte y del conjunto, a dónde va la energía
-          (diagrama de Sankey), diagramas T–s y T–Q, procedimiento y
-          barridos para encontrar la relación de presiones óptima
-          (ejemplos de Cengel cap. 9 y 10).
+          (diagrama de Sankey), diagramas T–s y T–Q, **cuánto ganás con
+          más presiones y recalentamiento** (con la regla de Baumann para
+          la humedad), la **exergía del ciclo de fondo**, procedimiento y
+          barridos (ejemplos de Cengel cap. 9 y 10 y de Kehlhofer cap. 5).
         - 📈 **Diagramas** — Propiedades, Isoentrópicos, Rankine,
           Refrigeración y Ciclo combinado incluyen
           gráficos interactivos con isolíneas (log p–h, T–s, h–s,
@@ -118,9 +120,9 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Ciclo combinado de dos y tres presiones con recalentamiento,
-        ciclo Brayton con regeneración, interenfriamiento y
-        recalentamiento, psicrometría, combustión, exergía. Ver el
+        Ciclo Brayton con regeneración, interenfriamiento y
+        recalentamiento, psicrometría, combustión, exergía de toda la
+        planta. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 

@@ -12,13 +12,20 @@ X_destruida = T₀·S_gen) y el punto de rocío de los gases.
 Los estados del agua de cada nivel se numeran como en la caldera de una
 presión: 1 entrada al economizador, 2 salida, 3 líquido saturado, 4 vapor
 saturado y 5 vapor sobrecalentado, con el nivel como subíndice (A alta,
-M media, B baja). Recibe un resultado ya calculado
+M media, B baja). Con recalentador (Fase 3.6): RF es el recalentamiento frío
+(el vapor que vuelve de la turbina de alta), RC el caliente y «mez» la mezcla
+con el vapor de media, si se suma. Recibe un resultado ya calculado
 (:class:`core.cycles.hrsg_multi.MultiHRSGResult`): no importa Streamlit.
 """
 
 from __future__ import annotations
 
-from core.cycles.hrsg_multi import LevelResult, MultiHRSGResult, hrsg_exergy
+from core.cycles.hrsg_multi import (
+    LevelResult,
+    MultiHRSGResult,
+    hrsg_exergy,
+    reheat_system,
+)
 from core.cycles.hrsg_procedure import (
     dew_point_step,
     gas_composition_step,
@@ -116,20 +123,42 @@ def _water_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Procedur
     else:
         below = result.levels[i + 1]
         h_f_below = below.water[2].h_J_per_kg
-        lines += [
-            _lookup(_h(1, lv), rf"h(p,\ s_{{3{_sub(below)}}})", _q(w[0].h_J_per_kg, _EH, system)),
-            latex_chain(
-                rf"w_{{B{_sub(lv)}}}",
-                rf"{_h(1, lv)} - {_h(3, below)}",
-                _diff(w[0].h_J_per_kg, h_f_below, _EH, system),
-                _q(lv.w_pump_J_per_kg, _EH, system),
-            ),
-        ]
+        eta = result.inputs.eta_pump
+        if eta == 1.0:
+            lines += [
+                _lookup(
+                    _h(1, lv), rf"h(p,\ s_{{3{_sub(below)}}})", _q(w[0].h_J_per_kg, _EH, system)
+                ),
+                latex_chain(
+                    rf"w_{{B{_sub(lv)}}}",
+                    rf"{_h(1, lv)} - {_h(3, below)}",
+                    _diff(w[0].h_J_per_kg, h_f_below, _EH, system),
+                    _q(lv.w_pump_J_per_kg, _EH, system),
+                ),
+            ]
+            how = "se toma isoentrópica (s igual)"
+        else:
+            h_s = h_f_below + lv.w_pump_J_per_kg * eta
+            sub_s = rf"h_{{1s{_sub(lv)}}}"
+            lines += [
+                _lookup(sub_s, rf"h(p,\ s_{{3{_sub(below)}}})", _q(h_s, _EH, system)),
+                latex_chain(
+                    rf"w_{{B{_sub(lv)}}}",
+                    rf"\frac{{{sub_s} - {_h(3, below)}}}{{\eta_B}}",
+                    rf"\frac{{{_diff(h_s, h_f_below, _EH, system)}}}{{{latex_number(eta, 4)}}}",
+                    _q(lv.w_pump_J_per_kg, _EH, system),
+                ),
+                latex_chain(
+                    _h(1, lv),
+                    rf"{_h(3, below)} + w_{{B{_sub(lv)}}}",
+                    _q(w[0].h_J_per_kg, _EH, system),
+                ),
+            ]
+            how = f"tiene rendimiento η_B = {eta:.3g} (con s igual da h_1s; el real, h_1)"
         inlet = (
             f"Su economizador recibe el líquido saturado del domo de {below.name}, que una bomba "
-            f"lleva de {_bar(below.level.p_Pa)} a {_bar(level.p_Pa)}. La bomba se toma "
-            "isoentrópica (s igual) y queda fuera de la caldera: su trabajo es chico (vademecum "
-            "§13)."
+            f"lleva de {_bar(below.level.p_Pa)} a {_bar(level.p_Pa)}. La bomba {how} y queda "
+            "fuera de la caldera: su trabajo es chico (vademecum §13)."
         )
     if level.approach_K > 0.0:
         lines.append(
@@ -182,7 +211,8 @@ def _flow_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Procedure
     w = lv.water
     h_top, h2, h3 = w[-1].h_J_per_kg, w[1].h_J_per_kg, w[2].h_J_per_kg
     above = result.levels[:i]
-    q_sym = _q_top(lv)
+    rh = result.reheat if i == 0 else None
+    q_sym = _q_top(lv, rh is not None)
     lines = [
         latex_chain(
             f"T_{p}",
@@ -202,6 +232,45 @@ def _flow_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Procedure
     devices = (
         "están el sobrecalentador y el evaporador" if level.superheated else "está el evaporador"
     )
+    if rh is not None:
+        h_rc, h_rf = rh.hot.h_J_per_kg, rh.cold.h_J_per_kg
+        per_kg = (h_top - h2) + (h_rc - h_rf)
+        lines += [
+            latex_chain(
+                r"\Delta h_{\mathrm{RH}}",
+                r"h_{\mathrm{RC}} - h_{\mathrm{RF}}",
+                _diff(h_rc, h_rf, _EH, system),
+                _q(h_rc - h_rf, _EH, system),
+            ),
+            latex_chain(
+                _m(lv),
+                rf"\frac{{{q_sym}}}{{({_h(top, lv)} - {_h(2, lv)}) + \Delta h_{{\mathrm{{RH}}}}}}",
+                rf"\frac{{{_n(Q, 'power', system)}}}{{{_n(per_kg, _EH, system)}}}",
+                _q(lv.m_steam_kg_s, "mass_flow", system),
+            ),
+        ]
+        devices = (
+            "están el sobrecalentador y el recalentador (en paralelo) y el evaporador"
+            if level.superheated
+            else "están el recalentador y el evaporador"
+        )
+        return ProcedureStep(
+            title=f"{_title(lv)}: caudal de vapor (gases {a} → {p})",
+            text=(
+                f"Los gases llegan a T_{a} y salen del evaporador a T_{p} = T_sat + pinch. En "
+                f"ese tramo {devices}: su calor es Q̇_tramo. El recalentador lleva el mismo vapor "
+                "(vuelve de la turbina de alta), así que cada kilogramo recibe su calor en la "
+                f"caldera, de 2 al estado {top}, más el del recalentamiento, de RF a RC:"
+            ),
+            latex=(
+                r"\begin{aligned}"
+                rf"&{_m(lv)}\,\bigl[({_h(top, lv)} - {_h(2, lv)})"
+                r" + \Delta h_{\mathrm{RH}}\bigr]"
+                rf" \\ &= {q_sym}"
+                r"\end{aligned}",
+                *lines,
+            ),
+        )
     if not above:
         lines.append(
             latex_chain(
@@ -269,8 +338,119 @@ def _flow_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Procedure
     )
 
 
-def _q_top(level: LevelResult) -> str:
-    """Símbolo del calor del tramo hasta el pinch: SH + EV (o EV) del nivel."""
+def _reheat_states_step(result: MultiHRSGResult, system: UnitSystem) -> ProcedureStep:
+    """Estados del recalentador: el frío (lo da la turbina de alta) y el caliente."""
+    rh = result.reheat
+    assert rh is not None
+    p = rh.reheater.p_Pa
+    joins = rh.reheater.joins_middle
+    lines = [
+        rf"T_{{\mathrm{{RF}}}} = {_T(rh.cold.T_K, system)}",
+        rf"h_{{\mathrm{{RF}}}} = {_q(rh.cold.h_J_per_kg, _EH, system)}",
+        _lookup(
+            r"h_{\mathrm{RC}}",
+            r"h(p_{\mathrm{RH}},\ T_{\mathrm{RC}})",
+            _q(rh.hot.h_J_per_kg, _EH, system),
+        ),
+    ]
+    middle = (
+        " Antes de entrar se le suma el vapor de media (a la misma presión): la mezcla depende "
+        "de los dos caudales y se calcula después."
+        if joins
+        else ""
+    )
+    return ProcedureStep(
+        title=f"Recalentador: estados del vapor ({_bar(p)})",
+        text=(
+            f"El recalentador recibe el vapor que vuelve de la turbina de alta a {_bar(p)} "
+            "(recalentamiento frío, RF: su entalpía sale de la expansión en la turbina) y lo "
+            f"calienta hasta {_degC(rh.hot.T_K)} (recalentamiento caliente, RC; tabla A-6). Va en "
+            "paralelo con el sobrecalentador de alta: los dos bancos ven los gases desde la "
+            "entrada y los dejan a la misma temperatura, así que comparten el tramo más "
+            f"caliente de la caldera.{middle}"
+        ),
+        latex=tuple(lines),
+    )
+
+
+def _coupled_flow_step(result: MultiHRSGResult, system: UnitSystem) -> ProcedureStep:
+    """Caudales de alta y de media con el vapor de media sumado al recalentamiento (2×2)."""
+    inputs = result.inputs
+    rh = result.reheat
+    assert rh is not None
+    hi, mid = result.levels[0], result.levels[1]
+    waters = [hi.water, mid.water]
+    sys_ = reheat_system(inputs, waters, rh.cold, rh.hot)
+    labels = _gas_labels(result)
+    a, c = labels[0][0], labels[0][-2]
+    e = labels[1][-2]
+    ta = 5 if hi.level.superheated else 4
+    tm = 5 if mid.level.superheated else 4
+    mA, mM = _m(hi), _m(mid)
+    P: QuantityKind = "power"
+
+    def coef(sym: str, expr: str, value: float, kind: QuantityKind = _EH) -> str:
+        return latex_chain(sym, expr, _q(value, kind, system))
+
+    lines = [
+        r"\begin{aligned}"
+        rf"&{mA}\,\bigl[({_h(ta, hi)} - {_h(2, hi)}) \\ "
+        r"&\quad + (h_{\mathrm{RC}} - h_{\mathrm{RF}})\bigr] \\ "
+        rf"&\quad + {mM}\,(h_{{\mathrm{{RC}}}} - {_h(tm, mid)}) \\ "
+        rf"&= \dot{{m}}_g\,\bigl[h_g(T_{a}) - h_g(T_{c})\bigr]"
+        r"\end{aligned}",
+        r"\begin{aligned}"
+        rf"&{mA}\,\bigl[({_h(3, mid)} - {_h(2, mid)}) \\ "
+        rf"&\quad + ({_h(2, hi)} - {_h(1, hi)})\bigr] \\ "
+        rf"&\quad + {mM}\,({_h(tm, mid)} - {_h(2, mid)}) \\ "
+        rf"&= \dot{{m}}_g\,\bigl[h_g(T_{c}) - h_g(T_{e})\bigr]"
+        r"\end{aligned}",
+        rf"a_{{11}}\,{mA} + a_{{12}}\,{mM} = b_1",
+        rf"a_{{21}}\,{mA} + a_{{22}}\,{mM} = b_2",
+        coef(
+            "a_{11}",
+            rf"({_h(ta, hi)} - {_h(2, hi)}) + (h_{{\mathrm{{RC}}}} - h_{{\mathrm{{RF}}}})",
+            sys_.a11,
+        ),
+        coef("a_{12}", rf"h_{{\mathrm{{RC}}}} - {_h(tm, mid)}", sys_.a12),
+        coef("a_{21}", rf"({_h(3, mid)} - {_h(2, mid)}) + ({_h(2, hi)} - {_h(1, hi)})", sys_.a21),
+        coef("a_{22}", rf"{_h(tm, mid)} - {_h(2, mid)}", sys_.a22),
+        coef("b_1", rf"\dot{{m}}_g\,\bigl[h_g(T_{a}) - h_g(T_{c})\bigr]", sys_.b1, P),
+        coef("b_2", rf"\dot{{m}}_g\,\bigl[h_g(T_{c}) - h_g(T_{e})\bigr]", sys_.b2, P),
+        latex_chain(
+            mA,
+            r"\frac{b_1\,a_{22} - a_{12}\,b_2}{a_{11}\,a_{22} - a_{12}\,a_{21}}",
+            _q(hi.m_steam_kg_s, "mass_flow", system),
+        ),
+        latex_chain(
+            mM,
+            r"\frac{a_{11}\,b_2 - a_{21}\,b_1}{a_{11}\,a_{22} - a_{12}\,a_{21}}",
+            _q(mid.m_steam_kg_s, "mass_flow", system),
+        ),
+    ]
+    return ProcedureStep(
+        title=f"Niveles de alta y de media: caudales (gases {a} → {e})",
+        text=(
+            "El vapor de media se suma al recalentamiento: el recalentador calienta ṁ_A + ṁ_M, "
+            "así que el calor del tramo de alta depende también de ṁ_M, y ṁ_M depende de cuánto "
+            "enfrió la alta a los gases. Se plantean juntos dos balances: el de alta, de la "
+            f"entrada de los gases a su pinch (T_{c}), y el de media, del pinch de alta al de "
+            f"media (T_{e}), que incluye el economizador de alta (calienta ṁ_A) y el domo de media "
+            "(lleva a T_sat el agua que sube a la alta). Es un sistema lineal en (ṁ_A, ṁ_M); por "
+            "la regla de Cramer:"
+        ),
+        latex=tuple(lines),
+    )
+
+
+def _q_top(level: LevelResult, reheat: bool = False) -> str:
+    """Símbolo del calor del tramo hasta el pinch: SH + EV, o EV, del nivel.
+
+    Con recalentador (SH, RH y EV) es el «tramo» del nivel: el símbolo largo no
+    entraba en el ancho de un celular.
+    """
+    if reheat:
+        return rf"\dot{{Q}}_{{\mathrm{{tramo}}{_sub(level)}}}"
     what = r"\mathrm{SH+EV}" if level.level.superheated else r"\mathrm{EV}"
     return rf"\dot{{Q}}_{{{what}{_sub(level)}}}"
 
@@ -301,6 +481,51 @@ def _gas_out_lines(
     ]
 
 
+def rh_joined_middle(result: MultiHRSGResult, i: int) -> bool:
+    """¿El nivel i es la media que se suma al recalentamiento (sus caudales salen del 2×2)?"""
+    rh = result.reheat
+    return rh is not None and rh.reheater.joins_middle and i == 1
+
+
+def _reheat_lines(result: MultiHRSGResult, system: UnitSystem) -> list[str]:
+    """Calor del recalentador: la mezcla con la media (si se suma) y Q̇_RH."""
+    rh = result.reheat
+    assert rh is not None
+    hi = result.levels[0]
+    lines: list[str] = []
+    h_in = rh.cold.h_J_per_kg
+    inlet = r"h_{\mathrm{RF}}"
+    flow = _m(hi)
+    if rh.reheater.joins_middle:
+        mid = result.levels[1]
+        tm = 5 if mid.level.superheated else 4
+        flow = r"\dot{m}_{\mathrm{RH}}"
+        inlet = r"h_{\mathrm{mez}}"
+        h_in = rh.inlet.h_J_per_kg
+        lines += [
+            latex_chain(
+                flow,
+                f"{_m(hi)} + {_m(mid)}",
+                _q(rh.m_kg_s, "mass_flow", system),
+            ),
+            latex_chain(
+                inlet,
+                rf"\frac{{{_m(hi)}\,h_{{\mathrm{{RF}}}} + {_m(mid)}\,{_h(tm, mid)}}}{{{flow}}}",
+                _q(h_in, _EH, system),
+            ),
+            rf"T_{{\mathrm{{mez}}}} = {_T(rh.inlet.T_K, system)}",
+        ]
+    lines.append(
+        latex_chain(
+            r"\dot{Q}_{\mathrm{RH}}",
+            rf"{flow}\,(h_{{\mathrm{{RC}}}} - {inlet})",
+            times_diff(rh.m_kg_s, "mass_flow", rh.hot.h_J_per_kg, h_in, system),
+            _q(rh.Q_W, "power", system),
+        )
+    )
+    return lines
+
+
 def _sections_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> ProcedureStep:
     """Sobrecalentador (si hay) y economizador del nivel i, con las temperaturas de los gases."""
     lv = result.levels[i]
@@ -313,27 +538,69 @@ def _sections_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Proce
     h = [s.h_J_per_kg for s in w]
     lines: list[str] = []
     parts: list[str] = []
+    rh = result.reheat if i == 0 else None
+    Q_sh = 0.0
     if level.superheated:
         Q_sh = lv.m_steam_kg_s * (h[4] - h[3])
         symbol = rf"\dot{{Q}}_{{\mathrm{{SH}}{sub}}}"
-        lines += [
+        lines.append(
             latex_chain(
                 symbol,
                 rf"{_m(lv)}\,({_h(5, lv)} - {_h(4, lv)})",
                 times_diff(lv.m_steam_kg_s, "mass_flow", h[4], h[3], system),
                 _q(Q_sh, "power", system),
-            ),
-            *_gas_out_lines(lv, labels, 1, Q_sh, m_g, symbol, system),
-        ]
-        parts.append(f"el sobrecalentador baja los gases de T_{labels[0]} a T_{labels[1]}")
-    if level.superheated:  # el evaporador (con el domo) es el resto del tramo hasta el pinch
+            )
+        )
+        if rh is None:
+            lines += _gas_out_lines(lv, labels, 1, Q_sh, m_g, symbol, system)
+            parts.append(f"el sobrecalentador baja los gases de T_{labels[0]} a T_{labels[1]}")
+    Q_first = Q_sh
+    if rh is not None:
+        lines += _reheat_lines(result, system)
+        Q_first = Q_sh + rh.Q_W
+        if level.superheated:
+            par = r"\dot{Q}_{\mathrm{par}}"
+            lines.append(
+                latex_chain(
+                    par,
+                    rf"\dot{{Q}}_{{\mathrm{{SH}}{sub}}} + \dot{{Q}}_{{\mathrm{{RH}}}}",
+                    f"{_n(Q_sh, 'power', system)} + {_n(rh.Q_W, 'power', system)}",
+                    _q(Q_first, "power", system),
+                )
+            )
+            parts.append(
+                f"el sobrecalentador y el recalentador, en paralelo, bajan los gases de "
+                f"T_{labels[0]} a T_{labels[1]}"
+            )
+        else:
+            par = r"\dot{Q}_{\mathrm{RH}}"
+            parts.append(f"el recalentador baja los gases de T_{labels[0]} a T_{labels[1]}")
+        lines += _gas_out_lines(lv, labels, 1, Q_first, m_g, par, system)
+    if Q_first > 0.0:  # el evaporador (con el domo) es el resto del tramo hasta el pinch
+        Q_top = m_g * (lv.h_gas_J_per_kg[0] - lv.h_gas_J_per_kg[-2])
+        first = (
+            r"\dot{Q}_{\mathrm{par}}"
+            if rh is not None and level.superheated
+            else (
+                r"\dot{Q}_{\mathrm{RH}}" if rh is not None else rf"\dot{{Q}}_{{\mathrm{{SH}}{sub}}}"
+            )
+        )
+        lines.append(
+            latex_chain(
+                rf"\dot{{Q}}_{{\mathrm{{EV}}{sub}}}",
+                rf"{_q_top(lv, rh is not None)} - {first}",
+                _diff(Q_top, Q_first, "power", system),
+                _q(Q_top - Q_first, "power", system),
+            )
+        )
+    if Q_first == 0.0 and rh_joined_middle(result, i):
+        # con el 2×2 el evaporador de media no tuvo su propio paso: es el tramo hasta su pinch
         Q_top = m_g * (lv.h_gas_J_per_kg[0] - lv.h_gas_J_per_kg[-2])
         lines.append(
             latex_chain(
                 rf"\dot{{Q}}_{{\mathrm{{EV}}{sub}}}",
-                rf"{_q_top(lv)} - \dot{{Q}}_{{\mathrm{{SH}}{sub}}}",
-                _diff(Q_top, Q_sh, "power", system),
-                _q(Q_top - Q_sh, "power", system),
+                rf"\dot{{m}}_g\,\bigl[h_g(T_{labels[0]}) - h_g(T_{labels[-2]})\bigr]",
+                _q(Q_top, "power", system),
             )
         )
     above = result.levels[:i]
@@ -366,11 +633,14 @@ def _sections_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Proce
         f"el economizador calienta {whose} hasta T_sat − approach y los gases salen a "
         f"T_{labels[k]}, {goes}"
     )
+    devices = ["sobrecalentador"] if level.superheated else []
+    if rh is not None:
+        devices.append("recalentador")
+    devices.append("economizador")
     return ProcedureStep(
-        title=(
-            f"{_title(lv)}: "
-            + ("sobrecalentador y economizador" if level.superheated else "economizador")
-        ),
+        title=f"{_title(lv)}: "
+        + (", ".join(devices[:-1]) + " y " if devices[:-1] else "")
+        + devices[-1],
         text=(
             "Con el caudal, cada sección da la temperatura de los gases a su salida (como h_g "
             "crece con T, se busca la T que da esa entalpía): " + "; ".join(parts) + "."
@@ -467,12 +737,23 @@ def exergy_step(result: MultiHRSGResult, system: UnitSystem) -> ProcedureStep:
 def multi_hrsg_steps(result: MultiHRSGResult, system: UnitSystem) -> list[ProcedureStep]:
     """Procedimiento completo de la HRSG de varias presiones, como se resuelve a mano."""
     steps = [gas_composition_step(result.inputs.gas, system), _gas_enthalpy_step(result, system)]
-    for i in range(len(result.levels)):
+    rh = result.reheat
+    start = 0
+    if rh is not None and rh.reheater.joins_middle:
         steps += [
-            _water_step(result, i, system),
-            _flow_step(result, i, system),
-            _sections_step(result, i, system),
+            _water_step(result, 0, system),
+            _reheat_states_step(result, system),
+            _water_step(result, 1, system),
+            _coupled_flow_step(result, system),
+            _sections_step(result, 0, system),
+            _sections_step(result, 1, system),
         ]
+        start = 2
+    for i in range(start, len(result.levels)):
+        steps.append(_water_step(result, i, system))
+        if i == 0 and rh is not None:
+            steps.append(_reheat_states_step(result, system))
+        steps += [_flow_step(result, i, system), _sections_step(result, i, system)]
     steps += [_total_step(result, system), exergy_step(result, system)]
     dew = dew_point_step(result.inputs.gas, system)
     if dew is not None:

@@ -9,6 +9,14 @@
   ciclo combinado.
 - :func:`multi_tq_figure`, :func:`exergy_split_figure` y
   :func:`exergy_sections_figure`: la HRSG de varias presiones (Fase 3.5).
+- :func:`render_steam_cycle_diagram`, :func:`bottoming_exergy_figure` y
+  :func:`configuration_figure`: el ciclo combinado de varias presiones, con
+  recalentamiento (Fase 3.6).
+
+Los colores de las exergías (útil, destruida, perdida) y de la comparación de
+configuraciones son los tres primeros de la paleta de referencia validada para
+daltonismo (azul, naranja y aguamarina): se distinguen también con protanopía y
+deuteranopía; cada barra lleva su valor escrito.
 
 Vive en ``ui/`` porque arma figuras de plotly y usa Streamlit; el cálculo
 está en ``core/``.
@@ -20,6 +28,7 @@ import plotly.graph_objects as go
 
 from core.cycles.brayton import BraytonResult, brayton_ts_lines
 from core.cycles.combined import CombinedResult
+from core.cycles.combined_multi import BottomingExergy, ConfigurationRow, MultiCombinedResult
 from core.cycles.hrsg import HRSGResult, TQProfile
 from core.cycles.hrsg_multi import HRSGExergy, MultiHRSGResult, MultiTQProfile
 from core.cycles.rankine import RankineResult, rankine_labeled_states, rankine_segments
@@ -27,25 +36,40 @@ from core.diagrams import (
     DiagramSpec,
     DiagramType,
     ProcessOverlay,
+    _join_with_gaps,
     isentropic_process,
     segments_overlays,
 )
+from core.fluids import StatePoint
 from core.state_report import format_value
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, unit_label
 from ui.diagrams import DiagramPoint, get_diagram, render_diagram_plotly
 
 __all__ = [
     "LEVEL_COLORS",
+    "bottoming_exergy_figure",
+    "configuration_figure",
     "energy_sankey_figure",
     "exergy_sections_figure",
     "exergy_split_figure",
     "gas_turbine_ts_figure",
     "multi_tq_figure",
     "render_rankine_diagram",
+    "render_steam_cycle_diagram",
     "tq_figure",
 ]
 
-_SECTION_SHORT = {"sobrecalentador": "SH", "evaporador": "EV", "economizador": "ECO"}
+_SECTION_SHORT = {
+    "sobrecalentador": "SH",
+    "evaporador": "EV",
+    "economizador": "ECO",
+    "recalentador": "RH",
+}
+_REHEAT_COLOR = "#9467bd"
+# Paleta de referencia validada para daltonismo (azul, naranja, aguamarina).
+_USEFUL = "#2a78d6"
+_DESTROYED = "#eb6834"
+_LOST = "#1baf7a"
 _GAS_COLOR = "#d62728"
 _WATER_COLOR = "#1f77b4"
 _AIR_COLOR = "#1f77b4"
@@ -433,7 +457,7 @@ def multi_tq_figure(
     for i, lv in enumerate(result.levels):  # un trazo por nivel (sus secciones son contiguas)
         xs: list[float] = []
         ys: list[float] = []
-        for seg in (s for s in profile.segments if s.level == i):
+        for seg in (s for s in profile.segments if s.level == i and s.kind != "recalentador"):
             xs += [Q(q) for q in seg.Q_W]
             ys += [T(t) for t in seg.T_K]
         name = f"agua y vapor de {lv.name}" if lv.name else "agua y vapor"
@@ -445,6 +469,18 @@ def multi_tq_figure(
                 name=name,
                 line={"color": LEVEL_COLORS[lv.name], "width": 3},
                 hovertemplate=hover + f"<extra>{name}</extra>",
+            )
+        )
+    # El recalentador, en paralelo con el sobrecalentador de alta (mismo tramo de Q).
+    for seg in (s for s in profile.segments if s.kind == "recalentador"):
+        fig.add_trace(
+            go.Scatter(
+                x=[Q(q) for q in seg.Q_W],
+                y=[T(t) for t in seg.T_K],
+                mode="lines",
+                name="recalentador (en paralelo)",
+                line={"color": _REHEAT_COLOR, "width": 3, "dash": "dash"},
+                hovertemplate=hover + "<extra>recalentador</extra>",
             )
         )
     # El pinch de cada nivel: de T_sat a los gases, a la salida de gases del evaporador.
@@ -468,9 +504,8 @@ def multi_tq_figure(
         )
     # Puntos de los gases (a, b, c…): el Q acumulado desde la chimenea.
     points = result.gas_points
-    gas_Q = [result.Q_W]
-    for section in result.sections:
-        gas_Q.append(gas_Q[-1] - section.Q_W)
+    m_g = result.inputs.m_gas_kg_s
+    gas_Q = [m_g * (h - result.h_stack_J_per_kg) for _, _, h in points]
     # Un punto pegado al anterior (una sección muy chica) queda sin rótulo: se pisarían.
     texts: list[str] = []
     last_Q = None
@@ -496,13 +531,21 @@ def multi_tq_figure(
     for q in profile.boundaries_W:
         fig.add_vline(x=Q(q), line_dash="dot", line_color="lightgray", line_width=1)
     bounds = [0.0, *profile.boundaries_W, result.Q_W]
-    sections = list(reversed(result.sections))  # desde la chimenea
+    # Un rótulo por tramo, desde la chimenea; los bancos en paralelo comparten el suyo.
+    shorts: list[str] = []
+    parallel = False
+    for flows in reversed(result._flows()):
+        kind, _, level = flows.section.name.partition(" de ")
+        short = _SECTION_SHORT[kind] + (f" {_LEVEL_SHORT[level]}" if level else "")
+        if flows.gas_share < 1.0 and parallel:
+            shorts[-1] = f"{short} + {shorts[-1]}"
+            continue
+        parallel = flows.gas_share < 1.0
+        shorts.append(short)
     row = 0
-    for section, lo, hi in zip(sections, bounds[:-1], bounds[1:], strict=True):
+    for short, lo, hi in zip(shorts, bounds[:-1], bounds[1:], strict=True):
         if (hi - lo) < 0.05 * result.Q_W:
             continue
-        kind, _, level = section.name.partition(" de ")
-        short = _SECTION_SHORT[kind] + (f" {_LEVEL_SHORT[level]}" if level else "")
         fig.add_annotation(  # en dos alturas alternadas: en un celular no se pisan
             x=Q(0.5 * (lo + hi)),
             y=0.99 - 0.06 * (row % 2),
@@ -530,9 +573,9 @@ def multi_tq_figure(
 
 
 _EXERGY_PARTS = (
-    ("al agua y el vapor", "#2ca02c"),
-    ("destruida", "#ff7f0e"),
-    ("por la chimenea", "#8c564b"),
+    ("al agua y el vapor", _USEFUL),
+    ("destruida", _DESTROYED),
+    ("por la chimenea", _LOST),
 )
 
 
@@ -607,4 +650,205 @@ def exergy_sections_figure(exergy: HRSGExergy, system: UnitSystem) -> go.Figure:
         showlegend=False,
     )
     fig.update_xaxes(exponentformat="none", separatethousands=True)
+    return fig
+
+
+# ---------------------------------------------------------------------
+# Ciclo combinado de varias presiones (Fase 3.6)
+# ---------------------------------------------------------------------
+
+
+def render_steam_cycle_diagram(
+    result: MultiCombinedResult, system: UnitSystem, diagram_type: DiagramType, *, chart_key: str
+) -> None:
+    """El ciclo de vapor con admisiones sobre el diagrama del agua (fluprodia + plotly).
+
+    Estados numerados del ciclo; el agua de cada nivel en la HRSG (de la entrada
+    a su economizador al vapor) y las bombas entre niveles, sin numerar; las
+    turbinas, las mezclas, el recalentador, el desaireador y el condensador; y,
+    con η_T < 1, la expansión isoentrópica de referencia de cada turbina.
+    """
+    cyc = result.steam
+    hrsg = result.hrsg
+    states = [s.to_state_point() for s in cyc.states]
+    pairs: list[tuple[StatePoint, StatePoint]] = []
+    if cyc.deaerator is None:
+        pairs.append((states[0], states[cyc.feedwater]))
+    else:
+        cp, da, fw = cyc.condensate_pump_out, cyc.deaerator, cyc.feedwater
+        pairs += [(states[0], states[cp]), (states[cp], states[da]), (states[da], states[fw])]
+    levels = hrsg.levels
+    pairs.append((states[cyc.feedwater], levels[-1].water[-1].to_state_point()))
+    for i in range(len(levels) - 1):
+        below, lv = levels[i + 1], levels[i]
+        pairs.append((below.water[2].to_state_point(), lv.water[0].to_state_point()))
+        pairs.append((lv.water[0].to_state_point(), lv.water[-1].to_state_point()))
+    for t in cyc.turbines:
+        if t.extraction is None:
+            pairs.append((states[t.inlet], states[t.outlet]))
+        else:
+            pairs += [
+                (states[t.inlet], states[t.extraction]),
+                (states[t.extraction], states[t.outlet]),
+            ]
+    for a in cyc.admissions:
+        pairs += [(states[a.turbine], states[a.outlet]), (states[a.steam], states[a.outlet])]
+    if cyc.hot_reheat is not None and cyc.reheat_inlet is not None:
+        pairs.append((states[cyc.reheat_inlet], states[cyc.hot_reheat]))
+    if cyc.deaerator is not None and cyc.extraction is not None:
+        pairs.append((states[cyc.extraction], states[cyc.deaerator]))
+    pairs.append((states[cyc.exhaust], states[0]))
+    diagram = get_diagram("Water", system)
+    spec = DiagramSpec(fluid="Water", system=system)
+    overlays: list[ProcessOverlay] = segments_overlays(diagram, spec, pairs)
+    points = [
+        DiagramPoint(state=s, label=str(k + 1), color=_GAS_COLOR) for k, s in enumerate(states)
+    ]
+    if result.inputs.steam.eta_turbine < 1.0:
+        # Las isoentrópicas de todas las turbinas en una sola entrada de la leyenda: en un
+        # celular, una por turbina ocupaba media figura.
+        chunks = [
+            isentropic_process(
+                diagram,
+                spec,
+                s_J_per_kg_K=cyc.states[t.inlet].s_J_per_kg_K,
+                p_start_Pa=cyc.states[t.inlet].P_Pa,
+                p_end_Pa=cyc.states[t.outlet].P_Pa,
+            )
+            for t in cyc.turbines
+        ]
+        overlays.append(
+            ProcessOverlay(
+                name="expansiones isoentrópicas de referencia",
+                color=_GREEN,
+                dash="dash",
+                coords_si=_join_with_gaps(chunks),
+            )
+        )
+        for t in cyc.turbines:
+            points.append(
+                DiagramPoint(
+                    state=t.outlet_s.to_state_point(), label=f"{t.outlet + 1}s", color=_GREEN
+                )
+            )
+    render_diagram_plotly(
+        fluid="Water",
+        diagram_type=diagram_type,
+        system=system,
+        points=points,
+        overlays=overlays,
+        chart_key=chart_key,
+        point_legend={_GAS_COLOR: "estados", _GREEN: "estados isoentrópicos (ks)"},
+    )
+
+
+_SHORT_WORDS = (
+    ("sobrecalentador", "SH"),
+    ("recalentador", "RH"),
+    ("evaporador", "EV"),
+    ("economizador", "ECO"),
+    ("mezcla del vapor de ", "mezcla "),
+    (" (recalentamiento frío)", " (RF)"),
+    (" (turbina)", ""),
+    ("turbina de ", "turbina "),
+)
+
+
+def _short(name: str) -> str:
+    """Rótulo corto para el eje (en un celular no entran los nombres largos)."""
+    for long, short in _SHORT_WORDS:
+        name = name.replace(long, short)
+    return name
+
+
+def bottoming_exergy_figure(exergy: BottomingExergy, system: UnitSystem) -> go.Figure:
+    """Barras horizontales: a dónde va la exergía de los gases de escape (% de lo que traen)."""
+    X = exergy.X_gas_in_W
+    unit = unit_label("power", system)
+    rows: list[tuple[str, float, str]] = [("trabajo neto (vapor)", exergy.W_net_W, "trabajo")]
+    rows += [(name, value, "destruida") for name, value in exergy.destroyed_W if value > 0.0]
+    rows += [
+        ("condensador", exergy.X_condenser_W, "perdida"),
+        ("chimenea", exergy.X_stack_W, "perdida"),
+    ]
+    order = [_short(name) for name, _, _ in rows]
+    fig = go.Figure()
+    for group, color, legend in (
+        ("trabajo", _USEFUL, "trabajo"),
+        ("destruida", _DESTROYED, "destruida (T₀·S_gen)"),
+        ("perdida", _LOST, "se va (condensador y chimenea)"),
+    ):
+        sel = [r for r in rows if r[2] == group]
+        fig.add_trace(
+            go.Bar(
+                orientation="h",
+                y=[_short(name) for name, _, _ in sel],
+                x=[value / X * 100 for _, value, _ in sel],
+                name=legend,
+                marker={"color": color, "cornerradius": 4},
+                text=[f"{value / X * 100:.1f} %" for _, value, _ in sel],
+                textposition="outside",
+                cliponaxis=False,
+                customdata=[[name, _value(value, "power", system)] for name, value, _ in sel],
+                hovertemplate=f"%{{customdata[0]}}: %{{customdata[1]}} {unit} (%{{x:.1f}} %)"
+                "<extra></extra>",
+            )
+        )
+    top = max(value for _, value, _ in rows) / X * 100
+    fig.update_layout(
+        height=110 + 26 * len(rows),
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        xaxis={"title": "% de la exergía de los gases de escape", "range": [0, 1.25 * top]},
+        yaxis={"categoryorder": "array", "categoryarray": order, "autorange": "reversed"},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        bargap=0.3,
+        separators=". ",
+    )
+    return fig
+
+
+def configuration_figure(rows: list[ConfigurationRow]) -> go.Figure:
+    """Rendimiento de cada configuración, con η_T constante y con la regla de Baumann.
+
+    Un gráfico de puntos (dos marcas por fila, unidas): las diferencias son de
+    décimas de punto, y unas barras desde cero las esconderían.
+    """
+    ok = [r for r in rows if r.result is not None and r.result_baumann is not None]
+    labels = [r.label for r in ok]
+    eta = [r.result.eta_th * 100 for r in ok]  # type: ignore[union-attr]
+    eta_b = [r.result_baumann.eta_th * 100 for r in ok]  # type: ignore[union-attr]
+    fig = go.Figure()
+    for label, a, b in zip(labels, eta, eta_b, strict=True):
+        fig.add_trace(
+            go.Scatter(
+                x=[a, b],
+                y=[label, label],
+                mode="lines",
+                line={"color": "lightgray", "width": 2},
+                showlegend=False,
+                hoverinfo="skip",
+            )
+        )
+    for values, name, color, symbol in (
+        (eta, "η_T constante", _USEFUL, "circle"),
+        (eta_b, "con la regla de Baumann", _DESTROYED, "diamond"),
+    ):
+        fig.add_trace(
+            go.Scatter(
+                x=values,
+                y=labels,
+                mode="markers",
+                name=name,
+                marker={"color": color, "size": 11, "symbol": symbol},
+                hovertemplate=f"%{{y}}: %{{x:.2f}} %<extra>{name}</extra>",
+            )
+        )
+    fig.update_layout(
+        height=90 + 38 * len(labels),
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        xaxis_title="η ciclo combinado [%]",
+        yaxis={"autorange": "reversed"},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        separators=". ",
+    )
     return fig

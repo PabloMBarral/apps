@@ -77,7 +77,7 @@ from ui.cycle_charts import (
 )
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.17.0"
+PAGE_VERSION = "0.18.0"
 
 _EXAMPLES = list(HRSG_EXAMPLES)
 # Opciones fijas: cambiarlas reiniciaría el widget.

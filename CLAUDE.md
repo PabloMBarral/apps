@@ -75,6 +75,10 @@ apps/
 │   │                          # Rankine con desaireador: métricas, Sankey, T–s de
 │   │                          # la TG, T–Q, ciclo de vapor, control con TESPy,
 │   │                          # procedimiento por partes, barridos.
+│   │                          # Fase 3.6: 1, 2 o 3 presiones y recalentamiento
+│   │                          # (selector), Baumann, T–s con admisiones,
+│   │                          # comparación de configuraciones, exergía del
+│   │                          # ciclo de fondo, TESPy del lado agua–vapor.
 │   └── 99_Acerca.py           # Créditos, licencias, citas
 ├── core/                      # Lógica pura, sin dependencia de Streamlit
 │   ├── __init__.py
@@ -174,6 +178,8 @@ apps/
 │   │   │                      # cascada), from_single, multi_tq_profile,
 │   │   │                      # hrsg_exergy (por sección), level_comparison,
 │   │   │                      # notas, ejemplos, barridos y multi_hrsg_to_dict.
+│   │   │                      # Fase 3.6: Reheater (en paralelo con el SH de
+│   │   │                      # alta), reheat_system (2×2), eta_pump.
 │   │   ├── hrsg_multi_procedure.py # ✅ Fase 3.5 — multi_hrsg_steps (por nivel)
 │   │   │                      # y exergy_step (también para la de una presión).
 │   │   ├── brayton.py         # ✅ Fase 3.4 — Fuel (ISO 6976), BraytonInputs /
@@ -185,8 +191,18 @@ apps/
 │   │   ├── combined.py        # ✅ Fase 3.4 — SteamCycle, CombinedInputs /
 │   │   │                      # solve_combined / CombinedResult (Kehlhofer, balance),
 │   │   │                      # notas, ejemplos, barridos y combined_to_dict.
-│   │   └── combined_procedure.py # ✅ Fase 3.4 — combined_sections: TG, HRSG,
-│   │                          # ciclo de vapor y el acople con el rendimiento.
+│   │   ├── combined_procedure.py # ✅ Fase 3.4 — combined_sections: TG, HRSG,
+│   │   │                      # ciclo de vapor y el acople con el rendimiento.
+│   │   ├── combined_multi.py  # ✅ Fase 3.6 — MultiCombinedInputs (niveles,
+│   │   │                      # ReheatSpec, baumann_alpha) / solve_combined_multi /
+│   │   │                      # MultiCombinedResult: turbina con admisiones
+│   │   │                      # (TurbineSection, Admission, MultiSteamCycle),
+│   │   │                      # desaireador, Baumann, from_combined (= 3.4),
+│   │   │                      # configuration_comparison, bottoming_exergy,
+│   │   │                      # notas, ejemplos, barridos, export y
+│   │   │                      # combined_multi_tespy (control).
+│   │   └── combined_multi_procedure.py # ✅ Fase 3.6 — combined_multi_sections:
+│   │                          # TG, HRSG (RH y 2×2), ciclo de vapor y acople.
 │   └── plots.py               # fluprodia + matplotlib helpers
 ├── ui/                        # Helpers de UI que sí importan Streamlit
 │   ├── branding.py            # Bloque de créditos compartido (sidebar)
@@ -201,6 +217,9 @@ apps/
 │                              # gas_turbine_ts_figure y energy_sankey_figure.
 │                              # Fase 3.5: multi_tq_figure, exergy_split_figure
 │                              # y exergy_sections_figure.
+│                              # Fase 3.6: el RH en el T–Q,
+│                              # render_steam_cycle_diagram,
+│                              # bottoming_exergy_figure y configuration_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
@@ -592,6 +611,49 @@ Notas de la Fase 3.5 (HRSG de dos y tres presiones):
   390 px.
 - LaTeX: 1212 expresiones distintas, máx. 313 px; en SI las búsquedas en
   tabla con ×10ⁿ (h = h(p, T) = …) van en dos renglones (`_lookup`).
+
+Notas de la Fase 3.6 (ciclo combinado de dos y tres presiones con recalentamiento):
+
+- Recalentador en `hrsg_multi` (`MultiHRSGInputs.reheat`, `None` = 0.17.0
+  idéntico): en paralelo con el SH de alta (los dos bancos ven los gases de
+  entrada y salen a una T común; en `_flows` cada banco lleva su parte de los
+  gases, `gas_share`, para el T–Q y la exergía). En serie no alcanza: el banco
+  que va segundo ve gases más fríos. Con tres niveles el vapor de media se suma
+  al recalentamiento frío (p_RH = p_media) y alta y media salen del 2×2
+  (`reheat_system`, Cramer); la mezcla queda en el ciclo de vapor. Bombas
+  entre niveles con `eta_pump` (en el ciclo combinado, el η_B del ciclo).
+- `combined_multi`: cálculo directo (el agua de alimentación y el
+  recalentamiento frío no dependen de los caudales) → HRSG → turbina con
+  admisiones. Cada tramo entre admisiones (o el RH) es una turbina con η_T
+  desde su entrada; la extracción del desaireador va sobre esa línea. Estados
+  numerados en el sentido del flujo: coincide con Cengel en el Rankine simple
+  (1–4), con recalentamiento (1–6) y con desaireador (1–7). Con un nivel y
+  sin RH reproduce `solve_combined` a 1e-9 (test).
+- Regla de Baumann (`baumann_alpha`): la expansión se parte donde la línea de
+  expansión cruza x = 1 (`brentq`); la parte húmeda va con η_T·(1 − α·ȳ),
+  iterando la humedad de salida. Sin ella, el RH casi no suma rendimiento (con
+  una sola presión lo baja: la chimenea se calienta) y solo seca el vapor;
+  con ella, 3P → 3PRH suma ~0,8 puntos. La página la trae apagada (como
+  Cengel); la comparación muestra las dos columnas.
+- TESPy de control (`combined_multi_tespy`, tests y página): banco paralelo
+  con `Splitter` + `Merge` de gases, `Ref(otro, 1, 0)` en la T de salida y sin
+  `pr1` en el RH (si no, la presión queda sobredeterminada: «circular
+  dependency»); cada tramo de turbina con el η local que reproduce la línea
+  (también con Baumann). Coincide al 0,2 % en caudales, 0,02 % en Ẇ_TV y
+  0,1 K en la chimenea; 0,1–0,8 s.
+- Exergía del ciclo de fondo (`bottoming_exergy`): Ẋ_gases = Ẇ_TV + Σ Ẋ_dest
+  (HRSG por sección, turbinas, mezclas, desaireador, bombas) + Ẋ_cond +
+  Ẋ_chim, cierra a ~1e-7 W (test).
+- Página: radio `cc_levels` y casilla `cc_reheat`; con 1 nivel y sin RH,
+  la 0.17.0 sin cambios. Si no, ejemplos de esa combinación (hay uno o dos
+  por combinación) y keys `cm{n}{r}_{ejemplo}_…`. Gráficos con la paleta de
+  referencia validada para daltonismo (azul, naranja, aguamarina: también en
+  las barras de exergía de /HRSG; el verde y el naranja de antes no se
+  distinguían con protanopía). La comparación es un gráfico de puntos: las
+  diferencias son de décimas y unas barras desde cero las esconderían.
+- LaTeX: 4007 expresiones distintas, KaTeX estricto, máx. 320 px. Con RH el
+  calor del tramo de alta es `\dot{Q}_{\mathrm{tramo},A}` (`SH+RH+EV` no
+  entraba).
 
 ### Citas y licencias
 

@@ -208,7 +208,8 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   el nivel. Con un nivel coincide exactamente con la caldera de una
   presión; una red de TESPy (un `DropletSeparator` y una `Pump` por domo)
   da lo mismo al 0,2 %. _Fase 3.5 cerrada._
-- ✅ **Ciclo combinado gas–vapor de una presión**: una **turbina de gas**
+- ✅ **Ciclo combinado gas–vapor de una, dos o tres presiones, con
+  recalentamiento**: una **turbina de gas**
   (compresor, cámara de combustión y turbina) cuyo escape alimenta la HRSG
   de una presión, y el vapor mueve el **ciclo de Rankine** de la app, con
   desaireador opcional. La turbina de gas se calcula con calores
@@ -240,16 +241,30 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   debajo de la salida del compresor, combustión con λ < 1, vapor más
   caliente que el escape, desaireador por encima de la caldera…). Fórmulas
   del vademecum (§3.3, §4.8, §5, §10.4, §16) y descarga CSV/JSON. _Fase 3.4
-  cerrada._
+  cerrada._ Con **dos o tres presiones y recalentamiento** (Fase 3.6), la
+  HRSG en cascada de la Fase 3.5 con el **recalentador en paralelo** con el
+  sobrecalentador de alta (con tres niveles el vapor de media se suma al
+  recalentamiento frío y los caudales de alta y media salen de un sistema
+  lineal de 2×2) y una **turbina de vapor con admisiones**: el vapor de cada
+  nivel entra mezclándose a la presión de su domo. Desaireador opcional y
+  **regla de Baumann** (la humedad baja el rendimiento de la parte húmeda de
+  la expansión). Muestra el título a la salida de la turbina, el T–Q con el
+  recalentador, el T–s del ciclo de vapor con las admisiones, **«¿Cuánto
+  ganás con más presiones y recalentamiento?»** (la misma turbina de gas con
+  1, 2 y 3 presiones, con y sin recalentamiento, con η_T constante y con
+  Baumann) y la **exergía del ciclo de fondo** por componente (HRSG,
+  turbinas, mezclas, bombas, condensador y chimenea). Con una presión y sin
+  recalentar coincide exactamente con la Fase 3.4; una red de TESPy de todo
+  el lado agua–vapor da lo mismo al 0,2 %. _Fase 3.6 cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
 igualdad por renglón) para que entren en el ancho de la pantalla.
 
 ### En desarrollo (roadmap)
-- **Ciclo combinado de dos y tres presiones** con recalentamiento (una
-  turbina de vapor con varias admisiones); secciones intercaladas en la
-  HRSG y quemadores suplementarios.
+- **Ciclo combinado (continuación)**: secciones intercaladas en la HRSG,
+  quemadores suplementarios, pérdidas de carga, recirculación del
+  precalentador y la exergía de toda la planta (con la del combustible).
 - **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
   Brayton con regeneración, interenfriamiento y recalentamiento (página
   propia, sobre la turbina de gas del ciclo combinado), cogeneración.
@@ -320,7 +335,9 @@ apps/
 │   │   ├── brayton.py            # turbina de gas (gases ideales; TESPy de control)
 │   │   ├── brayton_procedure.py  # su procedimiento con la función s°
 │   │   ├── combined.py           # ciclo combinado: turbina de gas + HRSG + Rankine
-│   │   └── combined_procedure.py # su procedimiento por partes
+│   │   ├── combined_procedure.py # su procedimiento por partes
+│   │   ├── combined_multi.py     # ciclo combinado de 2 y 3 presiones con recalentamiento
+│   │   └── combined_multi_procedure.py  # su procedimiento, con las admisiones
 │   └── plots.py
 ├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, gráficos
 │                          # de los ciclos (T–Q, T–s, Sankey), créditos
@@ -339,7 +356,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.17.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.18.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---

@@ -57,6 +57,7 @@ __all__ = [
     "combined_sweep",
     "combined_to_dict",
     "default_sweep_values",
+    "gas_turbine_to_dict",
     "solve_combined",
 ]
 
@@ -482,47 +483,52 @@ def _value(value_si: float, kind: QuantityKind, system: UnitSystem) -> dict[str,
     return {"valor": convert_from_si(value_si, kind, system), "unidad": unit_label(kind, system)}
 
 
-def combined_to_dict(result: CombinedResult, system: UnitSystem) -> dict[str, Any]:
-    """Resultado serializable a JSON (valores en ``system``)."""
-    gt = result.gas_turbine
+def gas_turbine_to_dict(gt: BraytonResult, system: UnitSystem) -> dict[str, Any]:
+    """La turbina de gas de un resultado, serializable a JSON (valores en ``system``)."""
     gi = gt.inputs
     fuel = gi.fuel
     return {
+        "modelo": "aire estándar" if fuel is None else f"combustión de {fuel.name}",
+        "relacion_de_presiones": gi.pressure_ratio,
+        "rendimiento_compresor": gi.eta_compressor,
+        "rendimiento_turbina": gi.eta_turbine,
+        "caida_de_presion_camara": gi.dp_combustor,
+        "T_ambiente": _value(gi.T_amb_K, "temperature", system),
+        "p_ambiente": _value(gi.p_amb_Pa, "pressure", system),
+        "TIT": _value(gi.T_turbine_in_K, "temperature", system),
+        "composicion_aire": {GAS_NAMES[s]: y for s, y in gi.air.mole_fractions.items()},
+        "PCI": None if fuel is None else _value(fuel.lhv_J_per_kg, "specific_enthalpy", system),
+        "estados": [
+            {
+                "estado": s.label,
+                "medio": s.medium,
+                "T": _value(s.T_K, "temperature", system),
+                "p": _value(s.P_Pa, "pressure", system),
+                "h_desde_25C": _value(s.h_J_per_kg, "specific_enthalpy", system),
+                "s": _value(s.s_J_per_kg_K, "specific_entropy", system),
+            }
+            for s in gt.states
+        ],
+        "relacion_combustible_aire": gt.fuel_air_ratio,
+        "exceso_de_aire": gt.excess_air,
+        "composicion_escape": {GAS_NAMES[s]: y for s, y in gt.gas.mole_fractions.items()},
+        "caudal_aire": _value(gt.m_air_kg_s, "mass_flow", system),
+        "caudal_combustible": _value(gt.m_fuel_kg_s, "mass_flow", system),
+        "potencia_compresor": _value(gt.W_compressor_W, "power", system),
+        "potencia_turbina": _value(gt.W_turbine_W, "power", system),
+        "potencia_neta": _value(gt.W_net_W, "power", system),
+        "rendimiento": gt.eta_th,
+        "relacion_trabajo_retroceso": gt.back_work_ratio,
+    }
+
+
+def combined_to_dict(result: CombinedResult, system: UnitSystem) -> dict[str, Any]:
+    """Resultado serializable a JSON (valores en ``system``)."""
+    gt = result.gas_turbine
+    return {
         "equipo": "ciclo combinado gas–vapor de una presión",
         "sistema_de_unidades": system,
-        "turbina_de_gas": {
-            "modelo": "aire estándar" if fuel is None else f"combustión de {fuel.name}",
-            "relacion_de_presiones": gi.pressure_ratio,
-            "rendimiento_compresor": gi.eta_compressor,
-            "rendimiento_turbina": gi.eta_turbine,
-            "caida_de_presion_camara": gi.dp_combustor,
-            "T_ambiente": _value(gi.T_amb_K, "temperature", system),
-            "p_ambiente": _value(gi.p_amb_Pa, "pressure", system),
-            "TIT": _value(gi.T_turbine_in_K, "temperature", system),
-            "composicion_aire": {GAS_NAMES[s]: y for s, y in gi.air.mole_fractions.items()},
-            "PCI": None if fuel is None else _value(fuel.lhv_J_per_kg, "specific_enthalpy", system),
-            "estados": [
-                {
-                    "estado": s.label,
-                    "medio": s.medium,
-                    "T": _value(s.T_K, "temperature", system),
-                    "p": _value(s.P_Pa, "pressure", system),
-                    "h_desde_25C": _value(s.h_J_per_kg, "specific_enthalpy", system),
-                    "s": _value(s.s_J_per_kg_K, "specific_entropy", system),
-                }
-                for s in gt.states
-            ],
-            "relacion_combustible_aire": gt.fuel_air_ratio,
-            "exceso_de_aire": gt.excess_air,
-            "composicion_escape": {GAS_NAMES[s]: y for s, y in gt.gas.mole_fractions.items()},
-            "caudal_aire": _value(gt.m_air_kg_s, "mass_flow", system),
-            "caudal_combustible": _value(gt.m_fuel_kg_s, "mass_flow", system),
-            "potencia_compresor": _value(gt.W_compressor_W, "power", system),
-            "potencia_turbina": _value(gt.W_turbine_W, "power", system),
-            "potencia_neta": _value(gt.W_net_W, "power", system),
-            "rendimiento": gt.eta_th,
-            "relacion_trabajo_retroceso": gt.back_work_ratio,
-        },
+        "turbina_de_gas": gas_turbine_to_dict(gt, system),
         "hrsg": hrsg_to_dict(result.hrsg, system),
         "ciclo_de_vapor": rankine_to_dict(result.steam, system),
         "resultados": {
