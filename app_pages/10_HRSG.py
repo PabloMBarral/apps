@@ -1,13 +1,15 @@
-"""Página 10 — Caldera de recuperación (HRSG) de una presión (Fase 3.3).
+"""Página 10 — Caldera de recuperación (HRSG) de una, dos o tres presiones (Fases 3.3 y 3.5).
 
-Arma el diagrama T–Q de una HRSG de una presión a partir de los gases que
-entran (temperatura, composición y caudal), la presión de evaporación, la
-temperatura del agua de alimentación, el pinch, el approach y la temperatura
-del vapor sobrecalentado, o con vapor saturado (sin sobrecalentador). El
-cálculo lo hace :mod:`core.cycles.hrsg` (balances de energía sección por
-sección, gases ideales y agua IAPWS-95); la página muestra el caudal de
-vapor, el diagrama, las secciones, los estados, la comparación entre vapor
-saturado y sobrecalentado, el procedimiento, la exportación y barridos.
+Arma el diagrama T–Q de una HRSG a partir de los gases que entran
+(temperatura, composición y caudal), la temperatura del agua de alimentación
+y, para cada nivel de presión, la presión de evaporación, el pinch, el
+approach y la temperatura del vapor sobrecalentado (o vapor saturado). Con
+una presión el cálculo lo hace :mod:`core.cycles.hrsg`; con dos o tres,
+:mod:`core.cycles.hrsg_multi` (niveles en cascada). La página muestra los
+caudales de vapor, el diagrama, las secciones, los estados, la exergía
+(cuánto vale el calor recuperado y cuánto se destruye), la comparación entre
+vapor saturado y sobrecalentado o entre 1, 2 y 3 presiones, el
+procedimiento, la exportación y barridos.
 """
 
 from __future__ import annotations
@@ -39,16 +41,43 @@ from core.cycles.hrsg import (
     other_steam_option,
     solve_hrsg,
 )
+from core.cycles.hrsg_multi import (
+    MULTI_HRSG_EXAMPLE_NOTES,
+    MULTI_HRSG_EXAMPLES,
+    HRSGExergy,
+    MultiHRSGInputs,
+    MultiHRSGResult,
+    MultiSweepParameter,
+    MultiTQProfile,
+    PressureLevel,
+    default_multi_sweep_values,
+    from_single,
+    hrsg_exergy,
+    level_comparison,
+    level_names,
+    multi_hrsg_notes,
+    multi_hrsg_sweep,
+    multi_hrsg_to_dict,
+    multi_tq_profile,
+    solve_multi_hrsg,
+)
+from core.cycles.hrsg_multi_procedure import exergy_step, multi_hrsg_steps
 from core.cycles.hrsg_procedure import hrsg_steps
 from core.export import dict_to_csv
 from core.fluids import fluid_state_from_pair
 from core.state_report import format_value, states_table
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, unit_label
 from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_credits
-from ui.cycle_charts import tq_figure
+from ui.cycle_charts import (
+    LEVEL_COLORS,
+    exergy_sections_figure,
+    exergy_split_figure,
+    multi_tq_figure,
+    tq_figure,
+)
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.16.0"
+PAGE_VERSION = "0.17.0"
 
 _EXAMPLES = list(HRSG_EXAMPLES)
 # Opciones fijas: cambiarlas reiniciaría el widget.
@@ -70,6 +99,19 @@ _GAS_PLACES = {
     "c": "salida del evaporador (pinch)",
     "d": "chimenea",
 }
+
+_LEVEL_OPTIONS = ("1 presión", "2 presiones", "3 presiones")
+_MULTI_EXAMPLES = {
+    n: [name for name, i in MULTI_HRSG_EXAMPLES.items() if len(i.levels) == n] for n in (2, 3)
+}
+_WATER_STATES = (
+    "entrada al economizador",
+    "salida del economizador",
+    "líquido saturado (domo)",
+    "vapor saturado",
+    "vapor sobrecalentado",
+)
+_LETTER = {"alta": "A", "media": "M", "baja": "B"}
 
 # (parámetro, magnitud del eje, rótulo del eje)
 _SWEEPS: dict[str, tuple[SweepParameter, QuantityKind, str]] = {
@@ -152,6 +194,39 @@ def _sweep_cached(
     ]
 
 
+@st.cache_data(show_spinner=False)
+def _exergy_single_cached(inputs: HRSGInputs) -> HRSGExergy:
+    """La exergía de la caldera de una presión, con el modelo de varias presiones (1 nivel)."""
+    return hrsg_exergy(solve_multi_hrsg(from_single(inputs)))
+
+
+@st.cache_data(show_spinner=False)
+def _solve_multi_cached(inputs: MultiHRSGInputs) -> tuple[MultiHRSGResult, MultiTQProfile]:
+    result = solve_multi_hrsg(inputs)
+    return result, multi_tq_profile(result)
+
+
+@st.cache_data(show_spinner=False)
+def _comparison_cached(
+    inputs: MultiHRSGInputs,
+) -> list[tuple[str, MultiHRSGResult | None, HRSGExergy | None, str]]:
+    return [
+        (label, r, None if r is None else hrsg_exergy(r), error)
+        for label, r, error in level_comparison(inputs)
+    ]
+
+
+@st.cache_data(show_spinner="Calculando el barrido…")
+def _multi_sweep_cached(
+    inputs: MultiHRSGInputs, parameter: MultiSweepParameter
+) -> list[tuple[float, tuple[float, ...], float, float]]:
+    values = default_multi_sweep_values(inputs, parameter)
+    return [
+        (p.value_si, p.m_steam_kg_s, p.T_stack_K, p.exergy_efficiency)
+        for p in multi_hrsg_sweep(inputs, parameter, values)
+    ]
+
+
 # ---------------------------------------------------------------------
 # Formato
 # ---------------------------------------------------------------------
@@ -218,7 +293,7 @@ def _carried_fractions(key: str, basis: str) -> dict[str, float] | None:
     return gas.mole_fractions if basis == "molar" else gas.mass_fractions
 
 
-def _read_gas(key: str, name: str, base: HRSGInputs) -> FlueGas | None:
+def _read_gas(key: str, name: str, base: HRSGInputs | MultiHRSGInputs) -> FlueGas | None:
     """Composición (preset con λ o cargada) y presión de los gases."""
     excess = HRSG_EXAMPLES_EXCESS_AIR.get(name)
     mode = st.radio(
@@ -602,7 +677,13 @@ def _render_procedure(result: HRSGResult, system: UnitSystem) -> None:
             "Cómo se resuelve a mano, sección por sección. El agua y el vapor salen de IAPWS-95 "
             "(lo mismo que las tablas de Cengel); los gases, del gas ideal de CoolProp."
         )
-        for i, step in enumerate(hrsg_steps(result, system), start=1):
+        steps = hrsg_steps(result, system)
+        # La exergía, con el modelo de varias presiones (un nivel da la misma caldera).
+        steps.insert(
+            -1 if steps[-1].title.startswith("Punto de rocío") else len(steps),
+            exergy_step(_solve_multi_cached(from_single(result.inputs))[0], system),
+        )
+        for i, step in enumerate(steps, start=1):
             st.markdown(f"**{i}. {step.title}**")
             if step.text:
                 st.markdown(step.text)
@@ -703,6 +784,500 @@ def _render_sweeps(inputs: HRSGInputs, system: UnitSystem) -> None:
         st.caption(_SWEEP_NOTES[parameter])
 
 
+def _render_single_exergy(inputs: HRSGInputs, system: UnitSystem) -> None:
+    st.markdown("#### Exergía: cuánto vale el calor recuperado")
+    exergy = _exergy_single_cached(inputs)
+    _exergy_metrics(exergy, system)
+    try:
+        st.plotly_chart(
+            exergy_sections_figure(exergy, system), width="stretch", key="hr_exergy_sections"
+        )
+    except Exception as exc:  # el diagrama no debe tumbar la página
+        st.warning(f"No se pudo dibujar el diagrama: {exc}")
+    st.caption(
+        f"Con el ambiente a {_fmt(exergy.T0_K, 'temperature', system, 4)}: de la exergía que "
+        "traen los gases (lo máximo que se podría convertir en trabajo), una parte la gana el "
+        "agua, otra se destruye porque el calor pasa con diferencia de temperatura (más en las "
+        "secciones donde las curvas del T–Q están más separadas) y otra se va por la chimenea. "
+        "Una caldera de dos o tres presiones acerca las curvas: probalo con el selector de "
+        "arriba."
+    )
+
+
+def _exergy_metrics(exergy: HRSGExergy, system: UnitSystem) -> None:
+    P = unit_label("power", system)
+    row = st.columns(4)
+    row[0].metric(f"Ẋ gases [{P}]", _value(exergy.X_gas_in_W, "power", system))
+    row[1].metric(f"Ẋ al agua [{P}]", _value(exergy.X_water_W, "power", system))
+    row[2].metric(f"Ẋ destruida [{P}]", _value(exergy.X_destroyed_W, "power", system))
+    row[3].metric(f"Ẋ chimenea [{P}]", _value(exergy.X_stack_W, "power", system))
+    st.caption(
+        f"Rendimiento exergético η_II = Ẋ al agua / Ẋ gases = {exergy.efficiency * 100:.1f} %."
+    )
+
+
+# ---------------------------------------------------------------------
+# Dos y tres presiones (Fase 3.5)
+# ---------------------------------------------------------------------
+
+
+def _multi_example(n: int) -> str:
+    return st.selectbox(
+        "Ejemplo precargado",
+        _MULTI_EXAMPLES[n],
+        key=f"hm{n}_example",
+        help="Podés cambiar cualquier dato: el resultado se actualiza solo.",
+    )
+
+
+def _read_level(key: str, name: str, base: PressureLevel, system: UnitSystem) -> PressureLevel:
+    st.markdown(f"**Nivel de {name}**")
+    left, right = st.columns(2)
+    with left:
+        p = number_input_si(
+            label=f"Presión de {name}",
+            kind="pressure",
+            default_si=base.p_Pa,
+            key=f"{key}_p",
+            format="%.5g",
+            min_value_si=0.0,
+        )
+        T_sat = _T_sat(p)
+        st.caption(
+            "Sin saturación a esa presión."
+            if T_sat is None
+            else f"T_sat = {_fmt(T_sat, 'temperature', system)}"
+        )
+    with right:
+        steam = st.radio(
+            f"Vapor de {name}",
+            (_STEAM_SH, _STEAM_SAT),
+            index=0 if base.superheated else 1,
+            horizontal=True,
+            key=f"{key}_steam",
+        )
+        T_steam = None
+        if steam == _STEAM_SH:
+            default = base.T_steam_K or ((T_sat or 373.15) + 30.0)
+            T_steam = number_input_si(
+                label=f"Vapor sobrecalentado de {name}",
+                kind="temperature",
+                default_si=default,
+                key=f"{key}_Ts",
+                format="%.4g",
+            )
+    left, right = st.columns(2)
+    with left:
+        pinch = number_input_si(
+            label=f"Pinch de {name}",
+            kind="temperature_difference",
+            default_si=base.pinch_K,
+            key=f"{key}_pinch",
+            format="%.3g",
+            min_value_si=0.0,
+        )
+    with right:
+        approach = number_input_si(
+            label=f"Approach de {name}",
+            kind="temperature_difference",
+            default_si=base.approach_K,
+            key=f"{key}_approach",
+            format="%.3g",
+            min_value_si=0.0,
+        )
+    return PressureLevel(p, T_steam, pinch, approach)
+
+
+def _read_multi_inputs(n: int, name: str) -> MultiHRSGInputs | None:
+    """Widgets con los valores del ejemplo (su posición y la cantidad de niveles van en la key)."""
+    base = MULTI_HRSG_EXAMPLES[name]
+    key = f"hm{n}_{_MULTI_EXAMPLES[n].index(name)}"
+    system = get_current_system()
+    st.markdown("#### Gases")
+    left, right = st.columns(2)
+    with left:
+        T_gas = number_input_si(
+            label="Entrada de los gases Tₐ",
+            kind="temperature",
+            default_si=base.T_gas_in_K,
+            key=f"{key}_Tg",
+            format="%.4g",
+            help="El escape de la turbina de gas (o los gases calientes que se aprovechan).",
+        )
+    with right:
+        m_gas = number_input_si(
+            label="Caudal de gases ṁ_g",
+            kind="mass_flow",
+            default_si=base.m_gas_kg_s,
+            key=f"{key}_mg",
+            format="%.5g",
+            min_value_si=0.0,
+        )
+    gas = _read_gas(key, name, base)
+    st.markdown("#### Agua y niveles de presión")
+    T_feed = number_input_si(
+        label="Agua de alimentación",
+        kind="temperature",
+        default_si=base.T_feedwater_K,
+        key=f"{key}_Tfw",
+        format="%.4g",
+        help="Entra al economizador de baja; de ahí sube, por las bombas, a los otros niveles.",
+    )
+    levels = tuple(
+        _read_level(f"{key}_{_LETTER[nm]}", nm, lv, system)
+        for nm, lv in zip(level_names(n), base.levels, strict=True)
+    )
+    if gas is None:
+        return None
+    return MultiHRSGInputs(T_gas, m_gas, gas, levels, T_feed)
+
+
+def _render_multi_metrics(result: MultiHRSGResult, exergy: HRSGExergy, system: UnitSystem) -> None:
+    T_unit = unit_label("temperature", system)
+    m_unit = unit_label("mass_flow", system)
+    row1 = st.columns(3)
+    row1[0].metric(f"ṁ vapor total [{m_unit}]", _value(result.m_steam_kg_s, "mass_flow", system))
+    row1[1].metric(f"Q̇ [{unit_label('power', system)}]", _value(result.Q_W, "power", system))
+    row1[2].metric(f"T chimenea [{T_unit}]", _value(result.T_stack_K, "temperature", system, 4))
+    row2 = st.columns(len(result.levels))
+    for col, lv in zip(row2, result.levels, strict=True):
+        col.metric(f"ṁ vapor de {lv.name} [{m_unit}]", _value(lv.m_steam_kg_s, "mass_flow", system))
+    row3 = st.columns(3)
+    row3[0].metric("Aprovechamiento [%]", f"{result.recovery * 100:.1f}")
+    row3[1].metric("η exergético [%]", f"{exergy.efficiency * 100:.1f}")
+    row3[2].metric(
+        f"Ẇ bombas [{unit_label('power', system)}]", _value(result.W_pumps_W, "power", system)
+    )
+    dew = result.dew_point_K
+    st.caption(
+        "El aprovechamiento compara Q̇ con el calor que cederían los gases enfriándose hasta "
+        f"{_fmt(result.inputs.T_ref_K, 'temperature', system, 4)}; el rendimiento exergético, la "
+        "exergía que gana el agua con la que traen los gases. Las bombas llevan el agua de un "
+        "domo al nivel siguiente (fuera de la caldera)"
+        + (
+            ""
+            if dew is None
+            else f". Punto de rocío de los gases: {_fmt(dew, 'temperature', system, 4)}"
+        )
+        + "."
+    )
+    for note in multi_hrsg_notes(result):
+        st.info(note)
+
+
+def _render_multi_tq(result: MultiHRSGResult, profile: MultiTQProfile, system: UnitSystem) -> None:
+    st.markdown("#### Diagrama T–Q")
+    try:
+        st.plotly_chart(
+            multi_tq_figure(result, profile, system), width="stretch", key="hm_tq_chart"
+        )
+    except Exception as exc:  # el diagrama no debe tumbar la página
+        st.warning(f"No se pudo dibujar el diagrama: {exc}")
+    st.caption(
+        "Las secciones van, desde la chimenea, del economizador de baja al sobrecalentador de "
+        "alta (los nombres arriba: ECO, EV y SH, con A alta, M media y B baja; las muy angostas "
+        "no llevan nombre). La curva del agua es un serrucho: el economizador de cada nivel "
+        "arranca a la temperatura del domo de abajo, porque su bomba trae el líquido saturado "
+        "de ese domo. Los segmentos punteados son el pinch de cada nivel (los gases a la salida "
+        "de su evaporador contra T_sat). Comparada con una sola presión, la curva del agua "
+        "sigue más de cerca a la de los gases: la chimenea queda más fría."
+    )
+
+
+def _render_multi_sections(result: MultiHRSGResult, system: UnitSystem) -> None:
+    st.markdown("#### Secciones")
+    T_unit = unit_label("temperature", system)
+    dT_unit = unit_label("temperature_difference", system)
+    rows = [
+        {
+            "Sección": s.name,
+            f"Q̇ [{unit_label('power', system)}]": _value(s.Q_W, "power", system),
+            "% de Q̇": f"{s.Q_W / result.Q_W * 100:.1f}",
+            f"Gases [{T_unit}]": (
+                f"{_value(s.T_gas_in_K, 'temperature', system, 4)} → "
+                f"{_value(s.T_gas_out_K, 'temperature', system, 4)}"
+            ),
+            f"Agua [{T_unit}]": (
+                f"{_value(s.T_water_in_K, 'temperature', system, 4)} → "
+                f"{_value(s.T_water_out_K, 'temperature', system, 4)}"
+            ),
+            f"ΔT caliente [{dT_unit}]": _value(s.dT_hot_K, "temperature_difference", system, 3),
+            f"ΔT frío [{dT_unit}]": _value(s.dT_cold_K, "temperature_difference", system, 3),
+        }
+        for s in result.sections
+    ]
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.caption(
+        "En el sentido de los gases. El evaporador de cada nivel incluye el domo: ahí se "
+        "termina de calentar (de T_sat − approach a T_sat) también el agua que sube a los "
+        "niveles de mayor presión."
+    )
+
+
+def _render_levels_comparison(inputs: MultiHRSGInputs, system: UnitSystem) -> None:
+    st.markdown("#### ¿Cuánto ganás con más presiones?")
+    rows = _comparison_cached(inputs)
+    T_unit = unit_label("temperature", system)
+    P = unit_label("power", system)
+    table = []
+    bars: list[tuple[str, HRSGExergy]] = []
+    for label, r, x, error in rows:
+        if r is None or x is None:
+            st.caption(f"{label}: {error}")
+            continue
+        bars.append((label, x))
+        table.append(
+            {
+                "Caldera": label,
+                f"T chimenea [{T_unit}]": _value(r.T_stack_K, "temperature", system, 4),
+                f"Q̇ [{P}]": _value(r.Q_W, "power", system),
+                f"ṁ vapor [{unit_label('mass_flow', system)}]": " + ".join(
+                    _value(lv.m_steam_kg_s, "mass_flow", system, 4) for lv in r.levels
+                ),
+                "Aprovechamiento [%]": f"{r.recovery * 100:.1f}",
+                "η exergético [%]": f"{x.efficiency * 100:.1f}",
+                f"Ẋ destruida [{P}]": _value(x.X_destroyed_W, "power", system),
+            }
+        )
+    st.dataframe(pd.DataFrame(table), hide_index=True, width="stretch")
+    if bars:
+        try:
+            st.plotly_chart(exergy_split_figure(bars, system), width="stretch", key="hm_split")
+        except Exception as exc:  # el diagrama no debe tumbar la página
+            st.warning(f"No se pudo dibujar el diagrama: {exc}")
+    st.caption(
+        "Los mismos gases, la misma agua de alimentación y los mismos niveles que cargaste: "
+        "solo el de alta, alta y baja, y los tres. Con un solo nivel de alta presión los gases "
+        "tienen que salir por encima de su T_sat + pinch y del agua que calienta su "
+        "economizador: la chimenea queda caliente. Un nivel de baja usa ese calor (más Q̇ y "
+        "chimenea más fría) y, como el agua recibe el calor más cerca de la temperatura de los "
+        "gases, se destruye menos exergía. El nivel de media reparte mejor el vapor: más "
+        "exergía por kilogramo que el de baja."
+    )
+
+
+def _render_multi_exergy(exergy: HRSGExergy, system: UnitSystem) -> None:
+    st.markdown("#### Exergía: ¿dónde se destruye?")
+    _exergy_metrics(exergy, system)
+    try:
+        st.plotly_chart(
+            exergy_sections_figure(exergy, system), width="stretch", key="hm_exergy_sections"
+        )
+    except Exception as exc:  # el diagrama no debe tumbar la página
+        st.warning(f"No se pudo dibujar el diagrama: {exc}")
+    st.caption(
+        "X_destruida = T₀·S_gen de cada sección (Cengel cap. 8): crece con la diferencia de "
+        "temperatura entre los gases y el agua. Las secciones con las curvas del T–Q más "
+        "separadas (el evaporador y el economizador de alta, donde los gases todavía están "
+        "muy calientes) son las que más destruyen."
+    )
+
+
+def _render_multi_states(result: MultiHRSGResult, system: UnitSystem) -> None:
+    st.markdown("#### Estados")
+    st.markdown("**Agua y vapor**")
+    labeled = []
+    for lv in result.levels:
+        letter = _LETTER[lv.name]
+        for k, (desc, state) in enumerate(zip(_WATER_STATES, lv.water, strict=False), start=1):
+            labeled.append((f"{k}{letter} {desc} ({lv.name})", state))
+    frame = pd.DataFrame(states_table(labeled, system))
+    frame = frame.drop(
+        columns=[c for c in frame.columns if c == "Fluido" or c.startswith(("v [", "u ["))]
+    )
+    for column in frame.columns:
+        if column not in ("Estado", "Región"):
+            frame[column] = [format_value(v) for v in frame[column]]
+    st.dataframe(frame, hide_index=True, width="stretch")
+    st.caption(
+        "Cada nivel numera sus estados como la caldera de una presión: 1 entra al economizador "
+        "(el agua de alimentación en el de baja; en los otros, la que trae la bomba del domo de "
+        "abajo), 2 sale del economizador, 3 y 4 saturados, 5 sobrecalentado."
+    )
+    st.markdown("**Gases**")
+    T_unit = unit_label("temperature", system)
+    e_unit = unit_label("specific_enthalpy", system)
+    places = ["entrada", *(f"salida del {s.name}" for s in result.sections)]
+    places[-1] = "chimenea"
+    rows = [
+        {
+            "Punto": label,
+            "Dónde": place,
+            f"T [{T_unit}]": _value(T, "temperature", system),
+            f"h_g [{e_unit}]": _value(h, "specific_enthalpy", system),
+        }
+        for (label, T, h), place in zip(result.gas_points, places, strict=True)
+    ]
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+
+
+def _render_multi_procedure(result: MultiHRSGResult, system: UnitSystem) -> None:
+    with st.expander("🔬 Procedimiento", expanded=False):
+        st.caption(
+            "Cómo se resuelve a mano, nivel por nivel, de mayor a menor presión (Kehlhofer et "
+            "al., cap. 5). El agua y el vapor salen de IAPWS-95 (lo mismo que las tablas de "
+            "Cengel); los gases, del gas ideal de CoolProp."
+        )
+        for i, step in enumerate(multi_hrsg_steps(result, system), start=1):
+            st.markdown(f"**{i}. {step.title}**")
+            if step.text:
+                st.markdown(step.text)
+            for tex in step.latex:
+                st.latex(tex)
+
+
+def _render_multi_export(result: MultiHRSGResult, system: UnitSystem) -> None:
+    st.markdown("#### 💾 Exportar")
+    data = multi_hrsg_to_dict(result, system)
+    left, right = st.columns(2)
+    left.download_button(
+        "Descargar CSV",
+        data=dict_to_csv(data).encode("utf-8"),
+        file_name="hrsg_varias_presiones.csv",
+        mime="text/csv",
+        key="hm_download_csv",
+    )
+    right.download_button(
+        "Descargar JSON",
+        data=json.dumps(data, ensure_ascii=False, indent=2),
+        file_name="hrsg_varias_presiones.json",
+        mime="application/json",
+        key="hm_download_json",
+    )
+
+
+_MULTI_SWEEPS: dict[str, tuple[MultiSweepParameter, QuantityKind, str]] = {
+    "Presión de baja": ("p_low", "pressure", "p baja"),
+    "Presión de alta": ("p_high", "pressure", "p alta"),
+    "Pinch (todos los niveles)": ("pinch", "temperature_difference", "ΔT pinch"),
+    "Temperatura del agua de alimentación": ("T_feedwater", "temperature", "T alimentación"),
+}
+_MULTI_SWEEP_NOTES: dict[str, str] = {
+    "p_low": (
+        "Con la presión de baja más baja el domo de baja hierve más frío: los gases se enfrían "
+        "más y la chimenea baja. Pero el vapor de baja vale menos (menos exergía por "
+        "kilogramo), y si baja demasiado el economizador de alta arranca más frío y le quita "
+        "calor al nivel de baja."
+    ),
+    "p_high": (
+        "Más presión de alta: el vapor de alta vale más y sube el rendimiento exergético, "
+        "aunque salga un poco menos de vapor de alta. La chimenea casi no cambia: la fija el "
+        "nivel de baja."
+    ),
+    "pinch": (
+        "Menos pinch en todos los niveles: más vapor, chimenea más fría y menos exergía "
+        "destruida, a cambio de más área (calderas más grandes y caras)."
+    ),
+    "T_feedwater": (
+        "El agua de alimentación más caliente deja menos calor para el economizador de baja: "
+        "la chimenea queda más caliente. Tiene que quedar por encima del punto de rocío de los "
+        "gases."
+    ),
+}
+
+
+def _render_multi_sweeps(inputs: MultiHRSGInputs, system: UnitSystem) -> None:
+    with st.expander("📊 ¿Cómo cambia la caldera?", expanded=False):
+        st.markdown(
+            "Elegí qué variar (el resto queda como en tu caldera) para ver cómo cambian la "
+            "chimenea, el rendimiento exergético y el vapor de cada nivel:"
+        )
+        choice = st.selectbox("Variable", list(_MULTI_SWEEPS), key="hm_sweep_param")
+        parameter, kind, axis = _MULTI_SWEEPS[choice]
+        if st.button("Calcular barrido", key="hm_sweep_btn"):
+            st.session_state["hm_sweep"] = (inputs, parameter)
+        if st.session_state.get("hm_sweep") != (inputs, parameter):
+            st.caption("Tocá «Calcular barrido» (resuelve la caldera varias veces).")
+            return
+        points = _multi_sweep_cached(inputs, parameter)
+        if not points:
+            st.warning("Ningún punto del barrido tiene sentido físico con estos datos.")
+            return
+        xs = [convert_from_si(p[0], kind, system) for p in points]
+        x_title = f"{axis} [{unit_label(kind, system)}]"
+        log_x = parameter in ("p_low", "p_high")
+        st.plotly_chart(
+            _chart(
+                xs,
+                [convert_from_si(p[2], "temperature", system) for p in points],
+                title="Temperatura de chimenea",
+                x_title=x_title,
+                y_title=f"T [{unit_label('temperature', system)}]",
+                log_x=log_x,
+            ),
+            width="stretch",
+            key="hm_sweep_stack",
+        )
+        st.plotly_chart(
+            _chart(
+                xs,
+                [p[3] * 100.0 for p in points],
+                title="Rendimiento exergético",
+                x_title=x_title,
+                y_title="η_II [%]",
+                log_x=log_x,
+            ),
+            width="stretch",
+            key="hm_sweep_exergy",
+        )
+        fig = go.Figure()
+        for i, name in enumerate(level_names(len(inputs.levels))):
+            fig.add_trace(
+                go.Scatter(
+                    x=xs,
+                    y=[convert_from_si(p[1][i], "mass_flow", system) for p in points],
+                    mode="lines+markers",
+                    name=f"de {name}",
+                    line={"color": LEVEL_COLORS[name]},
+                )
+            )
+        fig.update_layout(
+            height=280,
+            margin={"l": 10, "r": 10, "t": 30, "b": 10},
+            title="Vapor de cada nivel",
+            xaxis_title=x_title,
+            yaxis_title=f"ṁ vapor [{unit_label('mass_flow', system)}]",
+            legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+            separators=". ",
+        )
+        if log_x:
+            fig.update_xaxes(type="log")
+        st.plotly_chart(fig, width="stretch", key="hm_sweep_steam")
+        skipped = len(default_multi_sweep_values(inputs, parameter)) - len(points)
+        if skipped:
+            st.caption(
+                f"{skipped} valor(es) del barrido no tienen sentido físico (vapor más caliente "
+                "que los gases que le llegan, cruces, presiones demasiado cerca…) y se omiten."
+            )
+        st.caption(_MULTI_SWEEP_NOTES[parameter])
+
+
+def _render_multi(n: int, system: UnitSystem) -> None:
+    name = _multi_example(n)
+    inputs = _read_multi_inputs(n, name)
+    if inputs is None:
+        return
+    try:
+        result, profile = _solve_multi_cached(inputs)
+    except ValueError as exc:
+        st.error(str(exc), icon="🚫")
+        return
+    exergy = hrsg_exergy(result)
+    st.markdown("### Resultado")
+    note = MULTI_HRSG_EXAMPLE_NOTES.get(name)
+    if note:
+        st.caption(f"📘 Sobre este ejemplo: {note}")
+    _render_multi_metrics(result, exergy, system)
+    _render_multi_tq(result, profile, system)
+    _render_multi_sections(result, system)
+    _render_levels_comparison(inputs, system)
+    _render_multi_exergy(exergy, system)
+    _render_multi_states(result, system)
+    _render_multi_procedure(result, system)
+    _render_multi_export(result, system)
+    _render_multi_sweeps(inputs, system)
+
+
 # ---------------------------------------------------------------------
 # Fórmulas teóricas
 # ---------------------------------------------------------------------
@@ -716,9 +1291,10 @@ def _render_theory() -> None:
             "**§5 *Mezclas de gases ideales*** (§5.1 y §5.2 fracciones, masa molar y R; §5.3 "
             "ley de Dalton; §5.6 propiedades de la mezcla), §4.8 *Polinomios NASA*, §12 *Vapor "
             "húmedo*, §13 *Líquidos* y §16 *Combustión* (§16.1 aire técnico, §16.2 exceso de "
-            "aire). El diseño con pinch y approach, de Kehlhofer, Hannemann, Stirnimann y Rukes, "
-            "*Combined-Cycle Gas & Steam Turbine Power Plants* (3.ª ed., PennWell, 2009); el "
-            "ciclo combinado, en Çengel & Boles §10-9."
+            "aire) y §11 *Exergía*. El diseño con pinch y approach y las calderas de varias "
+            "presiones, de Kehlhofer, Hannemann, Stirnimann y Rukes, *Combined-Cycle Gas & "
+            "Steam Turbine Power Plants* (3.ª ed., PennWell, 2009, cap. 5); el ciclo combinado, "
+            "en Çengel & Boles §10-9."
         )
         st.markdown(
             "**Pinch y approach.** Los gases salen del evaporador (c) a T_sat + ΔT_pinch y el "
@@ -775,6 +1351,43 @@ def _render_theory() -> None:
             r"p_{\mathrm{H_2O}} = y_{\mathrm{H_2O}}\,p \qquad"
             r" T_{\text{rocío}} = T_{\mathrm{sat}}(p_{\mathrm{H_2O}})"
         )
+        st.markdown(
+            "**Dos y tres presiones, en cascada** (Kehlhofer et al., cap. 5). Los gases pasan "
+            "por los niveles de mayor a menor presión. El economizador de baja calienta toda el "
+            "agua; cada domo evapora su vapor y manda el resto, como líquido saturado, a la "
+            "bomba del nivel siguiente. Para cada nivel, el tramo de los gases desde que llegan "
+            "(T_llega) hasta su pinch evapora su vapor y termina de calentar, en el domo, el "
+            "agua que sube a los niveles de mayor presión:"
+        )
+        st.latex(
+            r"\begin{aligned}&\dot{m}_i\,(h_{5,i} - h_{2,i}) \\ &\quad"
+            r" + \dot{m}_{\mathrm{sube}}\,(h_{3,i} - h_{2,i}) \\ &= \dot{m}_g\,"
+            r"\bigl[h_g(T_{\mathrm{llega}}) - h_g(T_{\mathrm{pinch},i})\bigr]\end{aligned}"
+        )
+        st.latex(r"T_{\mathrm{pinch},i} = T_{\mathrm{sat},i} + \Delta T_{\mathrm{pinch},i}")
+        st.markdown(
+            "Su economizador calienta su vapor y el de los niveles de mayor presión "
+            "(ṁ_ECO = ṁ_i + ṁ_sube) hasta T_sat − approach."
+        )
+        st.markdown(
+            "**Exergía** (§11 *Exergía*: §11.8 trabajo perdido, §11.10 rendimiento exergético; "
+            "Çengel & Boles cap. 8). Con el ambiente a T₀ = 15 °C, la exergía de los gases (a "
+            "presión constante) es lo máximo que se podría convertir en trabajo al enfriarlos "
+            "hasta T₀. Se reparte en la que gana el agua, la destruida (T₀·S_gen de cada "
+            "sección) y la que se va por la chimenea:"
+        )
+        st.latex(
+            r"\begin{aligned}x_g(T) &= \bigl[h_g(T) - h_g(T_0)\bigr] \\ &\quad"
+            r" - T_0\,\bigl[s^{\circ}(T) - s^{\circ}(T_0)\bigr]\end{aligned}"
+        )
+        st.latex(
+            r"\dot{X}_{\mathrm{gases}} = \dot{X}_{\mathrm{agua}} + \dot{X}_{\mathrm{dest}}"
+            r" + \dot{X}_{\mathrm{chim}}"
+        )
+        st.latex(
+            r"\dot{X}_{\mathrm{dest}} = T_0\,\dot{S}_{\mathrm{gen}} \qquad \eta_{\mathrm{II}}"
+            r" = \frac{\dot{X}_{\mathrm{agua}}}{\dot{X}_{\mathrm{gases}}}"
+        )
 
 
 # ---------------------------------------------------------------------
@@ -786,11 +1399,12 @@ st.set_page_config(page_title="HRSG", page_icon="🏭", layout="centered")
 st.subheader(SUBJECT)
 st.title("🏭 Caldera de recuperación (HRSG)")
 st.markdown(
-    "Una caldera de recuperación de una presión aprovecha los gases calientes (por ejemplo, el "
-    "escape de una turbina de gas): pasan por el **sobrecalentador**, el **evaporador** y el "
-    "**economizador**, y el agua hace el camino inverso. Con el **pinch** y el **approach**, el "
-    "balance de energía de cada sección da el caudal de vapor, la temperatura de chimenea y el "
-    "**diagrama T–Q**, con vapor sobrecalentado o saturado."
+    "Una caldera de recuperación aprovecha los gases calientes (por ejemplo, el escape de una "
+    "turbina de gas): pasan por el **sobrecalentador**, el **evaporador** y el **economizador**, "
+    "y el agua hace el camino inverso. Con el **pinch** y el **approach**, el balance de energía "
+    "de cada sección da el caudal de vapor, la temperatura de chimenea y el **diagrama T–Q**, "
+    "con vapor sobrecalentado o saturado. Con **dos o tres niveles de presión**, la caldera "
+    "aprovecha más los gases y destruye menos exergía."
 )
 _render_theory()
 st.markdown("---")
@@ -799,24 +1413,40 @@ sidebar_credits(version=PAGE_VERSION, page_name="HRSG")
 render_units_selector()
 system = get_current_system()
 
-ex = _example_index()
-inputs = _read_inputs(ex)
+n_levels = 1 + _LEVEL_OPTIONS.index(
+    st.radio(
+        "Niveles de presión",
+        _LEVEL_OPTIONS,
+        horizontal=True,
+        key="hr_levels",
+        help=(
+            "Con dos o tres niveles, cada uno con su sobrecalentador, evaporador y economizador, "
+            "los gases se enfrían más (Kehlhofer et al., cap. 5)."
+        ),
+    )
+)
 
-if inputs is not None:
-    try:
-        result, profile = _solve_cached(inputs)
-    except ValueError as exc:
-        st.error(str(exc), icon="🚫")
-    else:
-        st.markdown("### Resultado")
-        note = HRSG_EXAMPLE_NOTES.get(_EXAMPLES[ex])
-        if note:
-            st.caption(f"📘 Sobre este ejemplo: {note}")
-        _render_metrics(result, system)
-        _render_tq(result, profile, system)
-        _render_sections(result, system)
-        _render_comparison(inputs, result, system)
-        _render_states(result, system)
-        _render_procedure(result, system)
-        _render_export(result, system)
-        _render_sweeps(inputs, system)
+if n_levels > 1:
+    _render_multi(n_levels, system)
+else:
+    ex = _example_index()
+    inputs = _read_inputs(ex)
+    if inputs is not None:
+        try:
+            result, profile = _solve_cached(inputs)
+        except ValueError as exc:
+            st.error(str(exc), icon="🚫")
+        else:
+            st.markdown("### Resultado")
+            note = HRSG_EXAMPLE_NOTES.get(_EXAMPLES[ex])
+            if note:
+                st.caption(f"📘 Sobre este ejemplo: {note}")
+            _render_metrics(result, system)
+            _render_tq(result, profile, system)
+            _render_sections(result, system)
+            _render_comparison(inputs, result, system)
+            _render_single_exergy(inputs, system)
+            _render_states(result, system)
+            _render_procedure(result, system)
+            _render_export(result, system)
+            _render_sweeps(inputs, system)

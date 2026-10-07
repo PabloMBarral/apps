@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.16.0` — Fase 3.4 cerrada (2026-10-06).
+> **Versión actual**: `0.17.0` — Fase 3.5 cerrada (2026-10-07).
 
 ---
 
@@ -669,18 +669,84 @@
   de ISO 6976 del `CITATION.cff` le faltaba `authors` (obligatorio en CFF
   1.2.0): ahora el archivo valida contra el esquema.
 
+### Fase 3.5 — HRSG de dos y tres presiones (y anchos en SI)
+- **Versión**: `0.17.0` (2026-10-07). Rama `claude/water-state-analyzer-f4fiev`
+  (el autor la había dejado para después del ciclo combinado; «dale mergea
+  y seguí»).
+- **Antes, ecuaciones en SI al ancho del celular** (`7b84e37`, con el OK del
+  autor): ver «Detectado en Fase 1.7» abajo. Rankine, Propiedades e
+  Isoentrópicos entran en 324 px en los tres sistemas; Técnico e Inglés del
+  Rankine idénticos.
+- **Scope**:
+  - **`core/cycles/hrsg_multi.py`**: niveles de presión (`PressureLevel`, de
+    alta a baja) en **cascada**: los gases los recorren de alta a baja; el
+    economizador de baja calienta toda el agua y cada domo manda el líquido
+    saturado que no evapora a la bomba (isoentrópica) del nivel siguiente.
+    Los caudales salen nivel por nivel del balance hasta cada pinch, con el
+    calor del domo del agua que sube (Kehlhofer et al., 2009, cap. 5).
+    `from_single` pasa la caldera de una presión al modelo nuevo (mismos
+    números).
+  - **Diagrama T–Q** con la curva del agua en serrucho (`multi_tq_profile`),
+    **exergía** (`hrsg_exergy`: la de los gases = la que gana el agua + la
+    destruida en cada sección + la de la chimenea; η_II), **comparación**
+    de la misma caldera con 1, 2 y 3 niveles (`level_comparison`), notas,
+    cuatro ejemplos, barridos (presión de baja y de alta, pinch, agua de
+    alimentación) y export.
+  - **`core/cycles/hrsg_multi_procedure.py`**: por nivel, los estados del
+    agua (1 a 5, con el nivel de subíndice), el caudal (con el calor del
+    domo), sobrecalentador, evaporador y economizador; el total, la exergía
+    y el punto de rocío. `exergy_step` también se suma al procedimiento de
+    la caldera de una presión.
+  - **Página `/HRSG`**: radio **«Niveles de presión»** (1, 2 o 3). Con 1 todo
+    queda como antes, más la exergía (métricas y barras por sección). Con 2
+    o 3: un bloque por nivel (presión, vapor sobrecalentado o saturado,
+    pinch y approach), métricas por nivel, T–Q (un color por nivel y el
+    pinch de cada uno), secciones, **«¿Cuánto ganás con más presiones?»**
+    (tabla y barras de exergía de 1, 2 y 3 niveles), exergía destruida por
+    sección, estados, procedimiento, export, barridos y teoría (cascada y
+    exergía; vademecum §11).
+  - **Ejemplos**: dos presiones (80 bar y 540 °C + 6 bar y 200 °C), tres
+    (100 / 20 / 4 bar) y una turbina moderna (escape a 640 °C) con dos y
+    con tres presiones.
+- **Validación** (escape de 600 °C y 100 kg/s, agua a 60 °C):
+
+  | Caldera | Vapor (kg/s) | Chimenea | Aprovechamiento | Ẋ destruida | η_II |
+  |---|---|---|---|---|---|
+  | 1 presión (60 bar) | 15,38 | 153 °C | 77,5 % | 4,31 MW | 76,6 % |
+  | 2 presiones (80/6 bar) | 15,27 + 2,33 | 103 °C | 85,7 % | 3,73 MW | 83,5 % |
+  | 3 presiones (100/20/4 bar) | 15,22 + 1,73 + 1,06 | 97 °C | 86,6 % | 3,19 MW | 85,8 % |
+
+  - Un nivel = la caldera de la Fase 3.3, exacto.
+  - Cálculo a mano independiente (PropsSI + brentq) a 10⁻⁷.
+  - **TESPy** (`HeatExchanger` en serie; cada domo, un `DropletSeparator` y
+    una `Pump`): al 0,12 % en caudales y 0,04 K en la chimenea.
+  - Balances de energía de cada sección y de exergía (cierre a 10⁻⁹).
+- **Mensajes al alumno** que nombran el nivel: presiones que no bajan o
+  demasiado cerca, gases que ya no alcanzan T_sat + pinch (o solo alcanzan
+  para el domo), vapor más caliente que los gases que le llegan (el límite
+  de la cascada), cruces en un economizador, punto de rocío.
+- **Tests**: de 2185 a 2253 passed (10 skipped), sin warnings.
+  - `tests/test_hrsg_multi.py` (51) y `tests/test_page_hrsg_multi.py` (17,
+    AppTest); `tests/test_page_hrsg.py` cuenta el gráfico de exergía.
+  - LaTeX: las 1212 expresiones distintas de la Fase 3.5 validan con KaTeX
+    estricto y entran en 313 px como máximo.
+  - Smoke test en Chromium a 1280 y 390 px: 1 presión, los cuatro ejemplos
+    de 2 y 3 presiones y 3 presiones en SI, con el procedimiento y la teoría
+    abiertos; sin ecuaciones con scroll ni desborde.
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
 
 - **Detectado en Fase 1.7, sin resolver**:
-  - En sistema SI (J/kg con ×10ⁿ) algunas sustituciones siguen siendo más
-    anchas que el celular (regla de la palanca, h₂ de Isoentrópicos: hasta
-    475 px; en Rankine, la h de la turbina real, la bomba de los ORC y las
-    sumas del ciclo regenerativo: ≤ 393 px) y se deslizan;
-    en Inglés, 5 apenas pasadas (≤ 339 px). Se resolvería mostrando las
-    energías en kJ/kg dentro del SI o con otro formato de número (decisión
-    del autor: hoy el SI es J/kg).
+  - ~~Ecuaciones más anchas que el celular en SI~~ (resuelto después de la
+    0.16.0, con el OK del autor): en el Rankine, Propiedades e
+    Isoentrópicos, una resta con números ×10ⁿ (o negativos) con un factor
+    delante pasa el segundo número a otro renglón. Ahora entran en 324 px
+    las 4309 expresiones distintas del Rankine (máx. 316 px en SI), las
+    1097 de las páginas 1–4 y las 129 de Isoentrópicos; Técnico e Inglés del
+    Rankine quedan idénticos.
   - Pseudo-puros con T y (s o v): dentro de la campana CoolProp los
     resuelve a una sola presión entre la de burbuja y la de rocío (es su
     modelo; el título no coincide con la palanca a T constante), y justo
@@ -688,10 +754,13 @@
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
-- **HRSG (continuación)**: dos y tres presiones, recalentamiento,
-  quemadores suplementarios, pérdidas de carga y purga, diseño de las
-  superficies (UA, NTU), condensación ácida, y el ciclo combinado de dos y
-  tres presiones sobre esta base.
+- **Fase 3.6 — Ciclo combinado de dos y tres presiones** con
+  recalentamiento, sobre la HRSG en cascada: una turbina de vapor con
+  varias admisiones (el vapor de media y de baja entra a la turbina) y el
+  recalentador en paralelo con el sobrecalentador de alta.
+- **HRSG (continuación)**: secciones intercaladas o en paralelo
+  (economizadores partidos), quemadores suplementarios, pérdidas de carga y
+  purga, diseño de las superficies (UA, NTU), condensación ácida.
 - **Ciclo combinado (continuación)**: aire húmedo, gas natural con otros
   componentes en la página (el núcleo ya los acepta), generador y pérdidas
   mecánicas, cogeneración.

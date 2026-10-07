@@ -52,7 +52,14 @@ from core.fluids import (
     saturation_at_pressure,
     saturation_at_temperature,
 )
-from core.latex import latex_number, latex_paren, latex_quantity, latex_value, text_quantity
+from core.latex import (
+    latex_is_wide,
+    latex_number,
+    latex_paren,
+    latex_quantity,
+    latex_value,
+    text_quantity,
+)
 from core.state_report import states_table
 from core.units_system import UnitSystem, convert_from_si, unit_label
 
@@ -983,9 +990,14 @@ def _build_steps_turbine_direct(
         r"\begin{aligned}"
         rf"h_1 &= {latex_quantity(h1, _EH, system)} \\"
         rf"h_{{2s}} &= {latex_quantity(h2s, _EH, system)} \\"
-        rf"h_2 &= {n1} - {latex_number(eta_s, 4)}\cdot({n1} - {latex_paren(n2s)}) \\"
-        rf"&= {latex_quantity(h2, _EH, system)} \\"
-        rf"w_t &= {n1} - {latex_paren(n2)} \\"
+        + (
+            rf"h_2 &= {n1} \\ &\quad - {latex_number(eta_s, 4)}\cdot({n1} \\ &\qquad "
+            rf"- {latex_paren(n2s)}) \\"
+            if latex_is_wide(n1, n2s)
+            else rf"h_2 &= {n1} - {latex_number(eta_s, 4)}\cdot({n1} - {latex_paren(n2s)}) \\"
+        )
+        + rf"&= {latex_quantity(h2, _EH, system)} \\"
+        rf"w_t &= {_diff_rows(n1, n2)} \\"
         rf"&= {latex_quantity(w_t, _EH, system)}"
         r"\end{aligned}"
     )
@@ -1038,6 +1050,34 @@ def _build_steps_turbine_inverse(
     return IsentropicSteps(formula, substituted, narrative)
 
 
+def _very_wide(a: str, b: str) -> bool:
+    """Una resta ``a - b`` que no entra en un renglón de celular: dos ×10ⁿ y un negativo."""
+    return (a + b).count(r"\times") == 2 and "-" in (a[:1], b[:1])
+
+
+def _diff_rows(a: str, b: str) -> str:
+    r"""``a - b`` para un renglón de ``aligned``; si es muy ancha, ``- b`` en otro renglón."""
+    if _very_wide(a, b):
+        return rf"{a} \\ &\quad - {latex_paren(b)}"
+    return rf"{a} - {latex_paren(b)}"
+
+
+def _compression_h2_row(n1: str, n2s: str, eta: str) -> str:
+    r"""Renglón ``h_2 = h_1 + (h_2s − h_1)/η_s`` de un ``aligned``, angosto para un celular.
+
+    Con números anchos (×10ⁿ o negativos) el término de la fracción va en otro
+    renglón; si además el numerador tiene dos números con ×10ⁿ y alguno es
+    negativo (un líquido orgánico en SI), ni la fracción entra: la resta se
+    escribe como división, partida en dos renglones.
+    """
+    numerator = rf"{n2s} - {latex_paren(n1)}"
+    if not latex_is_wide(n1, n2s):
+        return rf"h_2 &= {n1} + \dfrac{{{numerator}}}{{{eta}}} \\"
+    if _very_wide(n2s, n1):
+        return rf"h_2 &= {n1} \\ &\quad + ({n2s} \\ &\qquad - {latex_paren(n1)})/{eta} \\"
+    return rf"h_2 &= {n1} \\ &\quad + \dfrac{{{numerator}}}{{{eta}}} \\"
+
+
 def _build_steps_compressor_or_pump_direct(
     device: DeviceKind,
     state_in: StatePoint,
@@ -1065,10 +1105,10 @@ def _build_steps_compressor_or_pump_direct(
         r"\begin{aligned}"
         rf"h_1 &= {latex_quantity(h1, _EH, system)} \\"
         rf"h_{{2s}} &= {latex_quantity(h2s, _EH, system)} \\"
-        rf"h_2 &= {n1} + \dfrac{{{n2s} - {latex_paren(n1)}}}{{{latex_number(eta_s, 4)}}} \\"
-        rf"&= {latex_quantity(h2, _EH, system)} \\"
+        + _compression_h2_row(n1, n2s, latex_number(eta_s, 4))
+        + rf"&= {latex_quantity(h2, _EH, system)} \\"
         + work_label
-        + rf" &= {n2} - {latex_paren(n1)} \\"
+        + rf" &= {_diff_rows(n2, n1)} \\"
         + rf"&= {latex_quantity(w, _EH, system)}"
         + r"\end{aligned}"
     )

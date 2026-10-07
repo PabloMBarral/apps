@@ -62,6 +62,16 @@ def latex_paren(tex: str) -> str:
     return f"({tex})" if tex.startswith("-") else tex
 
 
+def latex_is_wide(*numbers: str) -> bool:
+    r"""Si alguno de estos números (ya en LaTeX) alarga el renglón en un celular.
+
+    Lo alargan los que llevan ×10ⁿ (los J/kg y los Pa del SI) y los negativos,
+    que van entre paréntesis después de un signo (:func:`latex_paren`). Con
+    alguno de ellos, una resta con un factor delante se parte en dos renglones.
+    """
+    return any(r"\times" in n or n.lstrip().startswith("-") for n in numbers)
+
+
 def latex_chain(lhs: str, *steps: str, relation: str = "=") -> str:
     r"""Cadena ``lhs = paso₁ = paso₂ = …`` con un renglón por paso.
 

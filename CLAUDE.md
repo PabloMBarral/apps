@@ -66,6 +66,9 @@ apps/
 │   │                          # (plotly) con vapor sobrecalentado o saturado,
 │   │                          # composición con λ o cargada, secciones, estados,
 │   │                          # comparación saturado/sobrecalentado, barridos.
+│   │                          # Fase 3.5: selector de 1, 2 o 3 presiones (cascada),
+│   │                          # T–Q en serrucho, exergía por sección, comparación
+│   │                          # 1/2/3 presiones, procedimiento por nivel.
 │   ├── 11_Exergia.py
 │   ├── 12_Ciclo_Combinado.py  # ✅ Fase 3.4 — Turbina de gas (metano o aire estándar)
 │   │                          # + HRSG de una presión (por pinch o por chimenea) +
@@ -166,6 +169,13 @@ apps/
 │   │   │                      # los gases, agua, caudal de vapor, secciones, total
 │   │   │                      # y aprovechamiento, punto de rocío. Fase 3.4: modo
 │   │   │                      # chimenea, times_diff / factor_times_diff públicos.
+│   │   ├── hrsg_multi.py      # ✅ Fase 3.5 — PressureLevel, MultiHRSGInputs /
+│   │   │                      # solve_multi_hrsg / MultiHRSGResult (niveles en
+│   │   │                      # cascada), from_single, multi_tq_profile,
+│   │   │                      # hrsg_exergy (por sección), level_comparison,
+│   │   │                      # notas, ejemplos, barridos y multi_hrsg_to_dict.
+│   │   ├── hrsg_multi_procedure.py # ✅ Fase 3.5 — multi_hrsg_steps (por nivel)
+│   │   │                      # y exergy_step (también para la de una presión).
 │   │   ├── brayton.py         # ✅ Fase 3.4 — Fuel (ISO 6976), BraytonInputs /
 │   │   │                      # solve_brayton / BraytonResult, validaciones, notas,
 │   │   │                      # brayton_ts_lines y brayton_tespy (control).
@@ -189,6 +199,8 @@ apps/
 │   └── cycle_charts.py        # ✅ Fase 3.4 — tq_figure (de /HRSG),
 │                              # render_rankine_diagram (de /Rankine),
 │                              # gas_turbine_ts_figure y energy_sankey_figure.
+│                              # Fase 3.5: multi_tq_figure, exergy_split_figure
+│                              # y exergy_sections_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
@@ -275,8 +287,12 @@ Notas de la Fase 1.7:
   separados o en un `aligned`. Los negativos después de un signo, con
   `latex_paren`. Medir el ancho real renderizando con KaTeX en un
   navegador (p. ej. Chromium con Playwright) en los tres sistemas de
-  unidades; en SI, los números con ×10ⁿ J/kg pueden quedar más anchos
-  (se deslizan).
+  unidades. En SI los números llevan ×10ⁿ (J/kg, Pa): una resta con un
+  factor delante (η, v, la fracción y, x de la palanca) pasa el segundo
+  número a otro renglón (`_factor_diff` del Rankine, `times_diff` de la
+  HRSG, `latex_is_wide` en Propiedades e Isoentrópicos, que también corta
+  con negativos). Desde la 0.17.0 todas las páginas entran en 324 px en
+  los tres sistemas (un test lo vigila en el Rankine).
 - **Isolíneas de fluprodia**: `set_isolines` interpreta los valores en
   las unidades activas del diagrama (`set_unit_system`). Generarlas en
   las unidades de cada sistema (`core.diagrams._isoline_grid(fluid,
@@ -529,10 +545,53 @@ Notas de la Fase 3.4 (turbina de gas y ciclo combinado de una presión):
 - Procedimiento con la notación de Cengel (s°₁, s°₂s; s°_g,3 para los
   gases). En SI la turbina calcula primero Δh_s y w_T usa
   `factor_times_diff`: máximo 306 px en los tres sistemas (2592
-  ecuaciones). Los pasos del Rankine en SI se siguen deslizando (hasta
-  384 px), igual que en /Rankine.
+  ecuaciones). Hasta la 0.16.0 los pasos del Rankine en SI se
+  deslizaban (hasta 393 px); desde la 0.17.0 también entran.
 - `ui/cycle_charts.py` junta los gráficos de los ciclos: /HRSG y /Rankine
   importan de ahí el T–Q y el diagrama del Rankine, sin cambios visibles.
+
+Notas de la Fase 3.5 (HRSG de dos y tres presiones):
+
+- Arreglo en cascada (`core/cycles/hrsg_multi.py`): los gases recorren los
+  niveles de alta a baja (SH, EV y ECO de cada uno); el ECO de baja calienta
+  toda el agua y cada domo manda el líquido saturado que no evapora a la
+  bomba (isoentrópica, fuera de la caldera) del nivel siguiente. Así cada
+  caudal sale en orden, de alta a baja, de un balance hasta el pinch del
+  nivel, con el calor del domo del agua que sube (ṁ_sube·(h₃ − h₂)). Las
+  calderas reales intercalan secciones (economizadores partidos o en
+  paralelo): queda como mejora.
+- Con un nivel (`from_single`) reproduce bit a bit `solve_hrsg` (test). El
+  evaporador de cada nivel incluye el domo: en el T–Q el agua sube vertical
+  de T_sat − approach a T_sat y los tubos ven T_sat (el mínimo ΔT de cada
+  nivel es su pinch).
+- Límite de la cascada: el SH de media o de baja ve los gases que ya pasaron
+  por el ECO de alta (con 100/20/4 bar, 257 °C): media a 300 °C no se puede
+  (error que nombra el nivel) y la nota del extremo caliente lo explica.
+  Las presiones demasiado cercanas (T_sat de abajo ≥ T_sat − approach de
+  arriba) también son error.
+- Exergía (`hrsg_exergy`, T₀ = T_ref = 15 °C): física de los gases a su
+  presión (h y s° desde T₀); X_gases = X_agua + Σ X_dest (T₀·S_gen de cada
+  sección) + X_chimenea, cierra a 10⁻⁹ (test). η_II = X_agua / X_gases (la
+  chimenea cuenta como pérdida, para comparar 1, 2 y 3 niveles). La de una
+  presión se calcula con el mismo modelo (`from_single`) y su procedimiento
+  suma `exergy_step` antes del punto de rocío.
+- TESPy de control (tests): `HeatExchanger` en serie para los gases; cada
+  domo de abajo es un `DropletSeparator` (out1 líquido a la `Pump`
+  isoentrópica, out2 vapor al SH) y el de alta evapora todo (x = 1). Con
+  `m0` del cálculo directo converge en 0,1–0,25 s; coincide al 0,12 % en
+  caudales y 0,04 K en la chimenea (presión parcial).
+- Los puntos de los gases van a, b, c… sin la «g» (h_g(T_g) se confundía con
+  la entalpía de los gases); los estados del agua se numeran 1–5 por nivel,
+  como la caldera de una presión, con el nivel de subíndice (h_{4,A}).
+- Página: radio «Niveles de presión» (`hr_levels`); con 1 todo queda como
+  en la 0.16.0 (mismas keys) más la exergía; con 2 o 3, ejemplos filtrados
+  por cantidad de niveles y keys `hm{n}_{ejemplo}_{A|M|B}_…`. En el T–Q los
+  nombres de las secciones van en dos alturas alternadas y sin las de menos
+  del 5 % del calor, y se ocultan los rótulos de puntos de gas pegados; en
+  las barras de exergía, `uniformtext` oculta los % que no entran. Medido a
+  390 px.
+- LaTeX: 1212 expresiones distintas, máx. 313 px; en SI las búsquedas en
+  tabla con ×10ⁿ (h = h(p, T) = …) van en dos renglones (`_lookup`).
 
 ### Citas y licencias
 

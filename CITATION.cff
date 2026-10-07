@@ -35,8 +35,8 @@ keywords:
   - gas-turbine
   - combined-cycle
 license: MIT
-version: "0.16.0"
-date-released: "2026-10-06"
+version: "0.17.0"
+date-released: "2026-10-07"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"

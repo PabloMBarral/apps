@@ -50,7 +50,7 @@ from core.fluids import (
     SaturationProperties,
     textbook_reference_offset,
 )
-from core.latex import latex_chain, latex_number, latex_paren, latex_unit
+from core.latex import latex_chain, latex_is_wide, latex_number, latex_paren, latex_unit
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, convert_to_si, unit_label
 
 # ---------------------------------------------------------------------
@@ -548,13 +548,15 @@ def _lever_line(y: str, x: float, sat: SaturationProperties, system: UnitSystem)
     yf = _sat_value(sat.liquid, y)
     yg = _sat_value(sat.vapor, y)
     result = yf + x * (yg - yf)
+    yf_n, yg_n = _n(yf, kind, system), _n(yg, kind, system)
     # y_f y el salto x·(y_g − y_f) en renglones separados: juntos no entran
-    # en un celular (v_f tiene muchas cifras: 0.0011272).
+    # en un celular (v_f tiene muchas cifras: 0.0011272). Con ×10ⁿ (SI) o
+    # negativos, también la resta del salto.
+    cut = r" \\ &\qquad" if latex_is_wide(yf_n, yg_n) else ""
     return latex_chain(
         y,
         rf"{y}_f + x\,({y}_g - {y}_f)",
-        rf"{_n(yf, kind, system)} \\ &\quad + "
-        rf"{latex_number(x, 5)}\,({_n(yg, kind, system)} - {latex_paren(_n(yf, kind, system))})",
+        rf"{yf_n} \\ &\quad + {latex_number(x, 5)}\,({yg_n}{cut} - {latex_paren(yf_n)})",
         _q(result, kind, system),
     )
 
@@ -819,7 +821,7 @@ def _steps_anchor(
         where = "a la derecha de la campana: **vapor sobrecalentado**."
     else:
         compare = (
-            rf"\begin{{aligned}}{y}_f = {_n(yf, kind, system)} &\le {y_tex} \\ "
+            rf"\begin{{aligned}}{y}_f &= {_n(yf, kind, system)} \\ &\le {y_tex} \\ "
             rf"&\le {y}_g = {_n(yg, kind, system)}\end{{aligned}}"
         )
         where = "dentro de la campana: **vapor húmedo**."
@@ -1001,7 +1003,8 @@ def _steps_hs(state: FluidState, system: UnitSystem) -> list[ProcedureStep]:
 def _pct(approx: float, exact: float) -> str:
     if abs(exact) < 1e-12:
         return ""
-    return rf"\quad (\text{{dif.}}\ {abs(approx - exact) / abs(exact) * 100:.2f}\,\%)"
+    # En su propio renglón: al lado del valor no entra en un celular (Btu/(lb·°R)).
+    return rf" \\ &\quad (\text{{dif.}}\ {abs(approx - exact) / abs(exact) * 100:.2f}\,\%)"
 
 
 def _step_incompressible(state: FluidState, system: UnitSystem) -> ProcedureStep:
@@ -1099,10 +1102,10 @@ def _step_consistency(state: FluidState, system: UnitSystem) -> ProcedureStep:
     p_unit = unit_label("pressure", system)
     v_unit = unit_label("specific_volume", system)
     e_unit = unit_label(eh, system)
-    product = (
-        rf"({_q(state.P_Pa, 'pressure', system)})\,"
-        rf"({_q(state.v_m3_per_kg, 'specific_volume', system)})"
-    )
+    p_q = _q(state.P_Pa, "pressure", system)
+    # En SI (Pa con ×10ⁿ) el producto no entra en un renglón de celular.
+    times = r" \\ &\quad \cdot " if latex_is_wide(p_q) else r"\,"
+    product = rf"({p_q}){times}({_q(state.v_m3_per_kg, 'specific_volume', system)})"
     if math.isclose(factor, 1.0):
         pv_line = latex_chain(r"p\,v", product, _q(pv_si, eh, system))
         units_txt = ""

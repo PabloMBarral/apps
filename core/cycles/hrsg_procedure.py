@@ -14,10 +14,10 @@ igualdad por renglón) para que entren en el ancho de un celular.
 from __future__ import annotations
 
 from core.cycles.hrsg import HRSGResult
-from core.cycles.rankine_procedure import _bar, _diff, _n, _q, _wrap
+from core.cycles.rankine_procedure import _bar, _diff, _factor_diff, _n, _q, _wrap
 from core.fluids import saturation_at_temperature
 from core.ideal_gas import R_U, FlueGas, molar_mass
-from core.latex import latex_chain, latex_number, latex_paren
+from core.latex import latex_chain, latex_number
 from core.state_report import ProcedureStep
 from core.units_system import QuantityKind, UnitSystem
 
@@ -47,11 +47,7 @@ def times_diff(
 
 def factor_times_diff(factor: str, a_si: float, b_si: float, system: UnitSystem) -> str:
     r"""Como :func:`times_diff`, con el factor ya escrito en LaTeX (p. ej. ``1 + f``)."""
-    diff = _diff(a_si, b_si, _EH, system)
-    if r"\times" not in diff:
-        return rf"{factor}\,({diff})"
-    b = latex_paren(_n(b_si, _EH, system))
-    return rf"{factor}\,({_n(a_si, _EH, system)} \\ &\quad - {b})"
+    return _factor_diff(factor, a_si, b_si, _EH, system)
 
 
 def _molar_unit(system: UnitSystem) -> str:
@@ -92,9 +88,13 @@ def gas_composition_lines(gas: FlueGas, system: UnitSystem) -> list[str]:
 
 
 def _composition_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
+    return gas_composition_step(result.inputs.gas, system)
+
+
+def gas_composition_step(gas: FlueGas, system: UnitSystem) -> ProcedureStep:
     """Masa molar, fracciones másicas y R de la mezcla (vademecum §5)."""
     english = system == "Inglés"
-    lines = gas_composition_lines(result.inputs.gas, system)
+    lines = gas_composition_lines(gas, system)
     return ProcedureStep(
         title="Composición de los gases",
         text=(
@@ -452,8 +452,12 @@ def _total_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep:
 
 
 def _dew_point_step(result: HRSGResult, system: UnitSystem) -> ProcedureStep | None:
-    gas = result.inputs.gas
-    dew = result.dew_point_K
+    return dew_point_step(result.inputs.gas, system)
+
+
+def dew_point_step(gas: FlueGas, system: UnitSystem) -> ProcedureStep | None:
+    """Presión parcial del vapor de agua y punto de rocío de los gases (vademecum §5.3)."""
+    dew = gas.dew_point_K
     if dew is None:
         return None
     y_w = gas.mole_fractions["H2O"]

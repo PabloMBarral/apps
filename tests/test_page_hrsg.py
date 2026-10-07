@@ -201,6 +201,6 @@ def test_sweeps_draw_the_charts(variable: str) -> None:
     at.selectbox(key="hr_sweep_param").set_value(variable).run()
     at.button(key="hr_sweep_btn").click().run()
     _no_problems(at)
-    assert len(at.get("plotly_chart")) == 3  # T–Q + caudal de vapor + chimenea
+    assert len(at.get("plotly_chart")) == 4  # T–Q + exergía + caudal de vapor + chimenea
     if variable.startswith("Temperatura del agua"):
         assert any("El caudal de vapor no cambia" in c.value for c in at.caption)

@@ -95,6 +95,29 @@ def _wrap(head: str, op: str, tail: str) -> str:
     return f"{head} {op} {tail}"
 
 
+def _factor_diff(
+    factor: str,
+    a_si: float,
+    b_si: float,
+    kind: QuantityKind,
+    system: UnitSystem,
+    *,
+    indent: str = r"\quad",
+) -> str:
+    r"""``factor\,(a - b)`` (o ``(a - b)`` sin factor); con ×10ⁿ (SI), ``- b`` en otro renglón.
+
+    Pensado para un paso de :func:`~core.latex.latex_chain`. ``indent`` es la
+    sangría del renglón de continuación (``\qquad`` dentro de un término que ya
+    empieza con ``\quad +``).
+    """
+    head = rf"{factor}\," if factor else ""
+    diff = _diff(a_si, b_si, kind, system)
+    if r"\times" not in diff:
+        return rf"{head}({diff})"
+    b = latex_paren(_n(b_si, kind, system))
+    return rf"{head}({_n(a_si, kind, system)} \\ &{indent} - {b})"
+
+
 def _absolute_T(T_K: float, system: UnitSystem) -> str:
     """Temperatura absoluta para Carnot: K (SI y Técnico) o °R (Inglés)."""
     if system == "Inglés":
@@ -290,11 +313,10 @@ def _pump_step(
     eta = result.inputs.eta_pump
     factor = pv_energy_factor(system)
     p_unit = unit_label("pressure", system)
-    dp = _diff(s_out.P_Pa, s_in.P_Pa, "pressure", system)
     v_in = _n(s_in.v_m3_per_kg, "specific_volume", system)
     # El factor de unidades (p. ej. 1 bar·m³/kg = 100 kJ/kg) va en su propio renglón
-    # para que la ecuación entre en un celular.
-    substitution = rf"{v_in}\,({dp})" + (
+    # para que la ecuación entre en un celular; en SI (Pa con ×10ⁿ), también p_a.
+    substitution = _factor_diff(v_in, s_out.P_Pa, s_in.P_Pa, "pressure", system) + (
         "" if math.isclose(factor, 1.0) else rf" \\ &\quad \cdot {latex_number(factor, 5)}"
     )
     w_ps_approx = s_in.v_m3_per_kg * (s_out.P_Pa - s_in.P_Pa)
@@ -432,9 +454,15 @@ def _turbine_step(
             latex_chain(
                 rf"h_{{{b}}}",
                 rf"h_{{{a}}} - \eta_T\,(h_{{{a}}} - h_{{{b}s}})",
-                rf"{_n(s_in.h_J_per_kg, _EH, system)} \\ &\quad - {latex_number(eta, 4)}\,"
-                rf"({_n(s_in.h_J_per_kg, _EH, system)} - "
-                rf"{latex_paren(_n(h_out_s, _EH, system))})",
+                rf"{_n(s_in.h_J_per_kg, _EH, system)} \\ &\quad - "
+                + _factor_diff(
+                    latex_number(eta, 4),
+                    s_in.h_J_per_kg,
+                    h_out_s,
+                    _EH,
+                    system,
+                    indent=r"\qquad",
+                ),
                 _q(s_out.h_J_per_kg, _EH, system),
             )
         )
@@ -563,7 +591,11 @@ def _simple_steps(result: RankineResult, system: UnitSystem) -> list[ProcedureSt
                 latex_chain(
                     _q_boiler(result),
                     "h_3 - h_2",
-                    _diff(s3.h_J_per_kg, s2.h_J_per_kg, _EH, system),
+                    _wrap(
+                        _n(s3.h_J_per_kg, _EH, system),
+                        "-",
+                        latex_paren(_n(s2.h_J_per_kg, _EH, system)),
+                    ),
                     _q(s3.h_J_per_kg - s2.h_J_per_kg, _EH, system),
                 ),
             ),
@@ -1641,7 +1673,8 @@ def _heat_and_work_steps(
                 a, b = (port.state, out) if sign > 0 else (out, port.state)
                 flow = flows[(ci, pi)]
                 sym.append(_times(result, flow, f"(h_{_ix(b + 1)} - h_{_ix(a + 1)})"))
-                num.append(_times_n(result, flow, f"({_diff(h[b], h[a], _EH, system)})"))
+                diff = _factor_diff("", h[b], h[a], _EH, system, indent=r"\qquad")
+                num.append(_times_n(result, flow, diff))
         return sym, num
 
     steps: list[ProcedureStep] = []

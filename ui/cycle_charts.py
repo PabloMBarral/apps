@@ -7,6 +7,8 @@
   absolutas, con el enfriamiento de los gases en la HRSG.
 - :func:`energy_sankey_figure`: a dónde va el calor del combustible en un
   ciclo combinado.
+- :func:`multi_tq_figure`, :func:`exergy_split_figure` y
+  :func:`exergy_sections_figure`: la HRSG de varias presiones (Fase 3.5).
 
 Vive en ``ui/`` porque arma figuras de plotly y usa Streamlit; el cálculo
 está en ``core/``.
@@ -19,6 +21,7 @@ import plotly.graph_objects as go
 from core.cycles.brayton import BraytonResult, brayton_ts_lines
 from core.cycles.combined import CombinedResult
 from core.cycles.hrsg import HRSGResult, TQProfile
+from core.cycles.hrsg_multi import HRSGExergy, MultiHRSGResult, MultiTQProfile
 from core.cycles.rankine import RankineResult, rankine_labeled_states, rankine_segments
 from core.diagrams import (
     DiagramSpec,
@@ -32,8 +35,12 @@ from core.units_system import QuantityKind, UnitSystem, convert_from_si, unit_la
 from ui.diagrams import DiagramPoint, get_diagram, render_diagram_plotly
 
 __all__ = [
+    "LEVEL_COLORS",
     "energy_sankey_figure",
+    "exergy_sections_figure",
+    "exergy_split_figure",
     "gas_turbine_ts_figure",
+    "multi_tq_figure",
     "render_rankine_diagram",
     "tq_figure",
 ]
@@ -381,4 +388,223 @@ def energy_sankey_figure(result: CombinedResult, system: UnitSystem) -> go.Figur
         separators=". ",
         font={"size": 12},
     )
+    return fig
+
+
+# ---------------------------------------------------------------------
+# HRSG de varias presiones (Fase 3.5)
+# ---------------------------------------------------------------------
+
+#: Un azul por nivel: más oscuro cuanto mayor la presión.
+LEVEL_COLORS = {"alta": "#08306b", "media": "#2171b5", "baja": "#6baed6", "": _WATER_COLOR}
+_LEVEL_SHORT = {"alta": "A", "media": "M", "baja": "B", "": ""}
+
+
+def multi_tq_figure(
+    result: MultiHRSGResult, profile: MultiTQProfile, system: UnitSystem
+) -> go.Figure:
+    """Diagrama T–Q de la HRSG en cascada: la curva del agua en «serrucho», un color por nivel.
+
+    En cada evaporador, un segmento punteado marca el pinch (de T_sat a los gases).
+    Los nombres de las secciones van arriba, salvo las muy angostas.
+    """
+
+    def T(value_K: float) -> float:
+        return convert_from_si(value_K, "temperature", system)
+
+    def Q(value_W: float) -> float:
+        return convert_from_si(value_W, "power", system)
+
+    T_unit = unit_label("temperature", system)
+    Q_unit = unit_label("power", system)
+    dT_unit = unit_label("temperature_difference", system)
+    hover = f"Q̇ = %{{x:,.0f}} {Q_unit}<br>T = %{{y:.1f}} {T_unit}"
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=[Q(q) for q in profile.Q_gas_W],
+            y=[T(t) for t in profile.T_gas_K],
+            mode="lines",
+            name="gases",
+            line={"color": _GAS_COLOR, "width": 3},
+            hovertemplate=hover + "<extra>gases</extra>",
+        )
+    )
+    for i, lv in enumerate(result.levels):  # un trazo por nivel (sus secciones son contiguas)
+        xs: list[float] = []
+        ys: list[float] = []
+        for seg in (s for s in profile.segments if s.level == i):
+            xs += [Q(q) for q in seg.Q_W]
+            ys += [T(t) for t in seg.T_K]
+        name = f"agua y vapor de {lv.name}" if lv.name else "agua y vapor"
+        fig.add_trace(
+            go.Scatter(
+                x=xs,
+                y=ys,
+                mode="lines",
+                name=name,
+                line={"color": LEVEL_COLORS[lv.name], "width": 3},
+                hovertemplate=hover + f"<extra>{name}</extra>",
+            )
+        )
+    # El pinch de cada nivel: de T_sat a los gases, a la salida de gases del evaporador.
+    for seg in (s for s in profile.segments if s.kind == "evaporador"):
+        lv = result.levels[seg.level]
+        q = Q(seg.Q_W[0])
+        pinch = _value(lv.pinch_K, "temperature_difference", system, 3)
+        label = f"pinch{' de ' + lv.name if lv.name else ''}: {pinch} {dT_unit}"
+        fig.add_trace(
+            go.Scatter(
+                x=[q, q],
+                y=[T(lv.T_sat_K), T(lv.T_pinch_gas_K)],
+                mode="lines+markers",
+                line={"color": "#333333", "dash": "dot", "width": 2},
+                marker={"size": 5, "color": "#333333"},
+                name="pinch de cada nivel",
+                legendgroup="pinch",
+                showlegend=seg.level == 0,
+                hovertemplate=f"{label}<extra></extra>",
+            )
+        )
+    # Puntos de los gases (a, b, c…): el Q acumulado desde la chimenea.
+    points = result.gas_points
+    gas_Q = [result.Q_W]
+    for section in result.sections:
+        gas_Q.append(gas_Q[-1] - section.Q_W)
+    # Un punto pegado al anterior (una sección muy chica) queda sin rótulo: se pisarían.
+    texts: list[str] = []
+    last_Q = None
+    for (label, _, _), q in zip(points, gas_Q, strict=True):
+        close = last_Q is not None and abs(last_Q - q) < 0.035 * result.Q_W
+        texts.append("" if close else label)
+        if not close:
+            last_Q = q
+    fig.add_trace(
+        go.Scatter(
+            x=[Q(q) for q in gas_Q],
+            y=[T(t) for _, t, _ in points],
+            mode="markers+text",
+            text=texts,
+            textposition="top left",
+            textfont={"color": _GAS_COLOR, "size": 13},
+            marker={"color": _GAS_COLOR, "size": 7},
+            showlegend=False,
+            hovertemplate=hover + "<extra>gases</extra>",
+        )
+    )
+    # Límites y nombres de las secciones (los de las muy angostas no entrarían).
+    for q in profile.boundaries_W:
+        fig.add_vline(x=Q(q), line_dash="dot", line_color="lightgray", line_width=1)
+    bounds = [0.0, *profile.boundaries_W, result.Q_W]
+    sections = list(reversed(result.sections))  # desde la chimenea
+    row = 0
+    for section, lo, hi in zip(sections, bounds[:-1], bounds[1:], strict=True):
+        if (hi - lo) < 0.05 * result.Q_W:
+            continue
+        kind, _, level = section.name.partition(" de ")
+        short = _SECTION_SHORT[kind] + (f" {_LEVEL_SHORT[level]}" if level else "")
+        fig.add_annotation(  # en dos alturas alternadas: en un celular no se pisan
+            x=Q(0.5 * (lo + hi)),
+            y=0.99 - 0.06 * (row % 2),
+            yref="paper",
+            text=short,
+            showarrow=False,
+            font={"color": "gray", "size": 11},
+            yanchor="top",
+        )
+        row += 1
+    fig.update_layout(
+        height=460,
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        xaxis_title=f"Q̇ desde la chimenea [{Q_unit}]",
+        yaxis_title=f"T [{T_unit}]",
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        separators=". ",
+        hovermode="closest",
+    )
+    Q_max = Q(result.Q_W)
+    fig.update_xaxes(
+        exponentformat="none", separatethousands=True, range=[-0.04 * Q_max, 1.05 * Q_max]
+    )
+    return fig
+
+
+_EXERGY_PARTS = (
+    ("al agua y el vapor", "#2ca02c"),
+    ("destruida", "#ff7f0e"),
+    ("por la chimenea", "#8c564b"),
+)
+
+
+def exergy_split_figure(rows: list[tuple[str, HRSGExergy]], system: UnitSystem) -> go.Figure:
+    """Barras horizontales apiladas: a dónde va la exergía de los gases, en % de lo que traen."""
+    fig = go.Figure()
+    unit = unit_label("power", system)
+    labels = [label for label, _ in rows]
+    for k, (name, color) in enumerate(_EXERGY_PARTS):
+        values = [
+            (x.X_water_W, x.X_destroyed_W, x.X_stack_W)[k] / x.X_gas_in_W * 100.0 for _, x in rows
+        ]
+        absolute = [
+            convert_from_si((x.X_water_W, x.X_destroyed_W, x.X_stack_W)[k], "power", system)
+            for _, x in rows
+        ]
+        fig.add_trace(
+            go.Bar(
+                y=labels,
+                x=values,
+                orientation="h",
+                name=name,
+                marker_color=color,
+                text=[f"{v:.1f} %" for v in values],
+                textposition="inside",
+                insidetextanchor="middle",
+                textangle=0,
+                customdata=absolute,
+                hovertemplate=f"{name}: %{{x:.1f}} %% (%{{customdata:,.0f}} {unit})<extra></extra>",
+            )
+        )
+    fig.update_layout(
+        barmode="stack",
+        height=110 + 50 * len(rows),
+        margin={"l": 10, "r": 10, "t": 10, "b": 10},
+        xaxis={"title": "% de la exergía de los gases", "range": [0, 100]},
+        yaxis={"autorange": "reversed"},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.35, "x": 0, "traceorder": "normal"},
+        uniformtext={"minsize": 10, "mode": "hide"},  # sin texto en los tramos angostos
+        separators=". ",
+    )
+    return fig
+
+
+def exergy_sections_figure(exergy: HRSGExergy, system: UnitSystem) -> go.Figure:
+    """Exergía destruida en cada sección (barras horizontales, un color por nivel)."""
+    unit = unit_label("power", system)
+    names = [name for name, _ in exergy.destroyed_W]
+    values = [convert_from_si(x, "power", system) for _, x in exergy.destroyed_W]
+    colors = []
+    for name in names:
+        level = name.partition(" de ")[2]
+        colors.append(LEVEL_COLORS.get(level, _WATER_COLOR))
+    fig = go.Figure(
+        go.Bar(
+            y=names,
+            x=values,
+            orientation="h",
+            marker_color=colors,
+            text=[f"{x / exergy.X_destroyed_W * 100:.0f} %" for _, x in exergy.destroyed_W],
+            textposition="outside",
+            hovertemplate=f"%{{y}}: %{{x:,.0f}} {unit}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        height=80 + 28 * len(names),
+        margin={"l": 10, "r": 10, "t": 10, "b": 10},
+        xaxis_range=[0, 1.25 * max(values)],  # lugar para el % de afuera
+        xaxis_title=f"Ẋ destruida [{unit}]",
+        yaxis={"autorange": "reversed"},
+        separators=". ",
+        showlegend=False,
+    )
+    fig.update_xaxes(exponentformat="none", separatethousands=True)
     return fig

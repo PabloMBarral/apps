@@ -80,7 +80,7 @@ from ui.units_ui import (
     render_units_selector,
 )
 
-PAGE_VERSION = "0.10.0"
+PAGE_VERSION = "0.17.0"
 
 # Códigos de par independiente reconocidos por core.fluids, ordenados por uso didáctico.
 _PAIR_LABELS_TO_CODE: dict[str, str] = {

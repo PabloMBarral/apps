@@ -344,6 +344,23 @@ def test_procedure_cites_the_textbook_sections(name: str) -> None:
         assert "§10-3" in text
 
 
+@pytest.mark.parametrize("name", list(RANKINE_EXAMPLES))
+def test_si_procedure_rows_fit_a_phone(name: str) -> None:
+    """En SI los números llevan ×10ⁿ: una resta de dos de ellos con un factor delante
+    (η_T, v, la fracción y) no entra en un renglón de celular (~324 px, medido con
+    KaTeX en Chromium), así que el segundo número va en otro renglón. Las fracciones
+    (``\\frac``) se apilan y entran."""
+    result = solve_rankine(RANKINE_EXAMPLES[name])
+    for step in rankine_steps(result, "SI"):
+        for tex in step.latex:
+            for row in tex.split(r"\\"):
+                if r"\frac" in row:
+                    continue
+                n = row.count(r"\times")
+                assert n <= 2, (step.title, row)
+                assert not (n == 2 and r"\,(" in row), (step.title, row)
+
+
 def test_wet_turbine_exit_uses_the_lever_rule() -> None:
     result = solve_rankine(_cengel_10_1())
     turbine = next(s for s in rankine_steps(result, "Técnico") if s.title.startswith("3 → 4"))

@@ -167,8 +167,8 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   punto triple, cámara sin vapor, cascada con el calor al revés, fuentes
   incompatibles con el refrigerante…). Fórmulas del vademecum (§3.3, §9.3,
   §10.4, §11, §12) y descarga CSV/JSON. _Fase 3.2 cerrada._
-- ✅ **Caldera de recuperación (HRSG) de una presión**: arma el **diagrama
-  T–Q** a partir de los gases que entran (temperatura, caudal y
+- ✅ **Caldera de recuperación (HRSG) de una, dos o tres presiones**:
+  arma el **diagrama T–Q** a partir de los gases que entran (temperatura, caudal y
   composición en fracción molar o másica con N₂, O₂, CO₂, H₂O y Ar, o el
   escape de una turbina de gas a metano con exceso de aire λ), la presión
   de evaporación, la temperatura del agua de alimentación, el **pinch**, el
@@ -192,7 +192,22 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   del vademecum (§3.3, §4.8, §5, §12, §13, §16) y descarga CSV/JSON.
   _Fase 3.3 cerrada._ El núcleo también la diseña por **temperatura de
   chimenea** (Cengel 10-9: el pinch pasa a ser un resultado), el modo que
-  usa el ciclo combinado.
+  usa el ciclo combinado. Con **dos o tres niveles de presión** (Fase 3.5)
+  los niveles van en **cascada** (Kehlhofer et al., cap. 5): los gases los
+  recorren de alta a baja; el economizador de baja calienta toda el agua y
+  cada domo manda el líquido que no evapora a la bomba del nivel siguiente.
+  Cada nivel tiene su presión, su pinch, su approach y su vapor
+  sobrecalentado o saturado. El T–Q muestra la curva del agua «en serrucho»
+  (un color por nivel) y el pinch de cada uno; la página compara la misma
+  caldera con 1, 2 y 3 presiones (chimenea, calor, vapor) y hace el
+  **balance de exergía** (con T₀ = 15 °C): la que gana el agua, la
+  **destruida en cada sección** (T₀·S_gen) y la que se va por la chimenea,
+  con el rendimiento exergético; con más niveles, más cerca las curvas y
+  menos exergía destruida. Procedimiento nivel por nivel, barridos (presión
+  de baja y de alta, pinch, agua de alimentación) y validaciones que nombran
+  el nivel. Con un nivel coincide exactamente con la caldera de una
+  presión; una red de TESPy (un `DropletSeparator` y una `Pump` por domo)
+  da lo mismo al 0,2 %. _Fase 3.5 cerrada._
 - ✅ **Ciclo combinado gas–vapor de una presión**: una **turbina de gas**
   (compresor, cámara de combustión y turbina) cuyo escape alimenta la HRSG
   de una presión, y el vapor mueve el **ciclo de Rankine** de la app, con
@@ -232,8 +247,9 @@ ecuaciones del procedimiento se escriben en renglones cortos (una
 igualdad por renglón) para que entren en el ancho de la pantalla.
 
 ### En desarrollo (roadmap)
-- **HRSG de dos y tres presiones**, con recalentamiento y quemadores
-  suplementarios.
+- **Ciclo combinado de dos y tres presiones** con recalentamiento (una
+  turbina de vapor con varias admisiones); secciones intercaladas en la
+  HRSG y quemadores suplementarios.
 - **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
   Brayton con regeneración, interenfriamiento y recalentamiento (página
   propia, sobre la turbina de gas del ciclo combinado), cogeneración.
@@ -299,6 +315,8 @@ apps/
 │   │   ├── refrigeration_procedure.py  # su procedimiento, con la exergía destruida
 │   │   ├── hrsg.py               # HRSG de una presión: balances, diagrama T–Q
 │   │   ├── hrsg_procedure.py     # su procedimiento «a mano»
+│   │   ├── hrsg_multi.py         # HRSG de dos y tres presiones (cascada) y su exergía
+│   │   ├── hrsg_multi_procedure.py  # su procedimiento nivel por nivel
 │   │   ├── brayton.py            # turbina de gas (gases ideales; TESPy de control)
 │   │   ├── brayton_procedure.py  # su procedimiento con la función s°
 │   │   ├── combined.py           # ciclo combinado: turbina de gas + HRSG + Rankine
@@ -321,7 +339,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.16.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.17.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
