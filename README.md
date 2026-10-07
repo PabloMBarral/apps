@@ -102,7 +102,7 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   drenaje (DCA), desrecalentador y el drenaje en cascada o bombeado hacia
   adelante desde cualquier cerrado), combinables con el recalentamiento—,
   ideal o real (rendimientos isoentrópicos y **pérdidas de carga y de
-  calor** del ciclo real de Cengel §10-5: caídas de presión en caldera,
+  calor** del ciclo real de Cengel §10-3: caídas de presión en caldera,
   recalentador, condensador, calentadores y cañerías, subenfriamiento del
   condensado), con entrada a la turbina sobrecalentada o como vapor
   saturado seco, y caudal másico o potencia neta como dato. Con un fluido
@@ -138,16 +138,105 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   recuperador con un fluido húmedo, agua de enfriamiento más caliente que
   el vapor…). Fórmulas del vademecum (§3.3, §9.2, §10.1, §10.4, §12, §13)
   y descarga CSV/JSON. _Fases 3.1a, 3.1b y 3.1c cerradas._
+- ✅ **Refrigeración por compresión de vapor** resuelta con TESPy (como su
+  tutorial de bomba de calor): ciclo **simple**, de **dos etapas con cámara
+  de evaporación instantánea** («economizador») o **en cascada** con uno o
+  dos refrigerantes (p. ej. CO₂ abajo y amoníaco arriba), ideal o real
+  (rendimiento isoentrópico del compresor, sobrecalentamiento,
+  subenfriamiento y caídas de presión), como **refrigerador o bomba de
+  calor**. Refrigerantes: R-134a, R-1234yf, R-410A, R-32, amoníaco, CO₂
+  (subcrítico), propano e isobutano. Los niveles se dan por presión o por
+  temperatura de saturación (rocío en el evaporador, burbuja en el
+  condensador) y el tamaño por caudal o por capacidad (con las toneladas de
+  refrigeración). Muestra COP, Q̇_C, Ẇ, Q̇_H, el COP de Carnot, la
+  temperatura de descarga, el caudal volumétrico aspirado, la comparación
+  con el ciclo simple equivalente, la tabla de estados (numeración de
+  Cengel) y el ciclo sobre el diagrama **log p–h** (una pestaña por
+  refrigerante en la cascada; las válvulas sobre su línea de h constante).
+  Con las temperaturas de las fuentes, el **segundo principio**: exergía
+  destruida en cada componente (tabla, barras e interpretación física),
+  trabajo mínimo y rendimiento exergético (Cengel §11-5). El
+  **procedimiento** lo resuelve como con las tablas (A-11 a A-13 para el
+  R-134a, con la aclaración de su estado de referencia), y los barridos
+  muestran cómo cambia el COP con las temperaturas, el compresor, el
+  subenfriamiento y el sobrecalentamiento, y el óptimo de la presión de la
+  cámara y de la temperatura intermedia de la cascada. Ejemplos de Cengel
+  (11-1 a 11-5, 8.ª ed.) verificados contra el libro, y propios (bomba de
+  calor aire–agua, cascada CO₂/amoníaco, amoníaco con cámara, heladera con
+  isobutano). Validación con mensajes en castellano (CO₂ transcrítico,
+  punto triple, cámara sin vapor, cascada con el calor al revés, fuentes
+  incompatibles con el refrigerante…). Fórmulas del vademecum (§3.3, §9.3,
+  §10.4, §11, §12) y descarga CSV/JSON. _Fase 3.2 cerrada._
+- ✅ **Caldera de recuperación (HRSG) de una presión**: arma el **diagrama
+  T–Q** a partir de los gases que entran (temperatura, caudal y
+  composición en fracción molar o másica con N₂, O₂, CO₂, H₂O y Ar, o el
+  escape de una turbina de gas a metano con exceso de aire λ), la presión
+  de evaporación, la temperatura del agua de alimentación, el **pinch**, el
+  **approach** y la temperatura del vapor sobrecalentado, o con **vapor
+  saturado** (sin sobrecalentador). Balance de energía sección por sección
+  (Kehlhofer et al., *Combined-Cycle Gas & Steam Turbine Power Plants*,
+  2009): los gases como mezcla de gases ideales (vademecum §5; la entalpía
+  de cada componente, del gas ideal de CoolProp) y el agua con IAPWS-95.
+  Muestra el caudal de vapor, el calor de cada sección, las temperaturas
+  de los gases entre secciones y de chimenea, el aprovechamiento (contra
+  15 °C), el punto de rocío de los gases, las tablas de secciones y de
+  estados, y la comparación entre vapor saturado y sobrecalentado. El
+  diagrama marca el pinch y el approach (el escalón del domo); el
+  **procedimiento** hace los balances a mano; los barridos muestran cómo
+  cambian el vapor y la chimenea con el pinch, el approach, la presión, la
+  temperatura del vapor, la del agua de alimentación y la de los gases.
+  Una red de TESPy (`HeatExchanger` en serie, como su tutorial de turbina
+  de gas) da lo mismo al 0,02 % en los tests. Validación con mensajes en
+  castellano (cruce de temperaturas, chimenea bajo el punto de rocío,
+  gases que no alcanzan para evaporar, presión supercrítica…). Fórmulas
+  del vademecum (§3.3, §4.8, §5, §12, §13, §16) y descarga CSV/JSON.
+  _Fase 3.3 cerrada._ El núcleo también la diseña por **temperatura de
+  chimenea** (Cengel 10-9: el pinch pasa a ser un resultado), el modo que
+  usa el ciclo combinado.
+- ✅ **Ciclo combinado gas–vapor de una presión**: una **turbina de gas**
+  (compresor, cámara de combustión y turbina) cuyo escape alimenta la HRSG
+  de una presión, y el vapor mueve el **ciclo de Rankine** de la app, con
+  desaireador opcional. La turbina de gas se calcula con calores
+  específicos variables (mezclas de gases ideales con la función s°(T),
+  como la tabla A-17 de Cengel, y entropías absolutas de NIST-JANAF),
+  quemando **metano** (poder calorífico de ISO 6976:2016 a 25 °C; da la
+  relación combustible/aire, el exceso de aire λ y la composición de los
+  gases) o con el modelo de **aire estándar** (Cengel §9-3), con aire seco
+  (el de las tablas de Cengel) o técnico (21 % O₂, vademecum §16.1); la
+  misma turbina resuelta con **TESPy** (`Compressor`,
+  `DiabaticCombustionChamber`, `Turbine`) queda al lado como control y
+  coincide al 0,3 %. La HRSG se diseña por pinch o por temperatura de
+  chimenea, con vapor sobrecalentado o saturado, y el agua de alimentación
+  es la que entrega la bomba del ciclo de vapor. El tamaño sale del caudal
+  de aire o de la potencia neta. Muestra los rendimientos de la turbina de
+  gas, del ciclo de vapor y del **ciclo combinado** (con la relación de
+  Kehlhofer η_CC = η_TG + η_HRSG·η_TV·(1 − η_TG) y el balance de energía,
+  que cierran exactos), las potencias, el caudal de vapor, la chimenea y el
+  heat rate; un **diagrama de Sankey** de a dónde va la energía del
+  combustible; el **T–s** de la turbina de gas (con el enfriamiento de los
+  gases en la HRSG), el **T–Q** de la HRSG y el diagrama del ciclo de
+  vapor; las tablas de estados de las tres partes; el **procedimiento** por
+  partes, y **barridos** que muestran que el óptimo de la relación de
+  presiones del ciclo combinado está por debajo del de la turbina de gas
+  sola (también la TIT, la presión del vapor y el pinch o la chimenea).
+  Ejemplos: una planta típica de una presión, Cengel 10-9 (ṁ_v/ṁ_g = 0,131,
+  η = 48,7 %; además 9-5 y 9-6 en los tests) y una turbina moderna (60,5 %).
+  Validación con mensajes en castellano que nombran la parte (TIT por
+  debajo de la salida del compresor, combustión con λ < 1, vapor más
+  caliente que el escape, desaireador por encima de la caldera…). Fórmulas
+  del vademecum (§3.3, §4.8, §5, §10.4, §16) y descarga CSV/JSON. _Fase 3.4
+  cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
 igualdad por renglón) para que entren en el ancho de la pantalla.
 
 ### En desarrollo (roadmap)
+- **HRSG de dos y tres presiones**, con recalentamiento y quemadores
+  suplementarios.
 - **Ciclos termodinámicos** con [TESPy](https://tespy.readthedocs.io):
-  refrigeración por compresión de vapor (simple, con economizador, cascada),
-  Brayton (simple, con regeneración, intercooling, recalentamiento),
-  ciclo combinado, cogeneración.
+  Brayton con regeneración, interenfriamiento y recalentamiento (página
+  propia, sobre la turbina de gas del ciclo combinado), cogeneración.
 - **Psicrometría** y procesos HVAC sobre carta psicrométrica interactiva.
 - **Estequiometría** de combustión: combustibles puros y mezclas,
   exceso de aire, composición de humos en base seca y húmeda,
@@ -193,6 +282,7 @@ apps/
 │   ├── latex.py           # cantidades y cadenas de igualdades en LaTeX
 │   ├── export.py          # dict → CSV (campo, valor) para las descargas
 │   ├── diagrams.py        # diagramas de propiedades (fluprodia)
+│   ├── ideal_gas.py       # mezclas de gases ideales: aire, gases de combustión, s°(T)
 │   ├── interpolation.py
 │   ├── isentropic.py
 │   ├── exergy.py
@@ -204,9 +294,18 @@ apps/
 │   │   ├── tespy_utils.py # red de TESPy en SI y errores en castellano
 │   │   ├── rankine.py     # Rankine simple, recalentamiento, regeneración, ciclo real y ORC (TESPy)
 │   │   ├── rankine_layout.py     # topología y numeración de estados (sin TESPy)
-│   │   └── rankine_procedure.py  # procedimiento «como con las tablas»
+│   │   ├── rankine_procedure.py  # procedimiento «como con las tablas»
+│   │   ├── refrigeration.py      # refrigeración simple, con cámara y en cascada (TESPy)
+│   │   ├── refrigeration_procedure.py  # su procedimiento, con la exergía destruida
+│   │   ├── hrsg.py               # HRSG de una presión: balances, diagrama T–Q
+│   │   ├── hrsg_procedure.py     # su procedimiento «a mano»
+│   │   ├── brayton.py            # turbina de gas (gases ideales; TESPy de control)
+│   │   ├── brayton_procedure.py  # su procedimiento con la función s°
+│   │   ├── combined.py           # ciclo combinado: turbina de gas + HRSG + Rankine
+│   │   └── combined_procedure.py # su procedimiento por partes
 │   └── plots.py
-├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, créditos
+├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, gráficos
+│                          # de los ciclos (T–Q, T–s, Sankey), créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── requirements.txt
 ├── CITATION.cff
@@ -222,7 +321,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.13.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.16.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -318,6 +417,30 @@ Organization for Standardization, 2016.
 }
 ```
 
+**Turbina de gas y ciclo combinado** — las entropías absolutas a 25 °C y 1 bar
+de los gases (N₂, O₂, CO₂, H₂O, Ar) son las de las tablas NIST-JANAF; el
+diseño de la HRSG y la relación entre los rendimientos, de Kehlhofer et al.:
+
+```bibtex
+@book{chase1998janaf,
+  author    = {Chase, Jr., Malcolm W.},
+  title     = {{NIST-JANAF} Thermochemical Tables},
+  edition   = {4},
+  series    = {Journal of Physical and Chemical Reference Data, Monograph 9},
+  publisher = {American Chemical Society and American Institute of Physics},
+  year      = {1998}
+}
+
+@book{kehlhofer2009combined,
+  author    = {Kehlhofer, Rolf and Hannemann, Frank and Stirnimann, Franz
+               and Rukes, Bert},
+  title     = {Combined-Cycle Gas \& Steam Turbine Power Plants},
+  edition   = {3},
+  publisher = {PennWell},
+  year      = {2009}
+}
+```
+
 ---
 
 ## Notas de uso
@@ -328,6 +451,11 @@ Organization for Standardization, 2016.
   página muestra "—" (en la API de bajo nivel, `StatePoint.x = -1`).
 - Las propiedades del agua salen de CoolProp con la formulación
   IAPWS-95; pueden diferir en el último decimal de las tablas impresas.
+- Las tablas del R-134a de Cengel (A-11 a A-13) toman h = s = 0 para el
+  líquido saturado a −40 °C; CoolProp usa la referencia del IIR (h =
+  200 kJ/kg y s = 1 kJ/(kg·K) a 0 °C). Las h, u y s de la app quedan
+  148,14 kJ/kg y 0,7956 kJ/(kg·K) por encima de las del libro; las
+  diferencias (calores, trabajos, COP) son iguales. Las páginas lo avisan.
   Las de los fluidos orgánicos (ORC), de las ecuaciones de estado de
   Helmholtz de CoolProp.
 - Los ciclos usan la numeración de estados de Çengel & Boles,

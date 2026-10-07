@@ -3,7 +3,7 @@
 Ciclo de potencia de vapor: simple, con recalentamiento y con regeneración
 (hasta tres calentadores de agua de alimentación, abiertos o cerrados, con
 subenfriador de drenaje, desrecalentador y drenajes bombeados), ideal o real
-(rendimientos isoentrópicos y pérdidas de carga y de calor, Cengel §10-5), con
+(rendimientos isoentrópicos y pérdidas de carga y de calor, Cengel §10-3), con
 agua o con un fluido orgánico (ORC, con recuperador). El cálculo lo hace
 :mod:`core.cycles.rankine` con una red de TESPy; la página muestra el
 resultado, las extracciones, la tabla de estados, el ciclo sobre el diagrama,
@@ -42,7 +42,6 @@ from core.cycles.rankine import (
     extraction_pressure_sweep,
     rankine_labeled_states,
     rankine_notes,
-    rankine_segments,
     rankine_steps,
     rankine_sweep,
     rankine_to_dict,
@@ -50,22 +49,17 @@ from core.cycles.rankine import (
     suggested_rankine_inputs,
 )
 from core.cycles.rankine_layout import PlantLayout, plant_layout
-from core.diagrams import (
-    DiagramSpec,
-    DiagramType,
-    ProcessOverlay,
-    isentropic_process,
-    segments_overlays,
-)
+from core.diagrams import DiagramType
 from core.export import dict_to_csv
 from core.fluids import FLUID_NAMES_ES, fluid_limits, saturation_at_pressure
 from core.state_report import format_value, states_table
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, convert_to_si, unit_label
 from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_credits
-from ui.diagrams import DiagramPoint, diagram_type_selector, get_diagram, render_diagram_plotly
+from ui.cycle_charts import render_rankine_diagram
+from ui.diagrams import diagram_type_selector
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.13.0"
+PAGE_VERSION = "0.16.0"
 FLUID = "Water"
 
 _EXAMPLES = list(RANKINE_EXAMPLES)
@@ -398,13 +392,13 @@ def _read_losses(
     reheat: Reheat | None,
     layout: PlantLayout | None,
 ) -> Losses:
-    """Bloque del ciclo real (Cengel §10-5): caídas de presión y de temperatura."""
+    """Bloque del ciclo real (Cengel §10-3): caídas de presión y de temperatura."""
     if not st.checkbox(
         "Con pérdidas (ciclo real: caídas de presión y de calor)",
         value=base.losses.any,
         key=f"rk_loss_{ex}{sfx}",
         help=(
-            "Cengel §10-5: la fricción baja la presión en la caldera, el condensador y las "
+            "Cengel §10-3: la fricción baja la presión en la caldera, el condensador y las "
             "cañerías (la bomba tiene que compensarlo), las cañerías pierden calor y el "
             "condensado se subenfría para que la bomba no cavite."
         ),
@@ -790,7 +784,7 @@ def _render_metrics(
         + (" q_pérd: calor que pierden las cañerías." if extras.startswith(" · q_pérd") else "")
         + (" q_rec: calor interno del recuperador." if result.has_recuperator else "")
     )
-    for note in rankine_notes(result):
+    for note in rankine_notes(result, system):
         st.info(note)
 
 
@@ -878,58 +872,8 @@ def _render_tespy(result: RankineResult, system: UnitSystem) -> None:
 def _cycle_diagram(result: RankineResult, system: UnitSystem) -> None:
     with st.expander("📈 Diagrama del ciclo", expanded=True):
         diagram_type: DiagramType = diagram_type_selector(key="rk_diagram_type", default="Ts")
-        labeled = rankine_labeled_states(result)
-        states = [state.to_state_point() for _, state in labeled]
-        points = [
-            DiagramPoint(state=state, label=label.split()[0], color="#d62728")
-            for (label, _), state in zip(labeled, states, strict=True)
-        ]
-        fluid = result.inputs.fluid
         try:
-            diagram = get_diagram(fluid, system)
-            spec = DiagramSpec(fluid=fluid, system=system)
-            overlays: list[ProcessOverlay] = segments_overlays(
-                diagram, spec, [(states[a], states[b]) for a, b in rankine_segments(result)]
-            )
-            if result.inputs.eta_turbine < 1.0:
-                turbines = result.of_kind("turbine")
-                casings: dict[str, tuple[int, int]] = {}
-                for comp in turbines:
-                    start = casings.get(comp.casing, (comp.port("in").state, 0))[0]
-                    casings[comp.casing] = (start, comp.port("out").state)
-                for start_i, end_i in casings.values():
-                    start = result.states[start_i]
-                    overlays.append(
-                        ProcessOverlay(
-                            name=f"{start_i + 1} → {end_i + 1}s (isoentrópica de referencia)",
-                            color="#2ca02c",
-                            dash="dash",
-                            coords_si=isentropic_process(
-                                diagram,
-                                spec,
-                                s_J_per_kg_K=start.s_J_per_kg_K,
-                                p_start_Pa=start.P_Pa,
-                                p_end_Pa=result.states[end_i].P_Pa,
-                            ),
-                        )
-                    )
-                for comp, state_s in zip(turbines, result.turbine_out_s, strict=True):
-                    points.append(
-                        DiagramPoint(
-                            state=state_s.to_state_point(),
-                            label=f"{comp.port('out').state + 1}s",
-                            color="#2ca02c",
-                        )
-                    )
-            render_diagram_plotly(
-                fluid=fluid,
-                diagram_type=diagram_type,
-                system=system,
-                points=points,
-                overlays=overlays,
-                chart_key="rk_diagram_chart",
-                point_legend={"#d62728": "estados", "#2ca02c": "estados isoentrópicos (ks)"},
-            )
+            render_rankine_diagram(result, system, diagram_type, chart_key="rk_diagram_chart")
         except Exception as exc:  # el diagrama no debe tumbar la página
             st.warning(f"No se pudo dibujar el diagrama: {exc}")
         st.caption(
@@ -943,8 +887,10 @@ def _cycle_diagram(result: RankineResult, system: UnitSystem) -> None:
             + ". En el ciclo ideal, bombas y "
             "turbina son isoentrópicas (verticales en T–s); en el real, la recta punteada que "
             "une la entrada y la salida es solo una referencia, y la verde es la expansión "
-            "isoentrópica con la que se compara η_T. Las válvulas de los drenajes también son "
-            "rectas de referencia (h constante), como las cañerías con pérdidas del ciclo real."
+            "isoentrópica con la que se compara η_T. Las válvulas de los drenajes (y una "
+            "cañería que pierde presión sin perder calor) se dibujan rayadas sobre su línea de h "
+            "constante: el estrangulamiento es irreversible y sus estados intermedios no son de "
+            "equilibrio."
             + (
                 " El recuperador aparece dos veces: el escape que se enfría y el líquido que se "
                 "calienta, cada uno sobre su isobara."
@@ -954,12 +900,19 @@ def _cycle_diagram(result: RankineResult, system: UnitSystem) -> None:
         )
 
 
+def _join_es(items: list[str]) -> str:
+    """«a», «a y b», «a, b y c»."""
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} y {items[-1]}"
+
+
 def _render_procedure(
     result: RankineResult, system: UnitSystem, cooling: CoolingWaterResult | None
 ) -> None:
     with st.expander("🔬 Procedimiento", expanded=False):
         sections = ["§10-2"]
         if result.has_losses:
+            sections.append("§10-3")
+        if result.has_reheat:
             sections.append("§10-5")
         if result.has_heaters:
             sections.append("§10-6")
@@ -968,7 +921,7 @@ def _render_procedure(
             "Cómo se resuelve "
             + ("con las tablas de vapor" if water else "con las propiedades del fluido")
             + ", estado por estado (Cengel "
-            + (" y ".join(sections) if len(sections) < 3 else "§10-2, §10-5 y §10-6")
+            + _join_es(sections)
             + "). Los valores salen de la ecuación de estado ("
             + ("IAPWS-95" if water else "de Helmholtz, en CoolProp")
             + "), así que pueden diferir en el último decimal de los de una tabla impresa."
@@ -1159,8 +1112,8 @@ def _render_theory() -> None:
         )
         st.latex(r"\bar{T}_H = \frac{q_H}{s_3 - s_2}")
         st.markdown(
-            "**Con recalentamiento** (estados 1 a 6): el calor entra en la caldera y en el "
-            "recalentador, y el trabajo sale de las dos turbinas:"
+            "**Con recalentamiento** (Cengel §10-5; estados 1 a 6): el calor entra en la "
+            "caldera y en el recalentador, y el trabajo sale de las dos turbinas:"
         )
         st.latex(r"q_H = (h_3 - h_2) + (h_5 - h_4)")
         st.latex(r"w_T = (h_3 - h_4) + (h_5 - h_6)")
@@ -1186,7 +1139,7 @@ def _render_theory() -> None:
             "misma línea de expansión, h_k = h_e − η_T·(h_e − h_ks)."
         )
         st.markdown(
-            "**Ciclo real** (Cengel §10-5): por la fricción el fluido pierde presión en la "
+            "**Ciclo real** (Cengel §10-3): por la fricción el fluido pierde presión en la "
             "caldera, el condensador y las cañerías, así que la bomba tiene que entregar más "
             "presión que la que recibe la turbina; las cañerías pierden calor hacia el ambiente "
             "y el condensado se subenfría para que la bomba no cavite. El primer principio suma "

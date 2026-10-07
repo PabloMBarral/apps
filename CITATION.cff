@@ -31,9 +31,12 @@ keywords:
   - tespy
   - fluprodia
   - iso-6976
+  - hrsg
+  - gas-turbine
+  - combined-cycle
 license: MIT
-version: "0.13.0"
-date-released: "2026-10-05"
+version: "0.16.0"
+date-released: "2026-10-06"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"
@@ -109,6 +112,8 @@ references:
     repository-code: "https://github.com/plotly/plotly.py"
   - type: standard
     scope: "Cálculo de poder calorífico de gas natural"
+    authors:
+      - name: "International Organization for Standardization"
     title: >-
       Natural gas — Calculation of calorific values, density, relative
       density and Wobbe indices from composition
@@ -116,6 +121,34 @@ references:
       name: "International Organization for Standardization"
     number: "ISO 6976:2016"
     year: 2016
+  - type: book
+    scope: "Entropías absolutas de los gases a 25 °C y 1 bar (turbina de gas)"
+    authors:
+      - family-names: "Chase"
+        given-names: "Malcolm W."
+        name-suffix: "Jr."
+    title: "NIST-JANAF Thermochemical Tables"
+    edition: "4"
+    collection-title: "Journal of Physical and Chemical Reference Data, Monograph 9"
+    publisher:
+      name: "American Chemical Society and American Institute of Physics"
+    year: 1998
+  - type: book
+    scope: "Diseño de la caldera de recuperación y del ciclo combinado"
+    authors:
+      - family-names: "Kehlhofer"
+        given-names: "Rolf"
+      - family-names: "Hannemann"
+        given-names: "Frank"
+      - family-names: "Stirnimann"
+        given-names: "Franz"
+      - family-names: "Rukes"
+        given-names: "Bert"
+    title: "Combined-Cycle Gas & Steam Turbine Power Plants"
+    edition: "3"
+    publisher:
+      name: "PennWell"
+    year: 2009
   - type: software
     scope: "Repositorio hermano: hoja de fórmulas teóricas"
     authors:

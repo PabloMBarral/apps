@@ -2,7 +2,7 @@
 
 Valores de referencia: Çengel & Boles, *Termodinámica*, ejemplo 10-2 (η = 36,1 %,
 Ẇ_neto = 18,9 MW con ṁ = 15 kg/s; estados de la figura 10-5), y cálculos a mano
-con CoolProp (IAPWS-95) siguiendo los balances del libro (§10-5).
+con CoolProp (IAPWS-95) siguiendo los balances del libro (§10-3).
 """
 
 from __future__ import annotations

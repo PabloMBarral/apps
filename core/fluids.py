@@ -62,6 +62,11 @@ SUPPORTED_FLUIDS: list[str] = [
     "R1233zd(E)",
     "Isopentane",
     "Toluene",
+    # Refrigerantes para la refrigeración por compresión de vapor (Fase 3.2):
+    # el HFC de los aires acondicionados actuales y dos naturales (Cengel §11-6).
+    "R32",
+    "Propane",
+    "IsoButane",
 ]
 
 #: Nombre en castellano de cada fluido soportado (para títulos y selectores).
@@ -77,6 +82,9 @@ FLUID_NAMES_ES: dict[str, str] = {
     "R1233zd(E)": "R-1233zd(E)",
     "Isopentane": "Isopentano (R-601a)",
     "Toluene": "Tolueno",
+    "R32": "R-32",
+    "Propane": "Propano (R-290)",
+    "IsoButane": "Isobutano (R-600a)",
 }
 
 # (kwarg en la API, símbolo CoolProp). El volumen específico viaja como
@@ -857,6 +865,28 @@ def suggested_inputs(fluid: str, pair: PairCode) -> dict[str, float]:
     return candidates[pair]
 
 
+# Estado de referencia de las tablas de Cengel para los refrigerantes que tabula:
+# h = s = 0 para el líquido saturado a −40 °C (ASHRAE). CoolProp usa la del IIR
+# (h = 200 kJ/kg y s = 1 kJ/(kg·K) para el líquido saturado a 0 °C). El agua no
+# necesita corrección: las dos usan u = s = 0 para el líquido en el punto triple.
+_TEXTBOOK_REFERENCE_T_K: dict[str, float] = {"R134a": 233.15}
+
+
+def textbook_reference_offset(fluid: str) -> tuple[float, float] | None:
+    """``(Δh, Δs)`` = valor de CoolProp − valor de las tablas de Cengel (SI), o ``None``.
+
+    Cengel (tablas A-11 a A-13) tabula el R-134a con h = s = 0 para el líquido
+    saturado a −40 °C; CoolProp usa la referencia del IIR. Restando Δh y Δs a
+    los valores de CoolProp se obtienen los del libro; las diferencias de h y
+    s (calores, trabajos, COP) no cambian. ``None`` si no hace falta corregir.
+    """
+    T_ref = _TEXTBOOK_REFERENCE_T_K.get(fluid)
+    if T_ref is None:
+        return None
+    liquid = _saturation(fluid, "T", T_ref).liquid
+    return liquid.h_J_per_kg, liquid.s_J_per_kg_K
+
+
 # ---------------------------------------------------------------------
 # Helpers internos: CoolProp, validación y mensajes
 # ---------------------------------------------------------------------
@@ -884,6 +914,9 @@ _FLUID_WITH_ARTICLE: dict[str, str] = {
     "R1233zd(E)": "el R-1233zd(E)",
     "Isopentane": "el isopentano",
     "Toluene": "el tolueno",
+    "R32": "el R-32",
+    "Propane": "el propano",
+    "IsoButane": "el isobutano",
 }
 
 

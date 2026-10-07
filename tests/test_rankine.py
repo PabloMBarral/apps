@@ -334,6 +334,16 @@ def test_steps_in_every_unit_system(inputs: RankineInputs, system: str, unit: st
     assert "- -" not in tex
 
 
+@pytest.mark.parametrize("name", list(RANKINE_EXAMPLES))
+def test_procedure_cites_the_textbook_sections(name: str) -> None:
+    """Cengel (7.ª a 9.ª ed.): §10-3 ciclo real, §10-5 recalentamiento, §10-6 regeneración."""
+    result = solve_rankine(RANKINE_EXAMPLES[name])
+    text = " ".join(f"{s.title} {s.text}" for s in rankine_steps(result, "Técnico"))
+    assert ("§10-5" in text) == result.has_reheat
+    if result.has_losses:
+        assert "§10-3" in text
+
+
 def test_wet_turbine_exit_uses_the_lever_rule() -> None:
     result = solve_rankine(_cengel_10_1())
     turbine = next(s for s in rankine_steps(result, "Técnico") if s.title.startswith("3 → 4"))

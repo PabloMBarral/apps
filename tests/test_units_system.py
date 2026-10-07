@@ -38,6 +38,7 @@ _KINDS = (
     "diffusivity",
     "mass_flow",
     "power",
+    "volume_flow",
 )
 
 
@@ -95,6 +96,9 @@ class TestUnitLabels:
             ("power", "SI", "W"),
             ("power", "Técnico", "kW"),
             ("power", "Inglés", "Btu/s"),
+            ("volume_flow", "SI", "m³/s"),
+            ("volume_flow", "Técnico", "m³/s"),
+            ("volume_flow", "Inglés", "ft³/s"),
         ],
     )
     def test_label(self, kind: str, system: str, expected: str) -> None:
@@ -120,6 +124,7 @@ class TestRoundTrip:
         "diffusivity": (1.0e-8, 1.4e-7, 1.5e-5, 1.0e-3),
         "mass_flow": (0.0, 1.0, 50.0, 600.0),
         "power": (0.0, 1.0, 1.0e3, 2.1e8),
+        "volume_flow": (0.0, 1.0e-4, 0.05, 30.0),
     }
 
     @pytest.mark.parametrize("kind", _KINDS)

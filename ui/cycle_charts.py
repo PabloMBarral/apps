@@ -1,0 +1,384 @@
+"""Gráficos de ciclos compartidos entre páginas — Fases 3.3 y 3.4.
+
+- :func:`tq_figure`: el diagrama T–Q de la HRSG (/HRSG y /Ciclo_Combinado).
+- :func:`render_rankine_diagram`: el ciclo de Rankine sobre el diagrama del
+  agua u otro fluido (/Rankine y /Ciclo_Combinado).
+- :func:`gas_turbine_ts_figure`: la turbina de gas en un T–s con entropías
+  absolutas, con el enfriamiento de los gases en la HRSG.
+- :func:`energy_sankey_figure`: a dónde va el calor del combustible en un
+  ciclo combinado.
+
+Vive en ``ui/`` porque arma figuras de plotly y usa Streamlit; el cálculo
+está en ``core/``.
+"""
+
+from __future__ import annotations
+
+import plotly.graph_objects as go
+
+from core.cycles.brayton import BraytonResult, brayton_ts_lines
+from core.cycles.combined import CombinedResult
+from core.cycles.hrsg import HRSGResult, TQProfile
+from core.cycles.rankine import RankineResult, rankine_labeled_states, rankine_segments
+from core.diagrams import (
+    DiagramSpec,
+    DiagramType,
+    ProcessOverlay,
+    isentropic_process,
+    segments_overlays,
+)
+from core.state_report import format_value
+from core.units_system import QuantityKind, UnitSystem, convert_from_si, unit_label
+from ui.diagrams import DiagramPoint, get_diagram, render_diagram_plotly
+
+__all__ = [
+    "energy_sankey_figure",
+    "gas_turbine_ts_figure",
+    "render_rankine_diagram",
+    "tq_figure",
+]
+
+_SECTION_SHORT = {"sobrecalentador": "SH", "evaporador": "EV", "economizador": "ECO"}
+_GAS_COLOR = "#d62728"
+_WATER_COLOR = "#1f77b4"
+_AIR_COLOR = "#1f77b4"
+_GREEN = "#2ca02c"
+
+
+def _value(value_si: float, kind: QuantityKind, system: UnitSystem, sig: int = 5) -> str:
+    """Valor en ``system``, sin unidad."""
+    return format_value(convert_from_si(value_si, kind, system), sig)
+
+
+def tq_figure(result: HRSGResult, profile: TQProfile, system: UnitSystem) -> go.Figure:
+    """Diagrama T–Q: gases y agua contra el calor transferido desde la chimenea."""
+
+    def T(value_K: float) -> float:
+        return convert_from_si(value_K, "temperature", system)
+
+    def Q(value_W: float) -> float:
+        return convert_from_si(value_W, "power", system)
+
+    T_unit = unit_label("temperature", system)
+    Q_unit = unit_label("power", system)
+    dT_unit = unit_label("temperature_difference", system)
+    hover = f"Q̇ = %{{x:,.0f}} {Q_unit}<br>T = %{{y:.1f}} {T_unit}"
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=[Q(q) for q in profile.Q_gas_W],
+            y=[T(t) for t in profile.T_gas_K],
+            mode="lines",
+            name="gases",
+            line={"color": _GAS_COLOR, "width": 3},
+            hovertemplate=hover + "<extra>gases</extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[Q(q) for q in profile.Q_water_W],
+            y=[T(t) for t in profile.T_water_K],
+            mode="lines",
+            name="agua y vapor",
+            line={"color": _WATER_COLOR, "width": 3},
+            hovertemplate=hover + "<extra>agua y vapor</extra>",
+        )
+    )
+    # Puntos de los gases: Q acumulado desde la chimenea.
+    sections = result.sections
+    gas_Q = [result.Q_W]
+    for section in sections:
+        gas_Q.append(gas_Q[-1] - section.Q_W)
+    gas_pos = {"a": "top left", "b": "top left", "c": "top left", "d": "top center"}
+    fig.add_trace(
+        go.Scatter(
+            x=[Q(q) for q in gas_Q],
+            y=[T(t) for t in result.T_gas_K],
+            mode="markers+text",
+            text=list(result.gas_labels),
+            textposition=[gas_pos[label] for label in result.gas_labels],
+            textfont={"color": _GAS_COLOR, "size": 14},
+            marker={"color": _GAS_COLOR, "size": 8},
+            showlegend=False,
+            hovertemplate=hover + "<extra>gases</extra>",
+        )
+    )
+    # Puntos del agua. El 2 y el 3 (el escalón del approach) quedan a unos pocos
+    # kelvin: los nombran las flechas del pinch y del approach.
+    Q_eco = sections[-1].Q_W
+    Q_ev = sections[-2].Q_W
+    w = result.water
+    water_Q = [0.0, Q_eco, Q_eco, Q_eco + Q_ev, result.Q_W][: len(w)]
+    water_text = ["1", "", "", "4", "5"][: len(w)]
+    fig.add_trace(
+        go.Scatter(
+            x=[Q(q) for q in water_Q],
+            y=[T(s.T_K) for s in w],
+            mode="markers+text",
+            text=water_text,
+            textposition="bottom right",
+            textfont={"color": _WATER_COLOR, "size": 14},
+            marker={"color": _WATER_COLOR, "size": 8},
+            showlegend=False,
+            hovertemplate=hover + "<extra>agua y vapor</extra>",
+        )
+    )
+    # Límites entre secciones y sus nombres (arriba: abajo a la izquierda está el agua
+    # de alimentación).
+    bounds = [0.0, *profile.boundaries_W, result.Q_W]
+    for q in profile.boundaries_W:
+        fig.add_vline(x=Q(q), line_dash="dot", line_color="gray", line_width=1)
+    names = [_SECTION_SHORT[s.name] for s in reversed(sections)]
+    for name, lo, hi in zip(names, bounds, bounds[1:], strict=False):
+        fig.add_annotation(
+            x=Q(0.5 * (lo + hi)),
+            y=0.99,
+            yref="paper",
+            text=name,
+            showarrow=False,
+            font={"color": "gray"},
+            yanchor="top",
+        )
+    # Pinch (entre c y 3) y approach (entre 2 y 3): unos pocos kelvin, no se ven a
+    # escala; las flechas vienen de zonas libres del evaporador (arriba de los gases
+    # y abajo de la meseta), también en un celular.
+    inputs = result.inputs
+    pinch = _value(result.pinch_K, "temperature_difference", system, 3)
+    fig.add_annotation(
+        x=Q(Q_eco),
+        y=T(result.T_sat_K + 0.5 * result.pinch_K),
+        text=f"pinch {pinch} {dT_unit}<br>(c – 3)",
+        showarrow=True,
+        arrowhead=2,
+        ax=55,
+        ay=-85,
+        font={"color": "#333333"},
+    )
+    if inputs.approach_K > 0.0:
+        approach = _value(inputs.approach_K, "temperature_difference", system, 3)
+        text = f"approach {approach} {dT_unit}<br>(2 → 3)"
+    else:
+        text = "approach 0<br>(2 = 3)"
+    fig.add_annotation(
+        x=Q(Q_eco),
+        y=T(result.T_sat_K - 0.5 * inputs.approach_K),
+        text=text,
+        showarrow=True,
+        arrowhead=2,
+        ax=55,
+        ay=65,
+        font={"color": "#333333"},
+    )
+    fig.update_layout(
+        height=440,
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        xaxis_title=f"Q̇ desde la chimenea [{Q_unit}]",
+        yaxis_title=f"T [{T_unit}]",
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        separators=". ",
+        hovermode="closest",
+    )
+    Q_max = Q(result.Q_W)  # margen para los rótulos de los extremos
+    fig.update_xaxes(
+        exponentformat="none", separatethousands=True, range=[-0.04 * Q_max, 1.07 * Q_max]
+    )
+    return fig
+
+
+def render_rankine_diagram(
+    result: RankineResult, system: UnitSystem, diagram_type: DiagramType, *, chart_key: str
+) -> None:
+    """El ciclo de Rankine sobre el diagrama del fluido (fluprodia + plotly).
+
+    Estados numerados, procesos sobre sus isolíneas (:func:`core.diagrams.segments_overlays`)
+    y, con turbina real, la expansión isoentrópica de referencia y los estados ks.
+    Lo usan /Rankine y /Ciclo_Combinado.
+    """
+    labeled = rankine_labeled_states(result)
+    states = [state.to_state_point() for _, state in labeled]
+    points = [
+        DiagramPoint(state=state, label=label.split()[0], color="#d62728")
+        for (label, _), state in zip(labeled, states, strict=True)
+    ]
+    fluid = result.inputs.fluid
+    diagram = get_diagram(fluid, system)
+    spec = DiagramSpec(fluid=fluid, system=system)
+    overlays: list[ProcessOverlay] = segments_overlays(
+        diagram, spec, [(states[a], states[b]) for a, b in rankine_segments(result)]
+    )
+    if result.inputs.eta_turbine < 1.0:
+        turbines = result.of_kind("turbine")
+        casings: dict[str, tuple[int, int]] = {}
+        for comp in turbines:
+            start = casings.get(comp.casing, (comp.port("in").state, 0))[0]
+            casings[comp.casing] = (start, comp.port("out").state)
+        for start_i, end_i in casings.values():
+            start = result.states[start_i]
+            overlays.append(
+                ProcessOverlay(
+                    name=f"{start_i + 1} → {end_i + 1}s (isoentrópica de referencia)",
+                    color="#2ca02c",
+                    dash="dash",
+                    coords_si=isentropic_process(
+                        diagram,
+                        spec,
+                        s_J_per_kg_K=start.s_J_per_kg_K,
+                        p_start_Pa=start.P_Pa,
+                        p_end_Pa=result.states[end_i].P_Pa,
+                    ),
+                )
+            )
+        for comp, state_s in zip(turbines, result.turbine_out_s, strict=True):
+            points.append(
+                DiagramPoint(
+                    state=state_s.to_state_point(),
+                    label=f"{comp.port('out').state + 1}s",
+                    color="#2ca02c",
+                )
+            )
+    render_diagram_plotly(
+        fluid=fluid,
+        diagram_type=diagram_type,
+        system=system,
+        points=points,
+        overlays=overlays,
+        chart_key=chart_key,
+        point_legend={"#d62728": "estados", "#2ca02c": "estados isoentrópicos (ks)"},
+    )
+
+
+def gas_turbine_ts_figure(
+    result: BraytonResult, system: UnitSystem, T_stack_K: float | None = None
+) -> go.Figure:
+    """La turbina de gas en un diagrama T–s, con entropías absolutas.
+
+    Con ``T_stack_K``, también el enfriamiento de los gases en la caldera de
+    recuperación (4 → chimenea).
+    """
+
+    def T(value_K: float) -> float:
+        return convert_from_si(value_K, "temperature", system)
+
+    def s(value: float) -> float:
+        return convert_from_si(value, "specific_entropy", system)
+
+    T_unit = unit_label("temperature", system)
+    s_unit = unit_label("specific_entropy", system)
+    hover = f"s = %{{x:.4g}} {s_unit}<br>T = %{{y:.1f}} {T_unit}"
+    styles = {
+        "isobar": ("isobaras", {"color": "#bbbbbb", "width": 1}),
+        "heat": ("calor a p constante", {"color": _GAS_COLOR, "width": 3}),
+        "isentropic": ("isoentrópicas (2s, 4s)", {"color": _GREEN, "width": 2, "dash": "dash"}),
+        "actual": (
+            "compresión y expansión reales",
+            {"color": "#555555", "width": 2, "dash": "dot"},
+        ),
+        "composition": ("cámara: cambia la composición", {"color": "#999999", "dash": "dot"}),
+    }
+    fig = go.Figure()
+    shown: set[str] = set()
+    for line in brayton_ts_lines(result, T_stack_K):
+        name, style = styles[line.kind]
+        fig.add_trace(
+            go.Scatter(
+                x=[s(v) for v in line.s_J_per_kg_K],
+                y=[T(v) for v in line.T_K],
+                mode="lines",
+                name=name,
+                legendgroup=line.kind,
+                showlegend=line.kind not in shown and line.kind != "composition",
+                line=style,
+                hovertemplate=hover + f"<extra>{line.medium}, p = "
+                f"{_value(line.p_Pa, 'pressure', system, 4)} {unit_label('pressure', system)}"
+                "</extra>",
+            )
+        )
+        shown.add(line.kind)
+    states = list(result.states)
+    labels = [st.label for st in states]
+    xs = [s(st.s_J_per_kg_K) for st in states]
+    ys = [T(st.T_K) for st in states]
+    positions = {
+        "1": "bottom right",
+        "2s": "top left",
+        "2": "middle right",
+        "3": "top center",
+        "4s": "bottom left",
+        "4": "middle right",
+    }
+    if T_stack_K is not None:
+        gas = result.gas
+        labels.append("chim.")
+        xs.append(s(gas.s(T_stack_K, result.state("4").P_Pa)))
+        ys.append(T(T_stack_K))
+        positions["chim."] = "bottom right"
+    fig.add_trace(
+        go.Scatter(
+            x=xs,
+            y=ys,
+            mode="markers+text",
+            text=labels,
+            textposition=[positions[label] for label in labels],
+            textfont={"size": 13},
+            marker={"color": "#333333", "size": 8},
+            showlegend=False,
+            hovertemplate=hover + "<extra>%{text}</extra>",
+        )
+    )
+    fig.update_layout(
+        height=430,
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        xaxis_title=f"s [{s_unit}]",
+        yaxis_title=f"T [{T_unit}]",
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        separators=". ",
+    )
+    return fig
+
+
+def energy_sankey_figure(result: CombinedResult, system: UnitSystem) -> go.Figure:
+    """A dónde va el calor del combustible: trabajo de las dos turbinas, condensador y chimenea."""
+    Q = result.Q_fuel_W
+    unit = unit_label("power", system)
+    source = "Calor" if result.gas_turbine.inputs.air_standard else "Combustible"
+    # Rótulos en varios renglones (<br>): en un celular no se pisan entre columnas.
+    nodes = [
+        (source, Q, "#7f7f7f"),
+        ("Ẇ turbina<br>de gas", result.W_gas_turbine_W, _GREEN),
+        ("Escape", result.Q_exhaust_W, _GAS_COLOR),
+        ("Vapor<br>(HRSG)", result.Q_hrsg_W, _WATER_COLOR),
+        ("Ẇ ciclo<br>de vapor", result.W_steam_turbine_W, _GREEN),
+        ("Condensador", result.Q_condenser_W, "#9467bd"),
+        ("Chimenea", result.Q_stack_W, "#8c564b"),
+    ]
+    links = [(0, 1), (0, 2), (2, 3), (2, 6), (3, 4), (3, 5)]
+
+    def label(name: str, value: float) -> str:
+        return f"{name}<br>{value / Q * 100:.1f} %"
+
+    fig = go.Figure(
+        go.Sankey(
+            arrangement="snap",
+            valueformat=",.0f",
+            valuesuffix=f" {unit}",
+            node={
+                "label": [label(n, v) for n, v, _ in nodes],
+                "color": [c for _, _, c in nodes],
+                "pad": 14,
+                "thickness": 14,
+            },
+            link={
+                "source": [a for a, _ in links],
+                "target": [b for _, b in links],
+                "value": [convert_from_si(nodes[b][1], "power", system) for _, b in links],
+                "color": ["rgba(150,150,150,0.35)"] * len(links),
+            },
+        )
+    )
+    fig.update_layout(
+        height=380,
+        margin={"l": 10, "r": 10, "t": 10, "b": 10},
+        separators=". ",
+        font={"size": 12},
+    )
+    return fig

@@ -595,7 +595,7 @@ def test_segments_cover_every_process() -> None:
     assert len(segs) == 15
 
 
-def test_segments_overlays_draw_bleeds_as_isobars_and_valves_as_lines() -> None:
+def test_segments_overlays_draw_bleeds_as_isobars_and_valves_at_constant_h() -> None:
     import numpy as np
 
     from core.cycles.rankine import rankine_segments
@@ -610,9 +610,14 @@ def test_segments_overlays_draw_bleeds_as_isobars_and_valves_as_lines() -> None:
     overlays = segments_overlays(diagram, spec, pairs)
     assert [o.name for o in overlays] == [
         "procesos a p o s constante",
-        "uniones rectas (referencia)",
+        "estrangulamiento (h constante)",
     ]
     assert all(np.isfinite(o.coords_si["s"]).any() for o in overlays)
-    # 5 → 7: la extracción condensa a p constante; 7 → 8: la válvula es una recta.
+    # 5 → 7: la extracción condensa a p constante; 7 → 8: la válvula del drenaje
+    # estrangula a h constante (Fase 3.2: antes era una recta de referencia).
     assert segment_between(diagram, spec, points[4], points[6])[0] == "isobaric"
-    assert segment_between(diagram, spec, points[6], points[7])[0] == "straight"
+    kind, coords = segment_between(diagram, spec, points[6], points[7])
+    assert kind == "isenthalpic"
+    assert coords["h"] == pytest.approx(np.full(len(coords["h"]), points[6].h_J_per_kg))
+    assert coords["p"][0] == pytest.approx(points[6].P_Pa)
+    assert coords["p"][-1] == pytest.approx(points[7].P_Pa)
