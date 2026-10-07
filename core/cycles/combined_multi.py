@@ -1018,6 +1018,12 @@ _EX_3PRH = "Tres presiones con recalentamiento: turbina de gas moderna, 120/25/4
 _EX_2P = "Dos presiones: turbina de gas típica, 80 bar y 540 °C + 6 bar"
 _EX_2PRH = "Dos presiones con recalentamiento: 100 bar, recalentamiento a 25 bar y 565 °C + 5 bar"
 _EX_1PRH = "Una presión con recalentamiento (para ver qué hace el recalentamiento solo)"
+_EX_3P = "Tres presiones sin recalentamiento: turbina de gas moderna, 120/25/4 bar y 565 °C"
+_EX_2P_MODERN = "Dos presiones: turbina de gas moderna, 100 bar y 565 °C + 5 bar"
+_EX_2PRH_TYPICAL = (
+    "Dos presiones con recalentamiento: turbina de gas típica, 100 bar, recalentamiento a "
+    "25 bar y 540 °C + 6 bar"
+)
 
 #: Ejemplos precargados.
 COMBINED_MULTI_EXAMPLES: dict[str, MultiCombinedInputs] = {
@@ -1048,6 +1054,26 @@ COMBINED_MULTI_EXAMPLES: dict[str, MultiCombinedInputs] = {
         steam=SteamCycle(0.08e5, 0.88, 0.80, 1.5e5),
         reheat=ReheatSpec(540.0 + _C, 25e5),
     ),
+    _EX_3P: MultiCombinedInputs(
+        gas_turbine=_GT_MODERN,
+        levels=(
+            PressureLevel(120e5, 565.0 + _C, 8.0, 5.0),
+            PressureLevel(25e5, None, 8.0, 5.0),
+            PressureLevel(4e5, None, 8.0, 5.0),
+        ),
+        steam=SteamCycle(0.06e5, 0.90, 0.80),
+    ),
+    _EX_2P_MODERN: MultiCombinedInputs(
+        gas_turbine=_GT_MODERN,
+        levels=(PressureLevel(100e5, 565.0 + _C, 8.0, 5.0), PressureLevel(5e5, None, 8.0, 5.0)),
+        steam=SteamCycle(0.06e5, 0.90, 0.80),
+    ),
+    _EX_2PRH_TYPICAL: MultiCombinedInputs(
+        gas_turbine=_GT_TYPICAL,
+        levels=(PressureLevel(100e5, 540.0 + _C, 10.0, 5.0), PressureLevel(6e5, None, 10.0, 5.0)),
+        steam=SteamCycle(0.08e5, 0.88, 0.80),
+        reheat=ReheatSpec(540.0 + _C, 25e5),
+    ),
 }
 
 #: Aclaraciones de cada ejemplo para mostrar en la página.
@@ -1073,6 +1099,20 @@ COMBINED_MULTI_EXAMPLE_NOTES: dict[str, str] = {
         "Una sola presión (100 bar y 540 °C) con recalentamiento a 25 bar y 540 °C y desaireador "
         "a 1,5 bar. Mirá la tabla de configuraciones: el recalentamiento seca el vapor, pero con "
         "una sola presión sube la chimenea y el rendimiento casi no cambia."
+    ),
+    _EX_3P: (
+        "La HRSG de tres presiones de la central moderna, pero sin recalentar: el vapor de "
+        "120 bar termina la expansión con mucha humedad (más del 16 %). Prendé el "
+        "recalentamiento (o la regla de Baumann) y compará."
+    ),
+    _EX_2P_MODERN: (
+        "La turbina moderna con dos presiones sin recalentamiento: alta a 100 bar y 565 °C y baja "
+        "a 5 bar. Con el recalentamiento a 25 bar es el ejemplo de dos presiones con "
+        "recalentamiento."
+    ),
+    _EX_2PRH_TYPICAL: (
+        "La turbina típica con dos presiones y recalentamiento: alta a 100 bar y 540 °C, "
+        "recalentamiento a 25 bar y 540 °C y baja a 6 bar, pinch 10 K."
     ),
 }
 

@@ -38,7 +38,7 @@ from core.cycles.hrsg_multi import PressureLevel
 
 C = 273.15
 NAMES = list(COMBINED_MULTI_EXAMPLES)
-EX_3PRH, EX_2P, EX_2PRH, EX_1PRH = NAMES
+EX_3PRH, EX_2P, EX_2PRH, EX_1PRH = NAMES[:4]
 THREE = COMBINED_MULTI_EXAMPLES[EX_3PRH]
 TWO = COMBINED_MULTI_EXAMPLES[EX_2P]
 WITH_DA = replace(THREE, steam=replace(THREE.steam, deaerator_p_Pa=1.5e5))

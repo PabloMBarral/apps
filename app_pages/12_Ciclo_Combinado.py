@@ -1,13 +1,16 @@
-"""Página 12 — Ciclo combinado gas–vapor de una presión (Fase 3.4).
+"""Página 12 — Ciclo combinado gas–vapor (Fases 3.4 y 3.6).
 
 Una turbina de gas (compresor, cámara de combustión y turbina, con metano o
-con el modelo de aire estándar), una caldera de recuperación (HRSG) de una
-presión y un ciclo de Rankine con desaireador opcional. El cálculo lo hace
-:mod:`core.cycles.combined` (turbina de gas y HRSG con gases ideales; el ciclo
-de vapor con TESPy). La página muestra los rendimientos y las potencias, a
-dónde va la energía (Sankey), los diagramas de cada parte, las tablas de
-estados, el procedimiento, el control de la turbina de gas con TESPy, la
-exportación y barridos.
+con el modelo de aire estándar), una caldera de recuperación (HRSG) y un ciclo
+de vapor. Con una presión y sin recalentamiento es el de la Fase 3.4
+(:mod:`core.cycles.combined`: el ciclo de vapor con TESPy y desaireador
+opcional). Con dos o tres presiones o con recalentamiento (Fase 3.6), la HRSG
+en cascada con el recalentador en paralelo y la turbina de vapor con
+admisiones (:mod:`core.cycles.combined_multi`, cálculo directo y TESPy de
+control). La página muestra los rendimientos y las potencias, a dónde va la
+energía (Sankey), los diagramas de cada parte, las tablas de estados, la
+comparación de configuraciones, la exergía del ciclo de fondo, el
+procedimiento, el control con TESPy, la exportación y barridos.
 """
 
 from __future__ import annotations
@@ -20,7 +23,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from core.cycles.brayton import METHANE, BraytonInputs, BraytonTespy, brayton_tespy
+from core.cycles.brayton import (
+    METHANE,
+    BraytonInputs,
+    BraytonResult,
+    BraytonTespy,
+    brayton_tespy,
+)
 from core.cycles.combined import (
     COMBINED_EXAMPLE_NOTES,
     COMBINED_EXAMPLES,
@@ -34,8 +43,28 @@ from core.cycles.combined import (
     default_sweep_values,
     solve_combined,
 )
+from core.cycles.combined_multi import (
+    COMBINED_MULTI_EXAMPLE_NOTES,
+    COMBINED_MULTI_EXAMPLES,
+    ConfigurationRow,
+    MultiCombinedInputs,
+    MultiCombinedResult,
+    MultiCombinedSweepParameter,
+    MultiCombinedTespy,
+    ReheatSpec,
+    bottoming_exergy,
+    combined_multi_notes,
+    combined_multi_sweep,
+    combined_multi_tespy,
+    combined_multi_to_dict,
+    configuration_comparison,
+    default_multi_combined_sweep_values,
+    solve_combined_multi,
+)
+from core.cycles.combined_multi_procedure import combined_multi_sections
 from core.cycles.combined_procedure import combined_sections
 from core.cycles.hrsg import hrsg_tq_profile
+from core.cycles.hrsg_multi import PressureLevel, level_names, multi_tq_profile
 from core.cycles.rankine import rankine_labeled_states
 from core.diagrams import DiagramType
 from core.export import dict_to_csv
@@ -45,18 +74,25 @@ from core.state_report import format_value, states_table
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, unit_label
 from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_credits
 from ui.cycle_charts import (
+    bottoming_exergy_figure,
+    configuration_figure,
     energy_sankey_figure,
     gas_turbine_ts_figure,
+    multi_tq_figure,
     render_rankine_diagram,
+    render_steam_cycle_diagram,
     tq_figure,
 )
 from ui.diagrams import diagram_type_selector
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.17.0"
+PAGE_VERSION = "0.18.0"
 
 _EXAMPLES = list(COMBINED_EXAMPLES)
+_MULTI_EXAMPLES = list(COMBINED_MULTI_EXAMPLES)
 # Opciones fijas: cambiarlas reiniciaría el widget.
+_LEVEL_OPTIONS = ("1 presión", "2 presiones", "3 presiones")
+_LETTERS = {"alta": "A", "media": "M", "baja": "B", "": "A"}
 _MODEL_FUEL = "Combustión de metano"
 _MODEL_AIR = "Aire estándar (sin combustible)"
 _AIRS = {"Seco (N₂, O₂, Ar, CO₂)": AIR_DRY, "Técnico (21 % O₂, 79 % N₂)": AIR_TECHNICAL}
@@ -449,13 +485,8 @@ def _read_steam(key: str, base: SteamCycle) -> SteamCycle:
     return SteamCycle(p_cond, float(eta_st), float(eta_p), p_da)
 
 
-def _read_inputs(ex: int) -> CombinedInputs:
-    """Widgets con los valores del ejemplo ``ex`` (su número va en cada key)."""
-    base = COMBINED_EXAMPLES[_EXAMPLES[ex]]
-    key = f"cc_{ex}"
-    gt = _read_gas_turbine(key, base.gas_turbine)
-    hrsg = _read_hrsg(key, base)
-    steam = _read_steam(key, base.steam)
+def _read_size(key: str, gt: BraytonInputs) -> tuple[BraytonInputs, float | None]:
+    """Caudal de aire o potencia neta total (todo escala con el caudal)."""
     st.markdown("#### Tamaño")
     size = st.radio(
         "Dato",
@@ -465,26 +496,35 @@ def _read_inputs(ex: int) -> CombinedInputs:
         key=f"{key}_size",
         help="Todo escala con el caudal: los rendimientos no cambian.",
     )
-    W_net = None
     if size == _SIZE_AIR:
         m_air = number_input_si(
             label="Caudal de aire",
             kind="mass_flow",
-            default_si=base.gas_turbine.m_air_kg_s,
+            default_si=gt.m_air_kg_s,
             key=f"{key}_mair",
             format="%.5g",
             min_value_si=0.0,
         )
-        gt = replace(gt, m_air_kg_s=m_air)
-    else:
-        W_net = number_input_si(
-            label="Potencia neta del ciclo combinado",
-            kind="power",
-            default_si=300e6,
-            key=f"{key}_W",
-            format="%.6g",
-            min_value_si=0.0,
-        )
+        return replace(gt, m_air_kg_s=m_air), None
+    W_net = number_input_si(
+        label="Potencia neta del ciclo combinado",
+        kind="power",
+        default_si=300e6,
+        key=f"{key}_W",
+        format="%.6g",
+        min_value_si=0.0,
+    )
+    return gt, W_net
+
+
+def _read_inputs(ex: int) -> CombinedInputs:
+    """Widgets con los valores del ejemplo ``ex`` (su número va en cada key)."""
+    base = COMBINED_EXAMPLES[_EXAMPLES[ex]]
+    key = f"cc_{ex}"
+    gt = _read_gas_turbine(key, base.gas_turbine)
+    hrsg = _read_hrsg(key, base)
+    steam = _read_steam(key, base.steam)
+    gt, W_net = _read_size(key, gt)
     return CombinedInputs(
         gas_turbine=gt,
         steam=steam,
@@ -814,6 +854,677 @@ def _render_sweeps(inputs: CombinedInputs, system: UnitSystem) -> None:
 
 
 # ---------------------------------------------------------------------
+# Dos y tres presiones, recalentamiento (Fase 3.6)
+# ---------------------------------------------------------------------
+
+# (parámetro, magnitud del eje, rótulo del eje)
+_MULTI_SWEEPS: dict[str, tuple[MultiCombinedSweepParameter, QuantityKind | None, str]] = {
+    "Presión de alta": ("p_high", "pressure", "p alta"),
+    "Presión de media": ("p_middle", "pressure", "p media"),
+    "Presión de baja": ("p_low", "pressure", "p baja"),
+    "Presión de recalentamiento": ("p_reheat", "pressure", "p recalentamiento"),
+    "Temperatura de recalentamiento": ("T_reheat", "temperature", "T recalentamiento"),
+    "Pinch (todos los niveles)": ("pinch", "temperature_difference", "ΔT pinch"),
+    "Relación de presiones": ("pressure_ratio", None, "r_p"),
+    "Temperatura de entrada a la turbina": ("T_turbine_in", "temperature", "TIT"),
+}
+_MULTI_SWEEP_NOTES: dict[str, str] = {
+    "p_high": (
+        "Más presión de alta: el vapor vale más y sube el rendimiento, pero sin recalentamiento "
+        "la humedad a la salida de la turbina crece (mirá el título). Con recalentamiento el "
+        "título casi no cambia: por eso las centrales de alta presión recalientan."
+    ),
+    "p_middle": (
+        "La presión de media reparte el calor entre la alta y la baja: muy cerca de la baja, la "
+        "media casi no produce; muy cerca de la alta, le saca gases calientes al nivel de alta. "
+        "Hay un óptimo."
+    ),
+    "p_low": (
+        "Con menos presión de baja la chimenea sale más fría (se recupera más calor), pero ese "
+        "vapor rinde menos en la turbina: hay un óptimo, en general de 3 a 8 bar."
+    ),
+    "p_reheat": (
+        "La presión de recalentamiento tiene un óptimo: muy baja, la turbina de alta hace casi "
+        "todo el salto y el recalentador se agranda; muy alta, el recalentamiento casi no seca "
+        "el vapor (Cengel §10-5)."
+    ),
+    "T_reheat": (
+        "Recalentar más caliente seca el vapor y lo hace más valioso, pero le saca calor de alta "
+        "temperatura a la producción de vapor: con una sola presión puede bajar el rendimiento."
+    ),
+    "pinch": _SWEEP_NOTES["pinch"],
+    "pressure_ratio": _SWEEP_NOTES["pressure_ratio"],
+    "T_turbine_in": _SWEEP_NOTES["T_turbine_in"],
+}
+
+
+@st.cache_data(show_spinner="Resolviendo el ciclo combinado…")
+def _solve_multi_cached(inputs: MultiCombinedInputs) -> MultiCombinedResult:
+    return solve_combined_multi(inputs)
+
+
+@st.cache_data(show_spinner="Comparando configuraciones (resuelve la planta varias veces)…")
+def _comparison_cached(inputs: MultiCombinedInputs) -> list[ConfigurationRow]:
+    return configuration_comparison(inputs)
+
+
+@st.cache_data(show_spinner="Resolviendo con TESPy…")
+def _multi_tespy_cached(
+    inputs: MultiCombinedInputs,
+) -> tuple[BraytonTespy | str, MultiCombinedTespy | str]:
+    result = solve_combined_multi(inputs)
+    gt: BraytonTespy | str
+    steam: MultiCombinedTespy | str
+    try:
+        gt = brayton_tespy(result.gas_turbine)
+    except ValueError as exc:
+        gt = str(exc)
+    try:
+        steam = combined_multi_tespy(result)
+    except ValueError as exc:
+        steam = str(exc)
+    return gt, steam
+
+
+@st.cache_data(show_spinner="Calculando el barrido…")
+def _multi_sweep_cached(
+    inputs: MultiCombinedInputs, parameter: MultiCombinedSweepParameter
+) -> list[tuple[float, float, float, float, float]]:
+    values = default_multi_combined_sweep_values(inputs, parameter)
+    return [
+        (p.value_si, p.eta, p.eta_gas_turbine, p.x_exhaust, p.T_stack_K)
+        for p in combined_multi_sweep(inputs, parameter, values)
+    ]
+
+
+def _configuration() -> tuple[int, bool]:
+    """Cantidad de niveles de la HRSG y si se recalienta."""
+    choice = st.radio(
+        "Niveles de presión de la HRSG",
+        _LEVEL_OPTIONS,
+        horizontal=True,
+        key="cc_levels",
+        help=(
+            "Con dos o tres presiones la HRSG enfría más los gases y el vapor de los niveles de "
+            "menor presión entra a la turbina en las admisiones (Kehlhofer et al., cap. 5)."
+        ),
+    )
+    reheat = st.checkbox(
+        "Recalentamiento",
+        key="cc_reheat",
+        help=(
+            "El vapor que sale de la turbina de alta vuelve a la HRSG y se recalienta en paralelo "
+            "con el sobrecalentador de alta (Cengel §10-5)."
+        ),
+    )
+    return _LEVEL_OPTIONS.index(choice) + 1, bool(reheat)
+
+
+def _multi_example(config: tuple[int, bool]) -> str:
+    n, rh = config
+    names = [
+        name
+        for name, i in COMBINED_MULTI_EXAMPLES.items()
+        if len(i.levels) == n and (i.reheat is not None) == rh
+    ]
+    return str(
+        st.selectbox(
+            "Ejemplo precargado",
+            names,
+            key=f"cm_example_{n}{'r' if rh else ''}",
+            help="Podés cambiar cualquier dato y volver a calcular.",
+        )
+    )
+
+
+def _read_level(prefix: str, name: str, level: PressureLevel) -> PressureLevel:
+    system = get_current_system()
+    key = f"{prefix}_{_LETTERS[name]}"
+    st.markdown(f"**Nivel de {name}**" if name else "**Caldera**")
+    left, right = st.columns(2)
+    with left:
+        p = number_input_si(
+            label="Presión",
+            kind="pressure",
+            default_si=level.p_Pa,
+            key=f"{key}_p",
+            format="%.5g",
+            min_value_si=0.0,
+        )
+        T_sat = _T_sat(p)
+        st.caption(
+            "Sin saturación a esa presión."
+            if T_sat is None
+            else f"T_sat = {_fmt(T_sat, 'temperature', system)}"
+        )
+        pinch = number_input_si(
+            label="Pinch",
+            kind="temperature_difference",
+            default_si=level.pinch_K,
+            key=f"{key}_pinch",
+            format="%.3g",
+            min_value_si=0.0,
+        )
+    with right:
+        steam = st.radio(
+            "Vapor",
+            (_STEAM_SH, _STEAM_SAT),
+            index=0 if level.T_steam_K is not None else 1,
+            horizontal=True,
+            key=f"{key}_steam",
+        )
+        T_steam = None
+        if steam == _STEAM_SH:
+            T_steam = number_input_si(
+                label="Vapor sobrecalentado",
+                kind="temperature",
+                default_si=level.T_steam_K or ((T_sat or 523.15) + 30.0),
+                key=f"{key}_Ts",
+                format="%.4g",
+            )
+        approach = number_input_si(
+            label="Approach",
+            kind="temperature_difference",
+            default_si=level.approach_K,
+            key=f"{key}_approach",
+            format="%.3g",
+            min_value_si=0.0,
+        )
+    return PressureLevel(p, T_steam, pinch, approach)
+
+
+def _read_reheat(prefix: str, base: MultiCombinedInputs, n: int) -> ReheatSpec:
+    st.markdown("#### Recalentamiento")
+    spec = base.reheat or ReheatSpec(base.levels[0].T_steam_K or 813.15, 25e5)
+    left, right = st.columns(2)
+    p: float | None = None
+    with left:
+        if n == 3:
+            st.caption(
+                "Con tres niveles el recalentamiento es a la presión de media: el vapor de media "
+                "se suma al que vuelve de la turbina de alta antes del recalentador."
+            )
+        else:
+            p = number_input_si(
+                label="Presión de recalentamiento",
+                kind="pressure",
+                default_si=spec.p_Pa or 25e5,
+                key=f"{prefix}_rh_p",
+                format="%.4g",
+                min_value_si=0.0,
+                help="La de salida de la turbina de alta: típico, 15 a 40 bar.",
+            )
+    with right:
+        T = number_input_si(
+            label="Vapor recalentado",
+            kind="temperature",
+            default_si=spec.T_K,
+            key=f"{prefix}_rh_T",
+            format="%.4g",
+            help="Típico: la misma que el vapor de alta (565 °C en las centrales modernas).",
+        )
+    return ReheatSpec(T, p)
+
+
+def _read_multi_inputs(config: tuple[int, bool], name: str) -> MultiCombinedInputs:
+    """Widgets con los valores del ejemplo ``name`` (su configuración y su número van en la key)."""
+    n, rh = config
+    base = COMBINED_MULTI_EXAMPLES[name]
+    prefix = f"cm{n}{'r' if rh else ''}_{_MULTI_EXAMPLES.index(name)}"
+    gt = _read_gas_turbine(prefix, base.gas_turbine)
+    st.markdown("#### Caldera de recuperación (HRSG)")
+    st.caption(
+        "Los niveles van de mayor a menor presión, en cascada: los gases los recorren de alta a "
+        "baja y el economizador de baja calienta toda el agua (ver la página HRSG)."
+    )
+    levels = tuple(
+        _read_level(prefix, nm, lv) for nm, lv in zip(level_names(n), base.levels, strict=True)
+    )
+    reheat = _read_reheat(prefix, base, n) if rh else None
+    steam = _read_steam(prefix, base.steam)
+    baumann = st.checkbox(
+        "Pérdida por humedad en la turbina (regla de Baumann, α = 1)",
+        value=base.baumann_alpha > 0.0,
+        key=f"{prefix}_baumann",
+        help=(
+            "Las gotas frenan los álabes: en la parte húmeda de cada expansión el rendimiento "
+            "baja a η_T·(1 − ȳ), con ȳ la humedad media. Sin la regla (como Cengel), la humedad "
+            "no cuesta rendimiento."
+        ),
+    )
+    gt, W_net = _read_size(prefix, gt)
+    return MultiCombinedInputs(
+        gas_turbine=gt,
+        levels=levels,
+        steam=steam,
+        reheat=reheat,
+        baumann_alpha=1.0 if baumann else 0.0,
+        W_net_W=W_net,
+    )
+
+
+def _render_multi_metrics(result: MultiCombinedResult, system: UnitSystem) -> None:
+    P = unit_label("power", system)
+    T_unit = unit_label("temperature", system)
+    m_unit = unit_label("mass_flow", system)
+    gt = result.gas_turbine
+    row1 = st.columns(3)
+    row1[0].metric("η ciclo combinado [%]", f"{result.eta_th * 100:.2f}")
+    row1[1].metric(f"Ẇ neto [{P}]", _value(result.W_net_W, "power", system))
+    heat = "Q̇ entrada" if gt.inputs.air_standard else "Q̇ combustible"
+    row1[2].metric(f"{heat} [{P}]", _value(result.Q_fuel_W, "power", system))
+    row2 = st.columns(3)
+    row2[0].metric("η turbina de gas [%]", f"{result.eta_gas_turbine * 100:.2f}")
+    row2[1].metric(f"Ẇ turbina de gas [{P}]", _value(result.W_gas_turbine_W, "power", system))
+    row2[2].metric(f"T escape [{T_unit}]", _value(gt.T_exhaust_K, "temperature", system, 4))
+    row3 = st.columns(3)
+    row3[0].metric("η ciclo de vapor [%]", f"{result.eta_steam * 100:.2f}")
+    row3[1].metric(f"Ẇ ciclo de vapor [{P}]", _value(result.W_steam_turbine_W, "power", system))
+    row3[2].metric(f"ṁ vapor total [{m_unit}]", _value(result.m_steam_kg_s, "mass_flow", system))
+    levels = result.hrsg.levels
+    row4 = st.columns(len(levels))
+    for col, lv in zip(row4, levels, strict=True):
+        label = f"ṁ vapor de {lv.name} [{m_unit}]" if lv.name else f"ṁ vapor [{m_unit}]"
+        col.metric(label, _value(lv.m_steam_kg_s, "mass_flow", system))
+    x = bottoming_exergy(result)
+    row5 = st.columns(3)
+    row5[0].metric(
+        f"T chimenea [{T_unit}]", _value(result.hrsg.T_stack_K, "temperature", system, 4)
+    )
+    row5[1].metric("x salida turbina", f"{result.steam.x_exhaust:.3f}")
+    row5[2].metric("η_II ciclo de fondo [%]", f"{x.efficiency * 100:.1f}")
+    parts = [f"ṁ aire = {_value(gt.m_air_kg_s, 'mass_flow', system)} {m_unit}"]
+    if not gt.inputs.air_standard:
+        parts += [
+            f"ṁ combustible = {_value(gt.m_fuel_kg_s, 'mass_flow', system)} {m_unit}",
+            f"λ = {format_value(gt.excess_air, 4)}",
+        ]
+    parts += [
+        f"ṁ_v/ṁ_g = {format_value(result.steam_gas_ratio, 4)}",
+        f"η_HRSG = {result.eta_hrsg * 100:.1f} %",
+        f"heat rate {_number(result.heat_rate_kJ_per_kWh)} kJ/kWh",
+    ]
+    st.caption(" · ".join(parts) + ".")
+    for note in combined_multi_notes(result):
+        st.info(note)
+
+
+def _render_multi_hrsg(result: MultiCombinedResult, system: UnitSystem) -> None:
+    st.markdown("#### Caldera de recuperación")
+    hrsg = result.hrsg
+    try:
+        st.plotly_chart(
+            multi_tq_figure(hrsg, multi_tq_profile(hrsg), system), width="stretch", key="cm_tq"
+        )
+    except Exception as exc:  # el diagrama no debe tumbar la página
+        st.warning(f"No se pudo dibujar el diagrama: {exc}")
+    T_unit = unit_label("temperature", system)
+    rows = [
+        {
+            "Sección": s.name,
+            f"Q̇ [{unit_label('power', system)}]": _value(s.Q_W, "power", system),
+            f"Gases [{T_unit}]": (
+                f"{_value(s.T_gas_in_K, 'temperature', system, 4)} → "
+                f"{_value(s.T_gas_out_K, 'temperature', system, 4)}"
+            ),
+            f"Agua [{T_unit}]": (
+                f"{_value(s.T_water_in_K, 'temperature', system, 4)} → "
+                f"{_value(s.T_water_out_K, 'temperature', system, 4)}"
+            ),
+        }
+        for s in hrsg.sections
+    ]
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    pinches = ", ".join(
+        f"{lv.name or 'único'} {_fmt(lv.pinch_K, 'temperature_difference', system, 3)}"
+        for lv in hrsg.levels
+    )
+    reheat = (
+        " El recalentador va en paralelo con el sobrecalentador de alta: los dos bancos ven los "
+        "gases de entrada y los dejan a la misma temperatura (en el T–Q, sus curvas ocupan el "
+        "mismo tramo)."
+        if hrsg.reheat is not None
+        else ""
+    )
+    st.caption(
+        f"Pinch de cada nivel: {pinches}; chimenea "
+        f"{_fmt(hrsg.T_stack_K, 'temperature', system, 4)}. El agua de alimentación es la que "
+        "entrega la bomba del ciclo de vapor." + reheat
+    )
+
+
+def _render_multi_steam(result: MultiCombinedResult, system: UnitSystem) -> None:
+    st.markdown("#### Ciclo de vapor")
+    cyc = result.steam
+    with st.expander("📈 Diagrama del ciclo de vapor", expanded=False):
+        diagram_type: DiagramType = diagram_type_selector(key="cm_diagram_type", default="Ts")
+        try:
+            render_steam_cycle_diagram(result, system, diagram_type, chart_key="cm_steam_chart")
+        except Exception as exc:  # el diagrama no debe tumbar la página
+            st.warning(f"No se pudo dibujar el diagrama: {exc}")
+        st.caption(
+            "Los estados numerados del ciclo; sin número, el agua de cada nivel en la HRSG (del "
+            "economizador al vapor) y las bombas entre niveles."
+        )
+    labeled = [
+        (f"{k + 1} · {label}", s)
+        for k, (label, s) in enumerate(zip(cyc.labels, cyc.states, strict=True))
+    ]
+    frame = pd.DataFrame(states_table(labeled, system))
+    frame = frame.drop(columns=[c for c in frame.columns if c == "Fluido" or c.startswith("u [")])
+    for column in frame.columns:
+        if column not in ("Estado", "Región"):
+            frame[column] = [format_value(v) for v in frame[column]]
+    st.dataframe(frame, hide_index=True, width="stretch")
+    P = unit_label("power", system)
+    m_unit = unit_label("mass_flow", system)
+    turbines = [
+        {
+            "Turbina": t.name,
+            "Estados": f"{t.inlet + 1} → {t.outlet + 1}",
+            f"ṁ [{m_unit}]": _value(t.m_in_kg_s, "mass_flow", system),
+            f"Ẇ [{P}]": _value(t.W_W, "power", system),
+            "η efectivo": format_value(
+                (cyc.states[t.inlet].h_J_per_kg - cyc.states[t.outlet].h_J_per_kg)
+                / (cyc.states[t.inlet].h_J_per_kg - t.outlet_s.h_J_per_kg),
+                4,
+            ),
+        }
+        for t in cyc.turbines
+    ]
+    st.dataframe(pd.DataFrame(turbines), hide_index=True, width="stretch")
+    st.caption(
+        "Cada tramo entre dos admisiones (o el recalentador) es una turbina con η_T desde su "
+        "entrada; el η efectivo baja si la regla de Baumann está prendida y la expansión termina "
+        "húmeda. El vapor de cada nivel entra mezclándose a la presión de su domo."
+    )
+
+
+def _render_comparison(computed: MultiCombinedInputs, system: UnitSystem) -> None:
+    st.markdown("#### ¿Cuánto ganás con más presiones y recalentamiento?")
+    rows = _comparison_cached(replace(computed, W_net_W=None))
+    T_unit = unit_label("temperature", system)
+    table = []
+    for row in rows:
+        if row.result is None or row.result_baumann is None:
+            table.append(
+                {
+                    "Configuración": row.label,
+                    "η [%]": "—",
+                    "η Baumann [%]": "—",
+                    "x salida": "—",
+                    f"Chimenea [{T_unit}]": "—",
+                    "η_II fondo [%]": "—",
+                }
+            )
+            continue
+        r = row.result
+        table.append(
+            {
+                "Configuración": row.label,
+                "η [%]": f"{r.eta_th * 100:.2f}",
+                "η Baumann [%]": f"{row.result_baumann.eta_th * 100:.2f}",
+                "x salida": f"{r.steam.x_exhaust:.3f}",
+                f"Chimenea [{T_unit}]": _value(r.hrsg.T_stack_K, "temperature", system, 4),
+                "η_II fondo [%]": f"{bottoming_exergy(r).efficiency * 100:.1f}",
+            }
+        )
+    st.dataframe(pd.DataFrame(table), hide_index=True, width="stretch")
+    try:
+        st.plotly_chart(configuration_figure(rows), width="stretch", key="cm_configurations")
+    except Exception as exc:  # el diagrama no debe tumbar la página
+        st.warning(f"No se pudo dibujar el diagrama: {exc}")
+    failed = [row for row in rows if row.result is None]
+    for row in failed:
+        st.caption(f"{row.label}: no tiene sentido físico con estos datos ({row.error})")
+    st.caption(
+        "La misma turbina de gas con los niveles de tus datos (alta; alta y baja; los tres), con "
+        "y sin recalentamiento. Más niveles acercan la curva del agua a la de los gases: la "
+        "chimenea sale más fría y se destruye menos exergía en la HRSG. El recalentamiento seca "
+        "el vapor (x más alto); con η_T constante casi no suma rendimiento, porque la humedad no "
+        "cuesta nada, y con la regla de Baumann sí."
+    )
+
+
+def _render_bottoming_exergy(result: MultiCombinedResult, system: UnitSystem) -> None:
+    st.markdown("#### Exergía del ciclo de fondo")
+    x = bottoming_exergy(result)
+    try:
+        st.plotly_chart(bottoming_exergy_figure(x, system), width="stretch", key="cm_exergy")
+    except Exception as exc:  # el diagrama no debe tumbar la página
+        st.warning(f"No se pudo dibujar el diagrama: {exc}")
+    st.caption(
+        f"De la exergía que traen los gases de escape ({_fmt(x.X_gas_in_W, 'power', system)}, con "
+        f"T₀ = {_fmt(x.T0_K, 'temperature', system, 4)}), el ciclo de vapor convierte en trabajo "
+        f"el {x.efficiency * 100:.1f} %. La HRSG destruye exergía porque pasa calor con "
+        "diferencia de temperatura (más niveles la achican); las turbinas, por fricción; las "
+        "mezclas, por juntar vapores a distinta temperatura. El agua de enfriamiento del "
+        "condensador se lleva lo que queda en el vapor de escape y la chimenea, lo que no se "
+        "recupera (Cengel cap. 8)."
+    )
+
+
+def _gt_tespy_rows(
+    gt: BraytonResult, control: BraytonTespy, system: UnitSystem
+) -> list[tuple[str, str, str]]:
+    T_unit = unit_label("temperature", system)
+    e_unit = unit_label("specific_enthalpy", system)
+    rows = [
+        (
+            f"T₂ [{T_unit}]",
+            _value(gt.state("2").T_K, "temperature", system),
+            _value(control.T2_K, "temperature", system),
+        ),
+        (
+            f"T₄ [{T_unit}]",
+            _value(gt.T_exhaust_K, "temperature", system),
+            _value(control.T4_K, "temperature", system),
+        ),
+        (
+            f"w_neto [{e_unit}]",
+            _value(gt.w_net_J_per_kg, "specific_enthalpy", system),
+            _value(control.w_net_J_per_kg, "specific_enthalpy", system),
+        ),
+        ("η turbina de gas [%]", f"{gt.eta_th * 100:.3f}", f"{control.eta_th * 100:.3f}"),
+    ]
+    if control.excess_air is not None and gt.excess_air is not None:
+        rows.append(("λ", format_value(gt.excess_air, 5), format_value(control.excess_air, 5)))
+    return rows
+
+
+def _render_multi_tespy(
+    computed: MultiCombinedInputs, result: MultiCombinedResult, system: UnitSystem
+) -> None:
+    with st.expander("⚙️ Control con TESPy", expanded=False):
+        st.markdown(
+            "La misma planta resuelta con [TESPy](https://tespy.readthedocs.io). Turbina de gas: "
+            "*Compressor*, *DiabaticCombustionChamber* y *Turbine*, como su tutorial. Lado "
+            "agua–vapor: *HeatExchanger* en serie para los gases (el sobrecalentador de alta y "
+            "el recalentador en paralelo, con *Splitter* y *Merge* de gases), un "
+            "*DropletSeparator* y una *Pump* por domo, *Turbine* por tramo y un *Merge* en cada "
+            "admisión y en el desaireador. TESPy evalúa los gases a su presión parcial: difiere "
+            "unas décimas de % del cálculo directo."
+        )
+        gt_control, steam_control = _multi_tespy_cached(computed)
+        columns = ["Magnitud", "Cálculo directo", "TESPy"]
+        if isinstance(gt_control, str):
+            st.warning(f"TESPy no pudo resolver la turbina de gas: {gt_control}")
+        else:
+            st.markdown("**Turbina de gas**")
+            st.dataframe(
+                pd.DataFrame(
+                    _gt_tespy_rows(result.gas_turbine, gt_control, system), columns=columns
+                ),
+                hide_index=True,
+                width="stretch",
+            )
+        if isinstance(steam_control, str):
+            st.warning(f"TESPy no pudo resolver el lado agua–vapor: {steam_control}")
+            return
+        m_unit = unit_label("mass_flow", system)
+        rows = [
+            (
+                f"ṁ vapor de {lv.name or 'la HRSG'} [{m_unit}]",
+                _value(lv.m_steam_kg_s, "mass_flow", system),
+                _value(m, "mass_flow", system),
+            )
+            for lv, m in zip(result.hrsg.levels, steam_control.m_steam_kg_s, strict=True)
+        ]
+        rows += [
+            (
+                f"Ẇ ciclo de vapor [{unit_label('power', system)}]",
+                _value(result.W_steam_turbine_W, "power", system),
+                _value(steam_control.W_steam_W, "power", system),
+            ),
+            (
+                f"T chimenea [{unit_label('temperature', system)}]",
+                _value(result.hrsg.T_stack_K, "temperature", system),
+                _value(steam_control.T_stack_K, "temperature", system),
+            ),
+        ]
+        st.markdown("**HRSG y ciclo de vapor**")
+        st.dataframe(pd.DataFrame(rows, columns=columns), hide_index=True, width="stretch")
+
+
+def _render_multi_procedure(result: MultiCombinedResult, system: UnitSystem) -> None:
+    with st.expander("🔬 Procedimiento", expanded=False):
+        st.caption(
+            "Cómo se resuelve a mano, parte por parte: la turbina de gas (Cengel §9-8), la HRSG "
+            "de varias presiones (Kehlhofer et al., cap. 5), el ciclo de vapor con sus admisiones "
+            "(Cengel §10-2 a §10-6) y, al final, el acople, el rendimiento y la exergía."
+        )
+        n = 0
+        for title, steps in combined_multi_sections(result, system):
+            st.markdown(f"##### {title}")
+            for step in steps:
+                n += 1
+                st.markdown(f"**{n}. {step.title}**")
+                if step.text:
+                    st.markdown(step.text)
+                for tex in step.latex:
+                    st.latex(tex)
+
+
+def _render_multi_export(result: MultiCombinedResult, system: UnitSystem) -> None:
+    st.markdown("#### 💾 Exportar")
+    data = combined_multi_to_dict(result, system)
+    left, right = st.columns(2)
+    left.download_button(
+        "Descargar CSV",
+        data=dict_to_csv(data).encode("utf-8"),
+        file_name="ciclo_combinado.csv",
+        mime="text/csv",
+        key="cm_download_csv",
+    )
+    right.download_button(
+        "Descargar JSON",
+        data=json.dumps(data, ensure_ascii=False, indent=2),
+        file_name="ciclo_combinado.json",
+        mime="application/json",
+        key="cm_download_json",
+    )
+
+
+def _render_multi_sweeps(inputs: MultiCombinedInputs, system: UnitSystem) -> None:
+    with st.expander("📊 ¿Cómo mejorar el ciclo combinado?", expanded=False):
+        st.markdown(
+            "Elegí qué variar (el resto queda como en tu ciclo) para ver cómo cambian el "
+            "rendimiento y el título a la salida de la turbina:"
+        )
+        n = len(inputs.levels)
+        skip = set()
+        if n < 3:
+            skip.add("p_middle")
+        if n < 2:
+            skip.add("p_low")
+        if inputs.reheat is None:
+            skip |= {"p_reheat", "T_reheat"}
+        elif n == 3:
+            skip.add("p_reheat")
+        sweeps = {k: v for k, v in _MULTI_SWEEPS.items() if v[0] not in skip}
+        choice = st.selectbox("Variable", list(sweeps), key="cm_sweep_param")
+        parameter, kind, axis = sweeps[choice]
+        if st.button("Calcular barrido", key="cm_sweep_btn"):
+            st.session_state["cm_sweep"] = (inputs, parameter)
+        if st.session_state.get("cm_sweep") != (inputs, parameter):
+            st.caption("Tocá «Calcular barrido» (resuelve el ciclo combinado varias veces).")
+            return
+        points = _multi_sweep_cached(inputs, parameter)
+        if not points:
+            st.warning("Ningún punto del barrido tiene sentido físico con estos datos.")
+            return
+        if kind is None:
+            xs = [p[0] for p in points]
+            x_title = f"{axis} [-]"
+        else:
+            xs = [convert_from_si(p[0], kind, system) for p in points]
+            x_title = f"{axis} [{unit_label(kind, system)}]"
+        log_x = parameter in ("pressure_ratio", "p_high", "p_middle", "p_low", "p_reheat")
+        fig = go.Figure()
+        for k, name in ((1, "ciclo combinado"), (2, "turbina de gas")):
+            fig.add_trace(
+                go.Scatter(x=xs, y=[p[k] * 100 for p in points], mode="lines+markers", name=name)
+            )
+        fig.update_layout(
+            height=320,
+            margin={"l": 10, "r": 10, "t": 30, "b": 10},
+            title="Rendimientos",
+            xaxis_title=x_title,
+            yaxis_title="η [%]",
+            legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+            separators=". ",
+        )
+        if log_x:
+            fig.update_xaxes(type="log")
+        st.plotly_chart(fig, width="stretch", key="cm_sweep_eta")
+        fig = go.Figure(
+            go.Scatter(x=xs, y=[p[3] for p in points], mode="lines+markers", name="x salida")
+        )
+        fig.add_hline(y=0.88, line_dash="dot", line_color="gray", annotation_text="x ≈ 0,88")
+        fig.update_layout(
+            height=280,
+            margin={"l": 10, "r": 10, "t": 30, "b": 10},
+            title="Título a la salida de la turbina",
+            xaxis_title=x_title,
+            yaxis_title="x [-]",
+            separators=". ",
+        )
+        if log_x:
+            fig.update_xaxes(type="log")
+        st.plotly_chart(fig, width="stretch", key="cm_sweep_x")
+        skipped = len(default_multi_combined_sweep_values(inputs, parameter)) - len(points)
+        if skipped:
+            st.caption(
+                f"{skipped} valor(es) del barrido no tienen sentido físico (cruce de "
+                "temperaturas en la HRSG, vapor más caliente que los gases…) y se omiten."
+            )
+        st.caption(_MULTI_SWEEP_NOTES[parameter])
+
+
+def _render_multi(computed: MultiCombinedInputs, name: str, system: UnitSystem) -> None:
+    try:
+        result = _solve_multi_cached(computed)
+    except ValueError as exc:
+        _render_error(exc)
+        return
+    st.markdown("### Resultado")
+    note = COMBINED_MULTI_EXAMPLE_NOTES.get(name)
+    if note:
+        st.caption(f"📘 Sobre este ejemplo: {note}")
+    _render_multi_metrics(result, system)
+    _render_energy(result, system)  # type: ignore[arg-type]
+    _render_gas_turbine(result, system)  # type: ignore[arg-type]
+    _render_multi_hrsg(result, system)
+    _render_multi_steam(result, system)
+    _render_comparison(computed, system)
+    _render_bottoming_exergy(result, system)
+    _render_multi_procedure(result, system)
+    _render_multi_tespy(computed, result, system)
+    _render_multi_export(result, system)
+    _render_multi_sweeps(computed, system)
+
+
+# ---------------------------------------------------------------------
 # Fórmulas teóricas
 # ---------------------------------------------------------------------
 
@@ -867,6 +1578,37 @@ def _render_theory() -> None:
             r"\begin{aligned}\dot{Q}_{\mathrm{comb}} &= \dot{W}_{TG} + \dot{W}_{TV} \\ &\quad"
             r" + \dot{Q}_{\mathrm{cond}} + \dot{Q}_{\mathrm{chim}}\end{aligned}"
         )
+        st.markdown(
+            "**Dos y tres presiones, recalentamiento** (Kehlhofer et al., cap. 5; Cengel §10-5). "
+            "La HRSG en cascada (ver la página HRSG) entrega vapor de cada nivel; el de media y el "
+            "de baja entran a la turbina en las *admisiones*, mezclándose a la presión de su domo "
+            "con el que viene de la turbina (mezcla adiabática, vademecum §3.3):"
+        )
+        st.latex(r"\dot{m}_3\,h_3 = \dot{m}_1\,h_1 + \dot{m}_2\,h_2")
+        st.markdown(
+            "El **recalentador** va en paralelo con el sobrecalentador de alta. Con tres niveles "
+            "el vapor de media se suma al recalentamiento frío: el calor del recalentador depende "
+            "de ṁ_M, y los balances de alta y de media forman un sistema lineal en (ṁ_A, ṁ_M):"
+        )
+        st.latex(
+            r"\begin{aligned}a_{11}\,\dot{m}_A + a_{12}\,\dot{m}_M &= b_1 \\"
+            r" a_{21}\,\dot{m}_A + a_{22}\,\dot{m}_M &= b_2\end{aligned}"
+        )
+        st.markdown(
+            "**Regla de Baumann**: en la parte húmeda de una expansión las gotas frenan los "
+            "álabes y el rendimiento baja con la humedad media ȳ (α ≈ 1):"
+        )
+        st.latex(r"\eta_{\mathrm{h}} = \eta_T\,(1 - \alpha\,\bar{y})")
+        st.markdown(
+            "**Exergía del ciclo de fondo** (Cengel cap. 8): la de los gases de escape termina "
+            "como trabajo, destruida en cada equipo (T₀·S_gen), en el condensador o en la "
+            "chimenea:"
+        )
+        st.latex(
+            r"\begin{aligned}\dot{X}_{\mathrm{gases}} &= \dot{W}_{TV}"
+            r" + \sum \dot{X}_{\mathrm{dest}} \\ &\quad"
+            r" + \dot{X}_{\mathrm{cond}} + \dot{X}_{\mathrm{chim}}\end{aligned}"
+        )
 
 
 # ---------------------------------------------------------------------
@@ -879,9 +1621,9 @@ st.subheader(SUBJECT)
 st.title("⚡ Ciclo combinado gas–vapor")
 st.markdown(
     "Una **turbina de gas** quema el combustible; sus gases de escape, todavía a 500–650 °C, "
-    "producen vapor en una **caldera de recuperación** (HRSG) de una presión, y el vapor mueve "
-    "un **ciclo de Rankine**. Con el mismo combustible se obtiene bastante más trabajo que con "
-    "la turbina de gas sola."
+    "producen vapor en una **caldera de recuperación** (HRSG) de una, dos o tres presiones, y el "
+    "vapor mueve un **ciclo de Rankine**, con recalentamiento si querés. Con el mismo "
+    "combustible se obtiene bastante más trabajo que con la turbina de gas sola."
 )
 _render_theory()
 st.markdown("---")
@@ -890,18 +1632,30 @@ sidebar_credits(version=PAGE_VERSION, page_name="Ciclo combinado")
 render_units_selector()
 system = get_current_system()
 
-ex = _example_index()
-inputs = _read_inputs(ex)
+config = _configuration()
+inputs: CombinedInputs | MultiCombinedInputs
+if config == (1, False):  # una presión sin recalentar: el ciclo de la Fase 3.4
+    ex = _example_index()
+    inputs = _read_inputs(ex)
+    marker: object = ex
+else:
+    multi_name = _multi_example(config)
+    inputs = _read_multi_inputs(config, multi_name)
+    marker = (config, multi_name)
 
-# Se calcula al elegir un ejemplo y cada vez que se toca el botón.
-if st.session_state.get("cc_example_prev") != ex:
-    st.session_state["cc_example_prev"] = ex
+# Se calcula al elegir un ejemplo (o una configuración) y cada vez que se toca el botón.
+if st.session_state.get("cc_example_prev") != marker:
+    st.session_state["cc_example_prev"] = marker
     st.session_state["cc_inputs"] = inputs
 if st.button("Calcular ciclo combinado", key="cc_btn", type="primary"):
     st.session_state["cc_inputs"] = inputs
 
-computed: CombinedInputs | None = st.session_state.get("cc_inputs")
-if computed is not None:
+computed: CombinedInputs | MultiCombinedInputs | None = st.session_state.get("cc_inputs")
+if isinstance(computed, MultiCombinedInputs):
+    if computed != inputs:
+        st.caption("Cambiaste datos: tocá «Calcular ciclo combinado» para actualizar el resultado.")
+    _render_multi(computed, multi_name, system)
+elif computed is not None:
     if computed != inputs:
         st.caption("Cambiaste datos: tocá «Calcular ciclo combinado» para actualizar el resultado.")
     try:
