@@ -87,6 +87,14 @@ def _home_page() -> None:
           bomba de calor: COP, estados, ciclo sobre el diagrama log p–h,
           procedimiento con las tablas, exergía destruida en cada
           componente y barridos (ejemplos de Cengel cap. 11).
+        - 🌀 **Brayton** — turbina de gas con las tres mejoras del ciclo
+          Brayton: compresión en etapas con interenfriamiento, expansión en
+          etapas con recalentamiento (con metano, una segunda cámara de
+          combustión) y regenerador, con combustión de metano o aire
+          estándar: rendimiento, trabajo y relación de trabajo de
+          retroceso, diagrama T–s, **cuánto suma cada mejora**, la
+          **exergía destruida en cada componente**, procedimiento con las
+          tablas de gas ideal y barridos (ejemplos de Cengel cap. 9).
         - 🏭 **HRSG** — caldera de recuperación de una, dos o tres
           presiones: con los gases (temperatura, caudal y composición, o el
           escape de una turbina de gas a metano con exceso de aire λ), el
@@ -120,9 +128,8 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Ciclo Brayton con regeneración, interenfriamiento y
-        recalentamiento, psicrometría, combustión, exergía de toda la
-        planta. Ver el
+        Psicrometría, combustión, poder calorífico por correlaciones,
+        exergía de toda la planta. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -135,8 +142,8 @@ def _home_page() -> None:
         (K, Pa, J/kg, J/(kg·K)), **Técnico** (°C, bar, kJ/kg, kJ/(kg·K))
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
-        Propiedades, Isoentrópicos, Rankine, Refrigeración, HRSG y Ciclo
-        combinado.
+        Propiedades, Isoentrópicos, Rankine, Refrigeración, Brayton, HRSG y
+        Ciclo combinado.
         Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
@@ -154,6 +161,7 @@ pages = [
     st.Page("app_pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
     st.Page("app_pages/5_Rankine.py", title="Rankine", icon="♨️"),
     st.Page("app_pages/6_Refrigeracion.py", title="Refrigeración", icon="❄️"),
+    st.Page("app_pages/13_Brayton.py", title="Brayton", icon="🌀"),
     st.Page("app_pages/10_HRSG.py", title="HRSG", icon="🏭"),
     st.Page("app_pages/12_Ciclo_Combinado.py", title="Ciclo combinado", icon="⚡"),
 ]
