@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.16.0"
+PAGE_VERSION = "0.17.0"
 
 
 def _home_page() -> None:
@@ -87,13 +87,16 @@ def _home_page() -> None:
           bomba de calor: COP, estados, ciclo sobre el diagrama log p–h,
           procedimiento con las tablas, exergía destruida en cada
           componente y barridos (ejemplos de Cengel cap. 11).
-        - 🏭 **HRSG** — caldera de recuperación de una presión: con los
-          gases (temperatura, caudal y composición, o el escape de una
-          turbina de gas a metano con exceso de aire λ), la presión de
-          evaporación, el agua de alimentación, el pinch y el approach,
-          arma el **diagrama T–Q** con vapor sobrecalentado o saturado:
-          caudal de vapor, temperaturas de los gases entre secciones y de
-          chimenea, punto de rocío, procedimiento y barridos.
+        - 🏭 **HRSG** — caldera de recuperación de una, dos o tres
+          presiones: con los gases (temperatura, caudal y composición, o el
+          escape de una turbina de gas a metano con exceso de aire λ), el
+          agua de alimentación y, para cada nivel, la presión, el pinch, el
+          approach y el vapor sobrecalentado o saturado, arma el
+          **diagrama T–Q**: caudales de vapor, temperaturas de los gases
+          entre secciones y de chimenea, punto de rocío, la **exergía**
+          (cuánto gana el agua, cuánto se destruye en cada sección y cuánto
+          se va por la chimenea), la comparación entre 1, 2 y 3 presiones,
+          procedimiento y barridos.
         - ⚡ **Ciclo combinado** — turbina de gas (compresor, cámara de
           combustión con metano o aire estándar y turbina, con calores
           específicos variables y TESPy como control) + caldera de
@@ -115,9 +118,9 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        HRSG de dos y tres presiones, ciclo Brayton con regeneración,
-        interenfriamiento y recalentamiento, psicrometría, combustión,
-        exergía. Ver el
+        Ciclo combinado de dos y tres presiones con recalentamiento,
+        ciclo Brayton con regeneración, interenfriamiento y
+        recalentamiento, psicrometría, combustión, exergía. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 

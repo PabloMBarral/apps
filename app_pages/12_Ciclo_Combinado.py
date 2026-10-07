@@ -53,7 +53,7 @@ from ui.cycle_charts import (
 from ui.diagrams import diagram_type_selector
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.16.0"
+PAGE_VERSION = "0.17.0"
 
 _EXAMPLES = list(COMBINED_EXAMPLES)
 # Opciones fijas: cambiarlas reiniciaría el widget.

@@ -66,7 +66,7 @@ from ui.diagrams import (
 )
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.10.0"
+PAGE_VERSION = "0.17.0"
 
 _RESULT_KEY = "prop_result"
 _LAST_INPUTS_KEY = "prop_last_inputs"
