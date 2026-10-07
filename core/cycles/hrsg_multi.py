@@ -768,6 +768,7 @@ _C = 273.15
 _EX_2P = "Dos presiones: 80 bar y 540 °C + 6 bar y 200 °C (escape a 600 °C)"
 _EX_3P = "Tres presiones: 100 bar y 540 °C + 20 bar y 240 °C + 4 bar (saturado)"
 _EX_MODERN = "Turbina moderna: escape a 640 °C; 120 bar y 565 °C + 25 bar y 240 °C + 4 bar"
+_EX_MODERN_2P = "Turbina moderna con dos presiones: 120 bar y 565 °C + 5 bar (saturado)"
 
 #: Ejemplos precargados (los gases y el agua de alimentación de la caldera de una presión).
 MULTI_HRSG_EXAMPLES: dict[str, MultiHRSGInputs] = {
@@ -800,6 +801,13 @@ MULTI_HRSG_EXAMPLES: dict[str, MultiHRSGInputs] = {
         ),
         60.0 + _C,
     ),
+    _EX_MODERN_2P: MultiHRSGInputs(
+        640.0 + _C,
+        150.0,
+        _GT_EXHAUST,
+        (PressureLevel(120e5, 565.0 + _C, 8.0), PressureLevel(5e5, None, 8.0)),
+        60.0 + _C,
+    ),
 }
 
 MULTI_HRSG_EXAMPLE_NOTES: dict[str, str] = {
@@ -816,6 +824,11 @@ MULTI_HRSG_EXAMPLE_NOTES: dict[str, str] = {
     _EX_MODERN: (
         "Una turbina de gas moderna (escape a 640 °C, 150 kg/s) con tres niveles y pinch 8 K: "
         "alta a 120 bar y 565 °C, media a 25 bar y 240 °C y baja a 4 bar."
+    ),
+    _EX_MODERN_2P: (
+        "La misma turbina moderna con dos niveles: alta a 120 bar y 565 °C y baja a 5 bar, "
+        "vapor saturado (el que se usa para desgasificar el agua de alimentación o para "
+        "procesos). Compará con la de tres presiones."
     ),
 }
 

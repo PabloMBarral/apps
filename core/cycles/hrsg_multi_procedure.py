@@ -25,7 +25,7 @@ from core.cycles.hrsg_procedure import (
     times_diff,
 )
 from core.cycles.rankine_procedure import _bar, _diff, _n, _q, _wrap
-from core.latex import latex_chain, latex_number
+from core.latex import latex_chain, latex_is_wide, latex_number
 from core.state_report import ProcedureStep
 from core.units_system import QuantityKind, UnitSystem
 
@@ -59,6 +59,13 @@ def _m(level: LevelResult) -> str:
 
 def _title(level: LevelResult) -> str:
     return f"Nivel de {level.name}" if level.name else "Caldera"
+
+
+def _lookup(lhs: str, how: str, value_tex: str) -> str:
+    """``h_{2,M} = h(p, T_{2,M}) = …``; con ×10ⁿ (SI) en dos renglones (celular)."""
+    if latex_is_wide(value_tex):
+        return latex_chain(lhs, how, value_tex)
+    return f"{lhs} = {how} = {value_tex}"
 
 
 def _gas_labels(result: MultiHRSGResult) -> list[list[str]]:
@@ -100,7 +107,7 @@ def _water_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Procedur
     lines = [rf"T_{{\mathrm{{sat}}{_sub(lv)}}} = {_T(lv.T_sat_K, system)}"]
     if last:
         lines.append(
-            rf"{_h(1, lv)} = h(p,\ T_{{\mathrm{{alim}}}}) = {_q(w[0].h_J_per_kg, _EH, system)}"
+            _lookup(_h(1, lv), r"h(p,\ T_{\mathrm{alim}})", _q(w[0].h_J_per_kg, _EH, system))
         )
         inlet = (
             f"El agua de alimentación entra a {_degC(w[0].T_K)} (líquido comprimido: h(p, T) "
@@ -110,7 +117,7 @@ def _water_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Procedur
         below = result.levels[i + 1]
         h_f_below = below.water[2].h_J_per_kg
         lines += [
-            rf"{_h(1, lv)} = h(p,\ s_{{3{_sub(below)}}}) = {_q(w[0].h_J_per_kg, _EH, system)}",
+            _lookup(_h(1, lv), rf"h(p,\ s_{{3{_sub(below)}}})", _q(w[0].h_J_per_kg, _EH, system)),
             latex_chain(
                 rf"w_{{B{_sub(lv)}}}",
                 rf"{_h(1, lv)} - {_h(3, below)}",
@@ -135,7 +142,7 @@ def _water_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Procedur
             )
         )
         lines.append(
-            rf"{_h(2, lv)} = h(p,\ T_{{2{_sub(lv)}}}) = {_q(w[1].h_J_per_kg, _EH, system)}"
+            _lookup(_h(2, lv), rf"h(p,\ T_{{2{_sub(lv)}}})", _q(w[1].h_J_per_kg, _EH, system))
         )
     else:
         lines.append(rf"{_h(2, lv)} = h_f(p) = {_q(w[1].h_J_per_kg, _EH, system)}")
@@ -143,7 +150,7 @@ def _water_step(result: MultiHRSGResult, i: int, system: UnitSystem) -> Procedur
     lines.append(rf"{_h(4, lv)} = h_g(p) = {_q(w[3].h_J_per_kg, _EH, system)}")
     if level.superheated:
         lines.append(
-            rf"{_h(5, lv)} = h(p,\ T_{{5{_sub(lv)}}}) = {_q(w[4].h_J_per_kg, _EH, system)}"
+            _lookup(_h(5, lv), rf"h(p,\ T_{{5{_sub(lv)}}})", _q(w[4].h_J_per_kg, _EH, system))
         )
     steam = (
         f"vapor sobrecalentado a {_degC(w[4].T_K)} (tabla A-6)"

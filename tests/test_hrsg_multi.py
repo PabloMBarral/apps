@@ -38,7 +38,7 @@ from core.ideal_gas import FlueGas, exhaust_composition
 
 C = 273.15
 NAMES = list(MULTI_HRSG_EXAMPLES)
-EX_2P, EX_3P, EX_MODERN = NAMES
+EX_2P, EX_3P, EX_MODERN, EX_MODERN_2P = NAMES
 TWO = MULTI_HRSG_EXAMPLES[EX_2P]
 THREE = MULTI_HRSG_EXAMPLES[EX_3P]
 COOLPROP = {"N2": "Nitrogen", "O2": "Oxygen", "CO2": "CarbonDioxide", "H2O": "Water", "Ar": "Argon"}
