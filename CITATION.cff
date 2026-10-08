@@ -38,8 +38,10 @@ keywords:
   - psychrometrics
   - chemical-equilibrium
   - heating-value
+  - chemical-exergy
+  - grassmann-diagram
 license: MIT
-version: "0.22.0"
+version: "0.23.0"
 date-released: "2026-10-08"
 references:
   - type: article
@@ -404,6 +406,87 @@ references:
       - name: "ASTM International"
     title: "ASTM D3172-13(2021)e1 Standard Practice for Proximate Analysis of Coal and Coke"
     year: 2021
+  - type: book
+    scope: "Exergía química estándar, modelo II (tabla de las sustancias de referencia)"
+    authors:
+      - family-names: "Szargut"
+        given-names: "Jan"
+      - family-names: "Morris"
+        given-names: "David R."
+      - family-names: "Steward"
+        given-names: "Frank R."
+    title: "Exergy Analysis of Thermal, Chemical, and Metallurgical Processes"
+    publisher:
+      name: "Hemisphere"
+      city: "New York"
+    year: 1988
+  - type: article
+    scope: "Exergía química estándar, modelo I (ambiente de referencia en equilibrio)"
+    authors:
+      - family-names: "Ahrendts"
+        given-names: "Joachim"
+    title: "Reference states"
+    journal: "Energy"
+    year: 1980
+    volume: 5
+    issue: "8-9"
+    start: 666
+    end: 677
+    doi: "10.1016/0360-5442(80)90087-0"
+  - type: article
+    scope: "Exergía química de combustibles sólidos y líquidos (β = e/PCI)"
+    authors:
+      - family-names: "Szargut"
+        given-names: "Jan"
+      - family-names: "Styrylska"
+        given-names: "Teresa"
+    title: "Angenäherte Bestimmung der Exergie von Brennstoffen"
+    journal: "Brennstoff-Wärme-Kraft"
+    year: 1964
+    volume: 16
+    issue: 12
+    start: 589
+    end: 596
+  - type: book
+    scope: "Exergía térmica y mecánica; humedad y azufre de los combustibles"
+    authors:
+      - family-names: "Kotas"
+        given-names: "Tadeusz J."
+    title: "The Exergy Method of Thermal Plant Analysis"
+    publisher:
+      name: "Butterworths"
+      city: "London"
+    year: 1985
+  - type: book
+    scope: "Exergía por componente: combustible, producto, destrucción y pérdida"
+    authors:
+      - family-names: "Bejan"
+        given-names: "Adrian"
+      - family-names: "Tsatsaronis"
+        given-names: "George"
+      - family-names: "Moran"
+        given-names: "Michael"
+    title: "Thermal Design and Optimization"
+    publisher:
+      name: "Wiley"
+      city: "New York"
+    year: 1996
+  - type: book
+    scope: "Tabla A-26: exergía química estándar en los modelos I y II"
+    authors:
+      - family-names: "Moran"
+        given-names: "Michael J."
+      - family-names: "Shapiro"
+        given-names: "Howard N."
+      - family-names: "Boettner"
+        given-names: "Daisie D."
+      - family-names: "Bailey"
+        given-names: "Margaret B."
+    title: "Fundamentals of Engineering Thermodynamics"
+    edition: "8"
+    publisher:
+      name: "Wiley"
+    year: 2014
   - type: software
     scope: "Repositorio hermano: hoja de fórmulas teóricas"
     authors:
