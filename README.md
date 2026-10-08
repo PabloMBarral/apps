@@ -281,6 +281,28 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   r_bw = 0,304 y η = 35,8 %, y 69,6 % con regenerador ideal); con una etapa
   y sin regenerador es idéntica a la turbina de la Fase 3.4, y TESPy da lo
   mismo dentro de 0,05 puntos de rendimiento. _Fase 3.7 cerrada._
+- ✅ **Psicrometría: aire húmedo, procesos de acondicionamiento y torres de
+  enfriamiento** (página `/Psicrometria`): el modelo del vademecum §14 (aire
+  seco y vapor como gases ideales con c_p constante; la presión de
+  saturación de IAPWS, sobre agua líquida o sobre hielo). El **estado** sale
+  de la presión (a nivel del mar, por altura con la atmósfera estándar de
+  ASHRAE o dada) y de dos datos cualquiera entre T, φ, bulbo húmedo, punto
+  de rocío, ω y h (trece pares): presiones parciales, ω, φ, μ, h, c_p, v, ρ,
+  R, bulbo húmedo (saturación adiabática; bulbo de hielo bajo 0 °C), punto
+  de rocío (o de escarcha), entropía y **exergía** (ψ_tm + ψ_qu), las masas
+  en un recinto y la comparación con el modelo de gas real de CoolProp
+  (ASHRAE RP-1485). Una **carta psicrométrica interactiva** a cualquier
+  presión: al pasar el mouse muestra el estado de cada punto y al tocarlo lo
+  carga como dato. Un **tren de procesos** (§14.12: calentamiento o
+  enfriamiento sensible, calentamiento con humidificación, serpentín de
+  enfriamiento y deshumidificación, humidificación adiabática y mezcla) con
+  el recorrido en la carta, el calor, el agua y la **exergía destruida** en
+  cada proceso, y la **torre de enfriamiento** (caudal de aire, reposición,
+  rango, aproximación, efectividad). Procedimiento con las fórmulas del
+  vademecum, export y barridos (altura, aire exterior, aproximación de la
+  torre). Reproduce los ejemplos 14-1 a 14-9 de Cengel (14-6: 511 kJ/min y
+  0,131 kg/min; 14-8: ω₃ = 0,0122, φ₃ = 89 %, T₃ = 19 °C; 14-9: 1,80 kg/s de
+  reposición). _Fase 4 cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -294,7 +316,9 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
   combustible).
 - **Ciclos termodinámicos**: cogeneración, refrigeración de álabes de la
   turbina de gas, turbinas de propulsión.
-- **Psicrometría** y procesos HVAC sobre carta psicrométrica interactiva.
+- **Psicrometría (continuación)**: cargas del local y factor de calor
+  sensible, serpentín con ADP y factor de bypass, número de Merkel para
+  dimensionar torres, niebla (mezclas sobresaturadas).
 - **Estequiometría** de combustión: combustibles puros y mezclas,
   exceso de aire, composición de humos en base seca y húmeda,
   temperatura adiabática de llama.
@@ -340,6 +364,9 @@ apps/
 │   ├── export.py          # dict → CSV (campo, valor) para las descargas
 │   ├── diagrams.py        # diagramas de propiedades (fluprodia)
 │   ├── ideal_gas.py       # mezclas de gases ideales: aire, gases de combustión, s°(T)
+│   ├── psychrometrics.py  # aire húmedo (vademecum §14): estado, exergía, carta
+│   ├── hvac.py            # procesos de acondicionamiento y torre de enfriamiento
+│   ├── psychrometrics_procedure.py  # su procedimiento «como en el pizarrón»
 │   ├── interpolation.py
 │   ├── isentropic.py
 │   ├── exergy.py
@@ -368,7 +395,7 @@ apps/
 │   │   └── combined_multi_procedure.py  # su procedimiento, con las admisiones
 │   └── plots.py
 ├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, gráficos
-│                          # de los ciclos (T–Q, T–s, Sankey), créditos
+│                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── requirements.txt
 ├── CITATION.cff
@@ -384,7 +411,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.19.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.20.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -441,6 +468,47 @@ las fuentes correspondientes:
   doi     = {10.1063/1.1461829}
 }
 ```
+
+**IAPWS (2011)** — presión de sublimación del hielo (aire húmedo bajo 0 °C):
+
+```bibtex
+@article{wagner2011sublimation,
+  author  = {Wagner, Wolfgang and Riethmann, Thomas and Feistel, Rainer and
+             Harvey, Allan H.},
+  title   = {New Equations for the Sublimation Pressure and Melting Pressure
+             of {H$_2$O} Ice {Ih}},
+  journal = {Journal of Physical and Chemical Reference Data},
+  volume  = {40},
+  number  = {4},
+  pages   = {043103},
+  year    = {2011},
+  doi     = {10.1063/1.3657937}
+}
+```
+
+**Aire húmedo real (ASHRAE RP-1485)** — el modelo de CoolProp con el que se
+compara el ideal:
+
+```bibtex
+@article{herrmann2009moistair,
+  author  = {Herrmann, Sebastian and Kretzschmar, Hans-Joachim and Gatley, Donald P.},
+  title   = {Thermodynamic Properties of Real Moist Air, Dry Air, Steam,
+             Water, and Ice ({RP}-1485)},
+  journal = {HVAC\&R Research},
+  volume  = {15},
+  number  = {5},
+  pages   = {961--986},
+  year    = {2009},
+  doi     = {10.1080/10789669.2009.10390874}
+}
+```
+
+**Exergía del aire húmedo y del agua** — Wepfer, W. J., Gaggioli, R. A. y
+Obert, E. F. (1979). *Proper evaluation of available energy for HVAC*.
+ASHRAE Transactions, 85(1), 214–230.
+
+**ASHRAE Handbook—Fundamentals** (2017), cap. 1, *Psychrometrics*: atmósfera
+estándar, entalpía del hielo y bulbo húmedo termodinámico. ASHRAE, Atlanta.
 
 **fluprodia** — diagramas de propiedades de fluidos. Witte, F.
 <https://github.com/fwitte/fluprodia>
