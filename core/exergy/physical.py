@@ -98,6 +98,12 @@ class Ambient:
             )
 
 
+def _noise(a: float, b: float) -> float:
+    """a − b, o 0 si la diferencia es ruido numérico de CoolProp (el estado muerto mismo)."""
+    d = a - b
+    return 0.0 if abs(d) <= 1e-11 * max(abs(a), abs(b), 1e-300) else d
+
+
 def _dead_state(fluid: str, ambient: Ambient) -> FluidState:
     try:
         return fluid_state_from_pair(fluid, "TP", t=ambient.T0_K, p=ambient.p0_Pa)
@@ -160,11 +166,11 @@ class PhysicalExergy:
     # --- flujo ----------------------------------------------------------
     @property
     def dh_J_per_kg(self) -> float:
-        return self.state.h_J_per_kg - self.dead.h_J_per_kg
+        return _noise(self.state.h_J_per_kg, self.dead.h_J_per_kg)
 
     @property
     def ds_J_per_kg_K(self) -> float:
-        return self.state.s_J_per_kg_K - self.dead.s_J_per_kg_K
+        return _noise(self.state.s_J_per_kg_K, self.dead.s_J_per_kg_K)
 
     @property
     def psi_J_per_kg(self) -> float:
@@ -188,11 +194,11 @@ class PhysicalExergy:
     # --- masa -----------------------------------------------------------
     @property
     def du_J_per_kg(self) -> float:
-        return self.state.u_J_per_kg - self.dead.u_J_per_kg
+        return _noise(self.state.u_J_per_kg, self.dead.u_J_per_kg)
 
     @property
     def dv_m3_per_kg(self) -> float:
-        return self.state.v_m3_per_kg - self.dead.v_m3_per_kg
+        return _noise(self.state.v_m3_per_kg, self.dead.v_m3_per_kg)
 
     @property
     def phi_J_per_kg(self) -> float:
