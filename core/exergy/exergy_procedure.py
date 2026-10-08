@@ -423,8 +423,8 @@ def species_steps(result: SpeciesExergy, system: UnitSystem) -> list[ProcedureSt
         )
     else:
         text = (
-            f"El {MODELS[result.model]} no tabula el {sp.name}: se calcula con el método de "
-            "Szargut (el paso siguiente)."
+            f"La tabla de {MODELS[result.model]} no trae el {sp.name}: se calcula con el método "
+            "de Szargut (el paso siguiente)."
         )
     latex = [
         rf"\bar e^{{ch}}_{{{f}}} = {_molar(result.e_J_per_mol, system)}",

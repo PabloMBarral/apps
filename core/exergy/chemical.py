@@ -50,6 +50,7 @@ from core.fluids import saturation_at_temperature
 from core.units_system import UnitSystem, format_quantity
 
 __all__ = [
+    "MIXTURE_EXAMPLES",
     "MODELS",
     "MODEL_P0",
     "T_STANDARD_K",
@@ -68,6 +69,7 @@ __all__ = [
     "mixture_chemical_exergy",
     "mixture_exergy_to_dict",
     "reference_fraction",
+    "species_available",
     "species_exergy",
     "species_exergy_to_dict",
     "standard_chemical_exergy",
@@ -293,7 +295,7 @@ def szargut_method(key: str, model: ReferenceModel = "szargut1988") -> SzargutMe
         ref, per_atom = _ELEMENT_REF[el]
         e_ref = _species(ref).tabulated_J_per_mol(model)
         if e_ref is None:
-            raise ValueError(f"El modelo {MODELS[model]} no tabula la referencia del {el}.")
+            raise ValueError(f"La tabla de {MODELS[model]} no trae la referencia del {el}.")
         elements.append((el, n * per_atom, ref, e_ref, _reference_s0(ref)))
     return SzargutMethod(
         key=key,
@@ -394,18 +396,37 @@ class SpeciesExergy:
         return self.method.e_J_per_mol / self.e_J_per_mol - 1.0
 
 
+def _has_method(sp: ChemicalSpecies) -> bool:
+    """Si el método de Szargut se puede aplicar (datos de NASA y elementos con referencia)."""
+    is_reference = sp.key in {ref for ref, _ in _ELEMENT_REF.values()}
+    return bool(sp.nasa_key) and set(sp.atoms) <= set(_ELEMENT_REF) and not is_reference
+
+
+def species_available(key: str, model: ReferenceModel = "szargut1988") -> bool:
+    """Si el modelo tabula la sustancia o el método de Szargut la puede calcular.
+
+    El modelo I (Ahrendts, 1980) no incluye los gases nobles menores (He, Ne, Kr,
+    Xe) ni varios hidrocarburos que no están entre los polinomios NASA del proyecto.
+    """
+    sp = _species(key)
+    return sp.tabulated_J_per_mol(model) is not None or _has_method(sp)
+
+
 def species_exergy(key: str, model: ReferenceModel = "szargut1988") -> SpeciesExergy:
     """Exergía química de una sustancia de la tabla (o por el método de Szargut)."""
     sp = _species(key)
-    method: SzargutMethod | None = None
-    is_reference = key in {ref for ref, _ in _ELEMENT_REF.values()}
-    if sp.nasa_key and set(sp.atoms) <= set(_ELEMENT_REF) and not is_reference:
-        method = szargut_method(key, model)
+    method = szargut_method(key, model) if _has_method(sp) else None
     tab = sp.tabulated_J_per_mol(model)
     if tab is None and method is None:
-        raise ValueError(
-            f"El {MODELS[model]} no tabula el {sp.name} y no hay datos para calcularlo."
-        )
+        other = next(m for m in MODELS if m != model)
+        if not sp.nasa_key and len(sp.atoms) == 1:  # un gas de referencia del aire
+            reason = f"el ambiente de {MODELS[model]} no incluye el {sp.name}"
+        else:
+            reason = (
+                f"la tabla de {MODELS[model]} no trae el {sp.name} y, sin sus datos de NASA, "
+                "no se puede calcular con el método de Szargut"
+            )
+        raise ValueError(f"{reason[0].upper()}{reason[1:]}: elegí {MODELS[other]}.")
     e = tab if tab is not None else method.e_J_per_mol  # type: ignore[union-attr]
     other: ReferenceModel = "ahrendts1980" if model == "szargut1988" else "szargut1988"
     other_e = sp.tabulated_J_per_mol(other)
@@ -424,8 +445,16 @@ def species_exergy(key: str, model: ReferenceModel = "szargut1988") -> SpeciesEx
 
 
 def fuel_ratio_table(model: ReferenceModel = "szargut1988") -> list[SpeciesExergy]:
-    """Los combustibles de la tabla con su φ = e/PCI, de menor a mayor."""
-    rows = [species_exergy(k, model) for k, sp in chemical_species().items() if sp.is_fuel]
+    """Los combustibles de la tabla con su φ = e/PCI, de menor a mayor.
+
+    Solo los que el modelo tabula o el método de Szargut puede calcular
+    (:func:`species_available`).
+    """
+    rows = [
+        species_exergy(k, model)
+        for k, sp in chemical_species().items()
+        if sp.is_fuel and species_available(k, model)
+    ]
     rows = [r for r in rows if r.ratio_lhv is not None]
     return sorted(rows, key=lambda r: r.ratio_lhv or 0.0)
 
@@ -545,6 +574,22 @@ def mixture_chemical_exergy(
         x_sat=x_sat,
         M_kg_per_mol=M,
     )
+
+
+#: Mezclas de ejemplo (fracciones molares).
+MIXTURE_EXAMPLES: dict[str, dict[str, float]] = {
+    "Aire seco (N₂, O₂, Ar y CO₂)": {"N2": 0.7808, "O2": 0.2095, "Ar": 0.0093, "CO2": 0.0004},
+    "Aire técnico (21 % de O₂ y 79 % de N₂, vademecum §16.1)": {"N2": 0.79, "O2": 0.21},
+    "Gas natural típico": {"CH4": 0.90, "C2H6": 0.05, "C3H8": 0.02, "N2": 0.02, "CO2": 0.01},
+    "Biogás (60 % de metano)": {"CH4": 0.60, "CO2": 0.38, "H2O": 0.018, "H2S": 0.002},
+    "Humos de metano con λ = 1,2 (condensan a 25 °C)": {
+        "CO2": 1.0 / 12.424,
+        "H2O": 2.0 / 12.424,
+        "O2": 0.4 / 12.424,
+        "N2": 9.024 / 12.424,
+    },
+    "Gas de síntesis (H₂ + CO)": {"H2": 0.40, "CO": 0.40, "CO2": 0.10, "N2": 0.10},
+}
 
 
 # ---------------------------------------------------------------------
@@ -720,13 +765,14 @@ def fuel_chemical_exergy(
     if not (math.isfinite(hhv_d_J_per_kg) and hhv_d_J_per_kg > 0.0):
         raise ValueError("El PCS seco tiene que ser positivo.")
     o_c = ultimate.O / ultimate.C
+    oc_txt = f"{o_c:.2f}".replace(".", ",")
     warnings: list[str] = []
     branch: Literal["carbón", "madera", "líquido"]
     if kind == "líquido":
         branch = "líquido"
         if o_c > 1.0:
             warnings.append(
-                f"o/c = {o_c:.2f}: la forma de los líquidos se ajustó con combustibles con poco "
+                f"o/c = {oc_txt}: la forma de los líquidos se ajustó con combustibles con poco "
                 "oxígeno (con el metanol, o/c = 1,33, se pasa +2,7 %)."
             )
         if moisture > 0.0:
@@ -740,12 +786,12 @@ def fuel_chemical_exergy(
         branch = "madera"
         if o_c > 2.0:
             warnings.append(
-                f"o/c = {o_c:.2f}: cerca del límite de la correlación (2,67) β crece rápido "
+                f"o/c = {oc_txt}: cerca del límite de la correlación (2,67) β crece rápido "
                 "(el denominador 1 − 0,3035·o/c se achica). Revisá el análisis."
             )
     else:
         raise ValueError(
-            f"Con o/c = {o_c:.2f} (en masa) el combustible tiene más oxígeno del que admite la "
+            f"Con o/c = {oc_txt} (en masa) el combustible tiene más oxígeno del que admite la "
             "correlación de Szargut y Styrylska (o/c ≤ 2,67, la relación del CO₂): un sólido "
             "así casi no tiene qué oxidar. Revisá el análisis."
         )

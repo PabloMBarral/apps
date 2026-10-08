@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from core.cycles.combined_multi import MultiCombinedResult, bottoming_exergy
@@ -730,7 +730,10 @@ def combined_plant_exergy(
     bt = bottoming_exergy(result)
     T0 = hx.T0_K
     cyc = result.steam
-    comps = list(parts.components)
+    # junto a las turbinas de vapor, la de gas se llama así
+    comps = [
+        replace(c, name="Turbina de gas") if c.name == "Turbina" else c for c in parts.components
+    ]
     # HRSG, sección por sección
     gained = dict(hx.gained_W)
     for name, D in hx.destroyed_W:
@@ -748,7 +751,9 @@ def combined_plant_exergy(
     for t in cyc.turbines:
         name, D = destroyed[k]
         k += 1
-        comps.append(ComponentExergy(f"Turbina de vapor: {name}", "turbina", t.W_W + D, t.W_W, D))
+        # «turbina de alta» → «Turbina de vapor de alta»; «turbina» → «Turbina de vapor»
+        label = "Turbina de vapor" + name.removeprefix("turbina")
+        comps.append(ComponentExergy(label, "turbina", t.W_W + D, t.W_W, D))
     for a in cyc.admissions:
         name, D = destroyed[k]
         k += 1

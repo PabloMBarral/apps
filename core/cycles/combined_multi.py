@@ -46,6 +46,7 @@ from core.cycles.combined import (
     CombinedInputs,
     SteamCycle,
     gas_turbine_to_dict,
+    solve_combined,
 )
 from core.cycles.hrsg import Water, _bar, _degC
 from core.cycles.hrsg_multi import (
@@ -87,6 +88,7 @@ __all__ = [
     "configuration_comparison",
     "default_multi_combined_sweep_values",
     "from_combined",
+    "from_combined_with_pinch",
     "solve_combined_multi",
     "validate_multi_combined_inputs",
 ]
@@ -171,6 +173,21 @@ def from_combined(inputs: CombinedInputs) -> MultiCombinedInputs:
         steam=inputs.steam,
         W_net_W=inputs.W_net_W,
     )
+
+
+def from_combined_with_pinch(inputs: CombinedInputs) -> MultiCombinedInputs:
+    """Como :func:`from_combined`, pero acepta también el diseño por chimenea.
+
+    Un ciclo diseñado por la temperatura de chimenea (Cengel §10-9, ejemplo 10-9)
+    se resuelve una vez con la Fase 3.4 y pasa al modelo de varias presiones con
+    el pinch que resulta: es el mismo ciclo (mismo η y misma chimenea, test a
+    1e-9). Si el diseño por chimenea no cierra (cruce de temperaturas), el
+    ``ValueError`` es el de la Fase 3.4.
+    """
+    if inputs.T_stack_K is None:
+        return from_combined(inputs)
+    pinch_K = solve_combined(inputs).hrsg.pinch_K
+    return from_combined(replace(inputs, T_stack_K=None, pinch_K=pinch_K))
 
 
 # ---------------------------------------------------------------------

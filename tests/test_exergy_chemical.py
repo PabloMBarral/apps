@@ -21,6 +21,7 @@ from core.exergy.chemical import (
     mixture_chemical_exergy,
     mixture_exergy_to_dict,
     reference_fraction,
+    species_available,
     species_exergy,
     species_exergy_to_dict,
     standard_chemical_exergy,
@@ -157,6 +158,33 @@ def test_fuel_ratios() -> None:
     assert ratios == sorted(ratios)
     assert rows[0].species.key in ("CO", "H2")
     assert species_exergy("CO2").ratio_lhv is None
+
+
+@pytest.mark.parametrize("model", list(MODELS))
+def test_species_available_matches_species_exergy(model: str) -> None:
+    """Cada sustancia se calcula si y solo si ``species_available`` lo dice."""
+    for key in chemical_species():
+        if species_available(key, model):  # type: ignore[arg-type]
+            assert species_exergy(key, model).e_J_per_mol > 0.0  # type: ignore[arg-type]
+        else:
+            with pytest.raises(ValueError, match="elegí"):
+                species_exergy(key, model)  # type: ignore[arg-type]
+    rows = fuel_ratio_table(model)  # type: ignore[arg-type]
+    assert rows and all(r.model == model for r in rows)
+
+
+def test_ahrendts_lacks_the_minor_noble_gases_and_some_hydrocarbons() -> None:
+    """El modelo I no incluye He, Ne, Kr ni Xe, ni los hidrocarburos sin datos de NASA."""
+    for key in ("He", "Ne", "Kr", "Xe"):
+        assert species_available(key, "szargut1988")
+        assert not species_available(key, "ahrendts1980")
+    with pytest.raises(ValueError, match="no incluye el helio"):
+        species_exergy("He", "ahrendts1980")
+    with pytest.raises(ValueError, match="sin sus datos de NASA"):
+        species_exergy("n-C6H14", "ahrendts1980")
+    # el n-butano no está en la tabla del modelo I: sale del método de Szargut
+    assert species_available("n-C4H10", "ahrendts1980")
+    assert species_exergy("n-C4H10", "ahrendts1980").source == "método de Szargut"
 
 
 # ---------------------------------------------------------------------

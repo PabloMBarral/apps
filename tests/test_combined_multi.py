@@ -32,6 +32,7 @@ from core.cycles.combined_multi import (
     configuration_comparison,
     default_multi_combined_sweep_values,
     from_combined,
+    from_combined_with_pinch,
     solve_combined_multi,
 )
 from core.cycles.hrsg_multi import PressureLevel
@@ -76,6 +77,22 @@ def test_from_combined_rejects_the_stack_design() -> None:
     by_stack = next(i for i in COMBINED_EXAMPLES.values() if i.T_stack_K is not None)
     with pytest.raises(ValueError, match="por pinch"):
         from_combined(by_stack)
+
+
+@pytest.mark.parametrize("name", list(COMBINED_EXAMPLES))
+def test_from_combined_with_pinch_keeps_the_cycle(name: str) -> None:
+    """El diseño por chimenea (Cengel 10-9) pasa al de pinch con el pinch que resulta."""
+    inputs = COMBINED_EXAMPLES[name]
+    old = solve_combined(inputs)
+    converted = from_combined_with_pinch(inputs)
+    if inputs.T_stack_K is None:
+        assert converted == from_combined(inputs)
+    else:
+        assert converted.levels[0].pinch_K == pytest.approx(old.hrsg.pinch_K)
+    new = _solve(converted)
+    assert new.eta_th == pytest.approx(old.eta_th, rel=1e-9)
+    assert new.m_steam_kg_s == pytest.approx(old.hrsg.m_steam_kg_s, rel=1e-9)
+    assert new.hrsg.T_stack_K == pytest.approx(old.hrsg.T_stack_K, rel=1e-9)
 
 
 # ---------------------------------------------------------------------
