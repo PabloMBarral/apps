@@ -72,6 +72,8 @@ QuantityKind = Literal[
     "mass_flow",
     "power",
     "volume_flow",
+    "molar_enthalpy",
+    "molar_entropy",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -187,6 +189,18 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "m³/s"),
         "Técnico": (1.0, 0.0, "m³/s"),
         "Inglés": (1.0 / _FT_PER_M**3, 0.0, "ft³/s"),
+    },
+    # Fase 5 (combustión): por mol, como las tablas de entalpías de formación.
+    # J/mol = kJ/kmol; 1 Btu/lbmol = 2,326 J/mol (como 1 Btu/lb = 2326 J/kg).
+    "molar_enthalpy": {
+        "SI": (1.0, 0.0, "J/mol"),
+        "Técnico": (1.0, 0.0, "kJ/kmol"),
+        "Inglés": (1000.0 / _BTU_PER_LB_J_PER_KG, 0.0, "Btu/lbmol"),
+    },
+    "molar_entropy": {
+        "SI": (1.0, 0.0, "J/(mol·K)"),
+        "Técnico": (1.0, 0.0, "kJ/(kmol·K)"),
+        "Inglés": (1000.0 / _BTU_PER_LB_R_J_PER_KG_K, 0.0, "Btu/(lbmol·°R)"),
     },
 }
 

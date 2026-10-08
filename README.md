@@ -303,6 +303,36 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   torre). Reproduce los ejemplos 14-1 a 14-9 de Cengel (14-6: 511 kJ/min y
   0,131 kg/min; 14-8: ω₃ = 0,0122, φ₃ = 89 %, T₃ = 19 °C; 14-9: 1,80 kg/s de
   reposición). _Fase 4 cerrada._
+- ✅ **Combustión: estequiometría, humos, llama adiabática y calor** (página
+  `/Combustion`): el modelo del vademecum §16 con los **polinomios NASA** de
+  9 coeficientes de McBride, Zehe y Gordon (2002), la fuente de la tabla de
+  §16.12 (32 especies de 200 a 6000 K, en `data/nasa9_thermo.csv`). El
+  combustible puede ser una mezcla gaseosa (gas natural, GLP, hidrógeno,
+  biogás o los componentes que quieras), un líquido puro (octano, metanol,
+  etanol, querosén, propano líquido) o un sólido o líquido pesado por su
+  análisis elemental, con el PCS como dato (carbón, bagazo, fueloil). El
+  comburente es aire técnico, aire seco u oxígeno, con la humedad del
+  ambiente y precalentado si hace falta. La cantidad de aire se da como λ,
+  exceso, % de aire teórico, φ, AC o el O₂ medido en los humos secos.
+  Resultados: el aire teórico y real, los **humos** en base húmeda, seca y
+  másica (M_g, GC, volumen normal, CO₂ máximo), los **puntos de rocío** del
+  agua y **ácido** (Verhoff y Banchero, 1974), el PCS y el PCI, la
+  **temperatura adiabática de llama** con combustión completa y **con
+  disociación** (equilibrio químico por minimización de la energía libre de
+  Gibbs, como NASA CEA, verificado con las K_p), la combustión con CO o con
+  defecto de aire, la combustión a volumen constante, el **calor** con los
+  humos a una temperatura dada (con condensación: sobre el PCI el
+  rendimiento puede pasar el 100 %), con el reparto del PCI, y el **segundo
+  principio** (entropía generada y exergía destruida). En el modo **análisis
+  de humos**, λ, el aire, el agua y la pérdida por CO salen del O₂ (y el CO)
+  que mide un analizador o de un Orsat, con el **diagrama de combustión**.
+  Procedimiento con los valores reemplazados en los tres sistemas, export y
+  barridos (λ, precalentamiento del aire, temperatura de los humos).
+  Reproduce los ejemplos 15-1 a 15-4, 15-6 a 15-8, 15-10 y 15-11 de Cengel
+  (15-10: 1788 K, el libro 1789 K; 15-11: 871 700 kJ/kmol de calor y
+  818 400 kJ/kmol de exergía destruida, el libro 871 400 y 818 000), y la
+  llama de equilibrio coincide con Cantera dentro de 0,004 K. _Fase 5
+  cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -319,9 +349,9 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
 - **Psicrometría (continuación)**: cargas del local y factor de calor
   sensible, serpentín con ADP y factor de bypass, número de Merkel para
   dimensionar torres, niebla (mezclas sobresaturadas).
-- **Estequiometría** de combustión: combustibles puros y mezclas,
-  exceso de aire, composición de humos en base seca y húmeda,
-  temperatura adiabática de llama.
+- **Combustión (continuación)**: hollín (carbono sólido en el equilibrio),
+  NOx con cinética (mecanismo de Zeldovich), inquemados sólidos en las
+  cenizas, los polinomios NASA en la turbina de gas y el ciclo combinado.
 - **Poder calorífico** a partir de:
   - composición **última** (Dulong, Boie, Channiwala-Parikh),
   - composición **próxima** (correlaciones de Parikh y similares),
@@ -371,8 +401,12 @@ apps/
 │   ├── isentropic.py
 │   ├── exergy.py
 │   ├── combustion/
-│   │   ├── stoichiometry.py
-│   │   ├── heating_value.py
+│   │   ├── thermo.py      # polinomios NASA-9: c_p, h, s°, g° de cada especie
+│   │   ├── fuels.py       # combustibles: mezclas, líquidos y análisis elemental
+│   │   ├── stoichiometry.py  # aire, exceso, productos, rocíos, Orsat
+│   │   ├── equilibrium.py # equilibrio químico (Gibbs, como NASA CEA)
+│   │   ├── combustion.py  # llama, calor, segundo principio, análisis de humos
+│   │   ├── combustion_procedure.py  # su procedimiento «como en el pizarrón»
 │   │   └── iso6976.py
 │   ├── cycles/
 │   │   ├── tespy_utils.py # red de TESPy en SI y errores en castellano
@@ -395,8 +429,11 @@ apps/
 │   │   └── combined_multi_procedure.py  # su procedimiento, con las admisiones
 │   └── plots.py
 ├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, gráficos
-│                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica, créditos
+│                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica,
+│                          # gráficos de la combustión, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
+├── data/                  # tablas: ISO 6976, polinomios NASA-9
+├── scripts/               # extracción de datos (los polinomios de thermo.inp de NASA CEA)
 ├── requirements.txt
 ├── CITATION.cff
 ├── LICENSE
@@ -411,7 +448,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.20.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.21.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -569,6 +606,61 @@ diseño de la HRSG y la relación entre los rendimientos, de Kehlhofer et al.:
   edition   = {3},
   publisher = {PennWell},
   year      = {2009}
+}
+```
+
+**Combustión** — los polinomios NASA de 9 coeficientes (de `thermo.inp` de
+[NASA CEA](https://github.com/nasa/cea), licencia Apache 2.0), el equilibrio
+químico por minimización de la energía libre de Gibbs, el punto de rocío
+ácido y los combustibles de los ejemplos:
+
+```bibtex
+@techreport{mcbride2002nasa,
+  author      = {McBride, Bonnie J. and Zehe, Michael J. and Gordon, Sanford},
+  title       = {{NASA} {Glenn} Coefficients for Calculating Thermodynamic
+                 Properties of Individual Species},
+  institution = {NASA Glenn Research Center},
+  number      = {NASA/TP-2002-211556},
+  year        = {2002}
+}
+
+@techreport{gordon1994cea,
+  author      = {Gordon, Sanford and McBride, Bonnie J.},
+  title       = {Computer Program for Calculation of Complex Chemical
+                 Equilibrium Compositions and Applications. {I}. Analysis},
+  institution = {NASA Lewis Research Center},
+  number      = {NASA RP-1311},
+  year        = {1994}
+}
+
+@article{verhoff1974dew,
+  author  = {Verhoff, Francis H. and Banchero, Julius T.},
+  title   = {Predicting dew points of flue gases},
+  journal = {Chemical Engineering Progress},
+  volume  = {70},
+  number  = {8},
+  pages   = {71--72},
+  year    = {1974}
+}
+
+@article{channiwala2002hhv,
+  author  = {Channiwala, S. A. and Parikh, P. P.},
+  title   = {A unified correlation for estimating {HHV} of solid, liquid and
+             gaseous fuels},
+  journal = {Fuel},
+  volume  = {81},
+  number  = {8},
+  pages   = {1051--1063},
+  year    = {2002},
+  doi     = {10.1016/S0016-2361(01)00131-4}
+}
+
+@book{hugot1986cane,
+  author    = {Hugot, E.},
+  title     = {Handbook of Cane Sugar Engineering},
+  edition   = {3},
+  publisher = {Elsevier},
+  year      = {1986}
 }
 ```
 

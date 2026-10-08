@@ -39,6 +39,8 @@ _KINDS = (
     "mass_flow",
     "power",
     "volume_flow",
+    "molar_enthalpy",
+    "molar_entropy",
 )
 
 
@@ -99,6 +101,12 @@ class TestUnitLabels:
             ("volume_flow", "SI", "m³/s"),
             ("volume_flow", "Técnico", "m³/s"),
             ("volume_flow", "Inglés", "ft³/s"),
+            ("molar_enthalpy", "SI", "J/mol"),
+            ("molar_enthalpy", "Técnico", "kJ/kmol"),
+            ("molar_enthalpy", "Inglés", "Btu/lbmol"),
+            ("molar_entropy", "SI", "J/(mol·K)"),
+            ("molar_entropy", "Técnico", "kJ/(kmol·K)"),
+            ("molar_entropy", "Inglés", "Btu/(lbmol·°R)"),
         ],
     )
     def test_label(self, kind: str, system: str, expected: str) -> None:
@@ -125,6 +133,8 @@ class TestRoundTrip:
         "mass_flow": (0.0, 1.0, 50.0, 600.0),
         "power": (0.0, 1.0, 1.0e3, 2.1e8),
         "volume_flow": (0.0, 1.0e-4, 0.05, 30.0),
+        "molar_enthalpy": (-393_510.0, 0.0, 44_004.0, 5.0e6),
+        "molar_entropy": (0.0, 69.95, 213.79, 1.0e4),
     }
 
     @pytest.mark.parametrize("kind", _KINDS)
@@ -363,3 +373,13 @@ class TestInvalidArgs:
     def test_convert_with_unknown_kind_raises(self) -> None:
         with pytest.raises(ValueError, match="QuantityKind"):
             convert_from_si(1.0, "torque", "SI")  # type: ignore[arg-type]
+
+
+def test_molar_units_follow_the_tables() -> None:
+    """kJ/kmol = J/mol; 1 Btu/lbmol = 2,326 kJ/kmol (Cengel A-26E: s° del CO₂ = 51,07)."""
+    assert convert_from_si(-393_520.0, "molar_enthalpy", "Técnico") == -393_520.0
+    assert convert_from_si(-393_520.0, "molar_enthalpy", "Inglés") == pytest.approx(
+        -169_200, rel=1e-3
+    )
+    # s° del CO₂: 213,80 kJ/(kmol·K) = 51,07 Btu/(lbmol·°R) (A-26E)
+    assert convert_from_si(213.80, "molar_entropy", "Inglés") == pytest.approx(51.07, rel=1e-3)
