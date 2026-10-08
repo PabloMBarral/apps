@@ -351,8 +351,8 @@ def _complete_flame(products: Mapping[str, float], target: float, process: Proce
     if f(T_MAX_K) < 0.0:
         raise ValueError(
             f"Con combustión completa la llama superaría {T_MAX_K:.0f} K, el límite de los "
-            "polinomios NASA: a esas temperaturas la disociación es fundamental (mirá la "
-            "llama con disociación)."
+            "polinomios NASA: a esas temperaturas la combustión completa no tiene sentido (la "
+            "disociación manda). Con más exceso de oxígeno, o con aire, la llama baja."
         )
     return float(brentq(f, _T_LOW_K, T_MAX_K, xtol=1e-9, rtol=1e-14))
 

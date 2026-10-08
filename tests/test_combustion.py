@@ -431,6 +431,14 @@ def test_analysis_fuels_have_no_second_law() -> None:
             "aire ambiente",
         ),
         (CombustionInputs(METHANE, m_fuel_kg_s=-1.0), "caudal"),
+        (
+            CombustionInputs(
+                FUELS["Carbón (Pensilvania)"],
+                oxidizer=Oxidizer("oxygen"),
+                air=AirSpec("lambda", 1.1),
+            ),
+            "superaría 6000 K",
+        ),
     ],
 )
 def test_invalid_data_explain_why(inputs: CombustionInputs, match: str) -> None:

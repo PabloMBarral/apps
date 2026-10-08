@@ -347,7 +347,7 @@ def test_every_flue_gas_example(name: str) -> None:
 def test_cengel_15_4_orsat() -> None:
     at = _app()
     _flue(at, FLUE[0])
-    assert _metric(at, "Aire teórico [%]") == pytest.approx(130.4, abs=0.1)
+    assert _metric(at, "Aire teórico [%]") == pytest.approx(130.3, abs=0.05)  # Cengel: 131 %
     assert any("El balance de oxígeno cierra" in i.value for i in at.info)
     assert any("N₂ por diferencia" in c.value for c in at.caption)
 
