@@ -767,10 +767,10 @@ Notas de la Fase 4 (psicrometría):
   rocío es de escarcha y el bulbo húmedo, de hielo (h = −333,4 + 2,1·t, ASHRAE).
   ω < 1e-12 se trata como aire seco (sin rocío): con una ω de 1e-17 el `brentq`
   del rocío fallaba con un error crudo.
-- Bulbo húmedo = saturación adiabática, con `brentq` entre el rocío y T. Los
-  pares sin T (h–φ, T_bh–φ) buscan T con `brentq`; los demás son cerrados.
-  ω con T_pr o ω son la misma información, y h con T_bh son casi paralelas: no
-  se aceptan (13 pares).
+- Bulbo húmedo = saturación adiabática, con `brentq` entre el rocío y T. Solo
+  dos pares (h–φ, T_bh–φ) buscan T con `brentq`; los demás son cerrados.
+  ω y T_pr son la misma información, y h y T_bh son casi paralelas: esos dos
+  pares no se aceptan (quedan 13).
 - h_w del agua que entra o sale (condensado, humidificador, torre) de tablas
   (IAPWS), como Cengel y el vademecum. Exergía del agua (Wepfer et al., 1979)
   contra el vapor del ambiente con el vapor del **modelo** a T₀ y p_v0: queda
