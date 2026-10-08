@@ -69,6 +69,8 @@ from core.state_report import states_table, textbook_reference_note
 from core.units_system import QuantityKind, UnitSystem, convert_from_si, unit_label
 
 __all__ = [
+    "check_reservoirs",
+    "default_reservoirs",
     "CYCLE_NAMES",
     "REFRIGERATION_EXAMPLES",
     "REFRIGERATION_EXAMPLE_NOTES",
@@ -964,6 +966,26 @@ def _validate_cascade(inputs: RefrigerationInputs, p_valve_out: float, p_cond_ou
             "a lo caliente. El de baja tiene que condensar a una temperatura mayor o igual (igual "
             "en el ejemplo 11-4 de Cengel; en la práctica, unos 5 K más)."
         )
+
+
+def check_reservoirs(result: RefrigerationResult, reservoirs: Reservoirs) -> None:
+    """Valida las fuentes contra el ciclo ya resuelto (los mismos mensajes que antes de resolver).
+
+    Lo usa la página de exergía, que agrega las fuentes a un ciclo que no las traía.
+    """
+    T1 = result.states[result.evaporator.outlet].T_K
+    T3 = result.states[result.condenser.outlet].T_K
+    _validate_reservoirs(reservoirs, T1, T3)
+
+
+def default_reservoirs(result: RefrigerationResult) -> Reservoirs:
+    """Fuentes por defecto: 5 K arriba de la salida del evaporador y 5 K abajo de la del
+    condensador, redondeadas al grado (la regla de la página de refrigeración)."""
+    if result.inputs.reservoirs is not None:
+        return result.inputs.reservoirs
+    T1 = result.states[result.evaporator.outlet].T_K
+    T3 = result.states[result.condenser.outlet].T_K
+    return Reservoirs(round(T1 - 273.15 + 5.0) + 273.15, round(T3 - 273.15 - 5.0) + 273.15)
 
 
 def _validate_reservoirs(res: Reservoirs, T1: float, T3: float) -> None:

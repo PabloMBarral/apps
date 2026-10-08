@@ -915,6 +915,7 @@ class HRSGExergy:
     X_stack_W: float
     X_water_W: float
     destroyed_W: tuple[tuple[str, float], ...]
+    gained_W: tuple[tuple[str, float], ...] = ()  # lo que gana el agua en cada sección
 
     @property
     def X_destroyed_W(self) -> float:
@@ -949,14 +950,16 @@ def hrsg_exergy(result: MultiHRSGResult) -> HRSGExergy:
     X_stack = x_gas(result.T_stack_K, result.h_stack_J_per_kg)
     X_water = 0.0
     destroyed: list[tuple[str, float]] = []
+    gained: list[tuple[str, float]] = []
     for flows in result._flows():
         sec = flows.section
         dS_w = sum(m * (b.s_J_per_kg_K - a.s_J_per_kg_K) for m, a, b in flows.streams)
         dH_w = sum(m * (b.h_J_per_kg - a.h_J_per_kg) for m, a, b in flows.streams)
         dS_g = flows.gas_share * m_g * (gas.s0(sec.T_gas_out_K) - gas.s0(sec.T_gas_in_K))
         X_water += dH_w - T0 * dS_w
+        gained.append((sec.name, dH_w - T0 * dS_w))
         destroyed.append((sec.name, T0 * (dS_w + dS_g)))
-    return HRSGExergy(T0, X_in, X_stack, X_water, tuple(destroyed))
+    return HRSGExergy(T0, X_in, X_stack, X_water, tuple(destroyed), tuple(gained))
 
 
 # ---------------------------------------------------------------------
