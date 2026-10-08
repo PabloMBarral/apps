@@ -36,8 +36,9 @@ keywords:
   - combined-cycle
   - brayton-cycle
   - psychrometrics
+  - chemical-equilibrium
 license: MIT
-version: "0.20.0"
+version: "0.21.0"
 date-released: "2026-10-08"
 references:
   - type: article
@@ -214,6 +215,84 @@ references:
     publisher:
       name: "ASHRAE"
     year: 2017
+  - type: report
+    scope: "Polinomios NASA de 9 coeficientes (c_p, h, s° de cada especie) de la combustión"
+    authors:
+      - family-names: "McBride"
+        given-names: "Bonnie J."
+      - family-names: "Zehe"
+        given-names: "Michael J."
+      - family-names: "Gordon"
+        given-names: "Sanford"
+    title: >-
+      NASA Glenn Coefficients for Calculating Thermodynamic Properties of
+      Individual Species
+    institution:
+      name: "NASA Glenn Research Center"
+    number: "NASA/TP-2002-211556"
+    year: 2002
+  - type: report
+    scope: "Equilibrio químico por minimización de la energía libre de Gibbs (llama con disociación)"
+    authors:
+      - family-names: "Gordon"
+        given-names: "Sanford"
+      - family-names: "McBride"
+        given-names: "Bonnie J."
+    title: >-
+      Computer Program for Calculation of Complex Chemical Equilibrium
+      Compositions and Applications. I. Analysis
+    institution:
+      name: "NASA Lewis Research Center"
+    number: "NASA RP-1311"
+    year: 1994
+  - type: software
+    scope: "Base de datos thermo.inp de la que se extraen los polinomios NASA (Apache 2.0)"
+    authors:
+      - name: "NASA Glenn Research Center"
+    title: "CEA: Chemical Equilibrium with Applications"
+    repository-code: "https://github.com/nasa/cea"
+    license: Apache-2.0
+  - type: article
+    scope: "Punto de rocío ácido (H₂SO₄) de los humos"
+    authors:
+      - family-names: "Verhoff"
+        given-names: "Francis H."
+      - family-names: "Banchero"
+        given-names: "Julius T."
+    title: "Predicting dew points of flue gases"
+    journal: "Chemical Engineering Progress"
+    year: 1974
+    volume: 70
+    issue: 8
+    start: 71
+    end: 72
+  - type: article
+    scope: "PCS del fueloil de los ejemplos (correlación por análisis elemental)"
+    authors:
+      - family-names: "Channiwala"
+        given-names: "S. A."
+      - family-names: "Parikh"
+        given-names: "P. P."
+    title: >-
+      A unified correlation for estimating HHV of solid, liquid and gaseous
+      fuels
+    journal: "Fuel"
+    year: 2002
+    volume: 81
+    issue: 8
+    start: 1051
+    end: 1063
+    doi: "10.1016/S0016-2361(01)00131-4"
+  - type: book
+    scope: "Análisis elemental y poder calorífico del bagazo de caña"
+    authors:
+      - family-names: "Hugot"
+        given-names: "E."
+    title: "Handbook of Cane Sugar Engineering"
+    edition: "3"
+    publisher:
+      name: "Elsevier"
+    year: 1986
   - type: software
     scope: "Repositorio hermano: hoja de fórmulas teóricas"
     authors:

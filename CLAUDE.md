@@ -63,7 +63,13 @@ apps/
 │   │                          # psicrométrica interactiva (tocar carga el estado),
 │   │                          # comparación con CoolProp, tren de procesos de
 │   │                          # acondicionamiento y torre de enfriamiento.
-│   ├── 8_Combustion.py
+│   ├── 8_Combustion.py        # ✅ Fase 5 — Combustión (vademecum §16): mezcla
+│   │                          # gaseosa, líquido o análisis elemental; aire
+│   │                          # técnico, seco u O₂, húmedo y precalentado; aire de
+│   │                          # seis formas; humos, rocíos, PCS/PCI, llama completa
+│   │                          # y con disociación (K_p), calor con condensación,
+│   │                          # segundo principio, análisis de humos (O₂ u Orsat)
+│   │                          # con el diagrama de combustión, barridos.
 │   ├── 9_Poder_Calorifico.py
 │   ├── 4_ISO6976.py           # ✅ Fase 2.3 (matriz identidad; teoría y export 1.7)
 │   ├── 10_HRSG.py             # ✅ Fase 3.3 — HRSG de una presión: diagrama T–Q
@@ -99,6 +105,8 @@ apps/
 │   │                          # Fase 1.6: + ΔT, ρ, velocidad, μ, k, difusividad.
 │   │                          # Fase 3.1a: + caudal másico y potencia.
 │   │                          # Fase 3.2: + caudal volumétrico (volume_flow).
+│   │                          # Fase 5: + entalpía y entropía molares (J/mol,
+│   │                          # kJ/kmol, Btu/lbmol).
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
@@ -152,9 +160,26 @@ apps/
 │   ├── exergy.py              # Exergía física y química
 │   ├── combustion/
 │   │   ├── __init__.py
-│   │   ├── fuels.py           # Modelos de combustible (sólido/líquido/gas)
-│   │   ├── stoichiometry.py   # Reacciones, exceso aire, productos
-│   │   ├── heating_value.py   # PCI/PCS por correlaciones (último/próximo)
+│   │   ├── thermo.py          # ✅ Fase 5 — Polinomios NASA-9 (McBride et al., 2002)
+│   │   │                      # desde data/nasa9_thermo.csv: Species (cp, h = h_f
+│   │   │                      # + Δh, s° a 1 bar, g°), mezclas, h_fg del agua.
+│   │   ├── fuels.py           # ✅ Fase 5 — Fuel: mezcla gaseosa, líquido puro
+│   │   │                      # (GLP licuado con CoolProp) o UltimateAnalysis con
+│   │   │                      # PCS dado; átomos, O₂ teórico, h, s, PCS/PCI; FUELS.
+│   │   ├── stoichiometry.py   # ✅ Fase 5 — Oxidizer (técnico, seco, O₂; humedad a
+│   │   │                      # T_humidity_K), AirSpec (6 formas), products (λ < 1
+│   │   │                      # como Cengel 15-8 c), Stoichiometry (humos, GC, V_N,
+│   │   │                      # rocíos, ácido de Verhoff y Banchero), Orsat.
+│   │   ├── equilibrium.py     # ✅ Fase 5 — Equilibrio químico (Gibbs con
+│   │   │                      # potenciales de elementos, como NASA CEA): TP, TV,
+│   │   │                      # llama adiabática HP y UV.
+│   │   ├── combustion.py      # ✅ Fase 5 — CombustionInputs / solve_combustion /
+│   │   │                      # CombustionResult (llama completa y de equilibrio,
+│   │   │                      # K_p, calor con condensación y reparto del PCI,
+│   │   │                      # segundo principio), análisis de humos, notas,
+│   │   │                      # ejemplos, barridos y export.
+│   │   ├── combustion_procedure.py # ✅ Fase 5 — combustion_steps y flue_gas_steps.
+│   │   ├── heating_value.py   # PCI/PCS por correlaciones (último/próximo): Fase 6
 │   │   └── iso6976.py         # ✅ Fase 2.3 — ISO 6976:2016 (matriz identidad;
 │   │                          # iso6976_to_dict, Fase 1.7)
 │   │                          # Normalization matrix: pendiente, requiere
@@ -261,11 +286,17 @@ apps/
 │                              # cualquier presión, grilla para tocar),
 │                              # grid_point_from_selection, hvac_chart_items y
 │                              # hvac_exergy_figure.
+│   └── combustion_charts.py   # ✅ Fase 5 — composition_figure,
+│                              # combustion_diagram_figure, energy_split_figure
+│                              # (cascada del PCI) y sweep_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
 │   ├── iso6976_components.csv # Valores tabulados por componente puro
+│   ├── nasa9_thermo.csv       # ✅ Fase 5 — 32 especies (60 tramos) de NASA CEA
 │   └── szargut_chemical_exergy.csv
+├── scripts/
+│   └── extract_nasa9.py       # ✅ Fase 5 — thermo.inp de NASA CEA → el CSV
 ├── requirements.txt
 ├── CITATION.cff
 ├── LICENSE
@@ -802,6 +833,74 @@ Notas de la Fase 4 (psicrometría):
   `aligned` el ancho del lado izquierdo se suma al del renglón más ancho:
   h*, Δh_a, Ẋ_Q); búsquedas en tabla en dos renglones con ×10ⁿ o negativos
   (`_is_wide` detecta también los negativos entre paréntesis); ω con 4 cifras.
+
+Notas de la Fase 5 (combustión):
+
+- Datos: los polinomios NASA de 9 coeficientes de McBride, Zehe y Gordon
+  (2002), la fuente de la tabla del vademecum §16.12, extraídos de `thermo.inp`
+  de NASA CEA (github.com/nasa/cea, Apache 2.0) con `scripts/extract_nasa9.py`
+  (32 especies; los tramos de más de 6000 K se descartan). h = h_f +
+  [poly(T) − poly(298,15 K)], así h(25 °C) = h_f exacto (el polinomio solo
+  dejaba ~2 J/mol de diferencia). s° a 1 bar; en una mezcla, s° − R·ln(y·p/p°).
+  Contra el vademecum: h_f a menos de 0,05 %, s° de los líquidos hasta 0,9
+  kJ/(kmol·K); el H₂O de NASA se aparta de la A-23 de Cengel hasta 0,5 % a
+  2000 K. h_fg del agua a 25 °C = 44 004 kJ/kmol (el vademecum dice 44 011).
+- Combustibles: con especies van por mol (como Cengel); un análisis elemental,
+  por kg, con h_f = PCS + Σ ν_p·h_f,p (agua líquida) y PCI = PCS −
+  n_agua·h_fg. Propano y butano líquidos: el gas de NASA menos el h_fg de
+  CoolProp a T. El PCS del carbón del ejemplo es 30,5 MJ/kg: con 31,1 la h_f
+  salía positiva.
+- Estequiometría como el vademecum (aire técnico 21/79, M = 28,85) o con el
+  aire seco de Cengel u O₂ puro. Con λ < 1, la regla de Cengel 15-8 c (H → H₂O
+  y S → SO₂ primero, el C reparte el resto entre CO₂ y CO) y error de hollín
+  bajo el mínimo. Orsat: balances de C (con el SO₂) y N₂ (con el Ar) en un 2×2;
+  el de H da el agua y el de O queda de control (residuo relativo).
+- Humedad: φ se da a la temperatura del ambiente (`Oxidizer.T_humidity_K`) y
+  precalentar no cambia el vapor; con φ a la T del comburente, 60 % a 200 °C no
+  es aire húmedo y el barrido de precalentamiento se caía arriba de 80 °C. En
+  la página, T₀ es el aire ambiente y el estado muerto (los ejemplos tienen
+  T₀ = T del aire salvo los precalentados).
+- Equilibrio (`equilibrium.py`): potenciales de elementos con la
+  amortiguación de NASA CEA (Gordon y McBride, 1994, RP-1311, ec. 2.24–2.26);
+  converge con Σ n_j·|Δln n_j| / Σ n_j < 0,5·10⁻⁵; la llama HP/UV con `brentq`
+  en T (arranque en caliente). Control con Cantera 3.2 (solo en el scratchpad,
+  no es dependencia) con los mismos polinomios y `reference-pressure: 1 bar`
+  (con su 1 atm por defecto daba 0,5 K de diferencia): 0,004 K.
+- Llama completa con `brentq` en [250, 6000] K; si pasa 6000 K (carbón con O₂
+  puro) es error. A volumen constante, U = H − R_u·T·n_gas. Calor con
+  condensación: n_v = p_sat/(p − p_sat)·n_seco; el reparto Q = PCI + q_reac −
+  q_inq − q_humos + q_lat es una identidad (test).
+- 15-8 c: el libro da 2236 K, pero con sus mismos productos el balance cierra
+  en 2284 K («revisá en tu edición»; los tests van contra el balance).
+- Segundo principio solo con especies (el análisis elemental no tiene s°):
+  S_gen = S_p − S_r (+ Q/T_b), X_dest = T₀·S_gen y X_comb ≈ PCI (§16.13).
+- Página: recalcula sola (~7 ms un caso con equilibrio; `st.cache_data`) y los
+  barridos van con botón (el de λ con equilibrio, 0,3 s). Keys `cb_{ejemplo}_…`
+  y `fg_{ejemplo}_…`; al cambiar la forma de dar el aire, el valor nuevo sale
+  del último resultado (`{key}_last`). La composición y el análisis van en
+  filas de dos columnas (un `st.columns` por par): con un solo
+  `st.columns(2)`, en el celular se apilaban columna por columna y
+  desordenaban los componentes. Las tablas muestran todas las filas
+  (`height = 35·(n + 1) + 3`).
+- Gráficos: la paleta validada (el violeta de «otros gases» se validó junto al
+  naranja y al gris de las barras apiladas). En los barridos, el título arriba
+  y la leyenda en su propio renglón a la izquierda: anclada a x = 0,35 no
+  entraba en 390 px y plotly achicaba el gráfico para hacerle lugar; la línea
+  punteada de los datos se explica en el texto (un rótulo pisaba la leyenda).
+- Streamlit 1.65: `number_input`, `radio` y `checkbox` con key se identifican
+  solo por la key (`key_as_main_identity`): cambiar el rótulo o el valor por
+  defecto no los reinicia; `selectbox` y `multiselect` suman pocos parámetros.
+- LaTeX: 14 745 expresiones distintas (procedimiento y teoría), KaTeX estricto,
+  máx. 321 px. Lo que hizo falta: entalpías molares enteras con espacio fino
+  (−393\,510), la reacción con el aire entre paréntesis en renglones propios,
+  la cadena de K_p con el factor de presión en otro renglón si hay ×10ⁿ y los
+  negativos del reparto con `latex_paren`. AppTest devuelve el LaTeX de
+  `st.latex` envuelto en `$$`: sacarlo antes de validar.
+- Smoke test de las ecuaciones: Streamlit ajusta la caja de cada `st.latex` a
+  su contenido y KaTeX sobresale ~2 px por los glifos (scrollWidth =
+  clientWidth + 2 sin barra visible, también en /Psicrometria). Lo que cuenta
+  es si la ecuación se pasa del borde de su expansor (izquierda + scrollWidth
+  contra el borde derecho del `stExpanderDetails` menos su padding).
 
 ### Citas y licencias
 

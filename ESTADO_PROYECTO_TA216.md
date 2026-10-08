@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.20.0` — Fase 4 cerrada (2026-10-08).
+> **Versión actual**: `0.21.0` — Fase 5 cerrada (2026-10-08).
 
 ---
 
@@ -968,6 +968,103 @@
     tocado queda cargado como dato.
 - **Dependencias**: ninguna nueva (CoolProp ya trae `HAPropsSI`).
 
+### Fase 5 — Combustión: estequiometría, humos, llama adiabática y calor
+- **Versión**: `0.21.0` (2026-10-08). Rama `claude/water-state-analyzer-f4fiev`
+  («mergeá»: se mergeó el PR de la Fase 4 y la Fase 5 se planeó e implementó
+  sin esperar, como en las fases anteriores).
+- **Scope**:
+  - **`data/nasa9_thermo.csv`** y **`scripts/extract_nasa9.py`** (nuevos): los
+    polinomios NASA de 9 coeficientes de McBride, Zehe y Gordon (2002), la
+    fuente de la tabla del vademecum §16.12, extraídos de `thermo.inp` de NASA
+    CEA (Apache 2.0): 32 especies (gases de combustión, radicales,
+    combustibles gaseosos y líquidos) en 60 tramos de 200 a 6000 K.
+  - **`core/combustion/thermo.py`** (nuevo): c_p, h = h_f + Δh, s° (1 bar) y
+    g° de cada especie; mezclas; h_fg del agua a 25 °C.
+  - **`core/combustion/fuels.py`** (nuevo): mezclas gaseosas, líquidos puros
+    (con propano y butano líquidos: el gas menos el h_fg de CoolProp) y
+    análisis elemental con el PCS como dato (h_f desde el PCS; PCI = PCS −
+    agua·h_fg); biblioteca de 14 combustibles.
+  - **`core/combustion/stoichiometry.py`** (nuevo): aire técnico, seco u O₂
+    con la humedad del ambiente; la cantidad de aire de seis formas (λ, e, %
+    teórico, φ, AC u O₂ en humos secos); productos completos, con CO o con
+    defecto de aire (Cengel 15-8 c, con el error de hollín); humos en base
+    húmeda, seca y másica, M_g, GC, volumen normal, CO₂ máximo, rocío del agua y
+    **ácido** (Verhoff y Banchero, 1974); Orsat (Cengel 15-4).
+  - **`core/combustion/equilibrium.py`** (nuevo): equilibrio químico por
+    minimización de la energía libre de Gibbs con potenciales de elementos,
+    como NASA CEA (Gordon y McBride, 1994), a T y p o a T y V, y la llama
+    adiabática HP o UV con 13 especies.
+  - **`core/combustion/combustion.py`** (nuevo): la llama completa y con
+    disociación (con la verificación de las K_p), la combustión a volumen
+    constante, el calor con los humos a T_s (con condensación y el reparto del
+    PCI), el rendimiento sobre PCI y PCS, el segundo principio (S_gen,
+    X_dest = T₀·S_gen, X_comb ≈ PCI), el análisis de humos (O₂ y CO medidos u
+    Orsat), notas, 13 + 3 ejemplos, barridos (λ, T del aire, T de los humos) y
+    export.
+  - **`core/combustion/combustion_procedure.py`** (nuevo): el procedimiento
+    de los dos modos en los tres sistemas, con las unidades molares nuevas de
+    `core/units_system.py` (J/mol, kJ/kmol, Btu/lbmol).
+  - **`ui/combustion_charts.py`** (nuevo): composición de los humos, diagrama
+    de combustión, cascada del PCI al calor útil y curvas de barrido.
+  - **Página `/Combustion`** (nueva, después de Psicrometría): los dos modos,
+    con recalculo automático, notas, tablas, gráficos, procedimiento, teoría
+    (vademecum §16 con la tabla de §16.12, y §4.8), export y barridos.
+- **Validación**:
+
+  | Ejemplo | App | Cengel |
+  |---|---|---|
+  | 15-1: octano con 20 kmol de O₂ | AC 24,05 | 24,2 (con M_aire = 29) |
+  | 15-2: etano, 20 % de exceso, 100 kPa | AC 19,19; T_pr 52,5 °C | 19,3; 52,3 °C |
+  | 15-3: gas natural con aire a 20 °C y 80 % | T_pr 61,0 °C | 60,9 °C |
+  | 15-4: Orsat del octano | 130,3 % de aire teórico; condensan 6,60 kmol | 131 %; 6,59 kmol |
+  | 15-6: propano líquido, 10 % del C a CO | ṁ_aire 1,168 kg/min; Q̇ 411 kJ/min | 1,18 (M = 29); 413 |
+  | 15-7: CH₄ + 3 O₂ en una bomba | Q 308 600 Btu/lbmol; p₂ 3,354 atm | 308 730; 3,35 atm |
+  | 15-8: octano, 100 % y 400 % de aire | 2392 K y 962 K | 2395 K y 962 K |
+  | 15-8 c: con 90 % de aire | 2283 K (*) | 2236 K |
+  | 15-10: metano, 50 % de exceso | 1788 K | 1789 K |
+  | 15-11: enfriado a 25 °C | Q 871 700 kJ/kmol; S_gen 2745; X_dest 818 400 | 871 400; 2746; 818 000 |
+
+  (*) Con los productos y los datos del libro, a 2236 K los productos tienen
+  4,249 MJ y hacen falta 4,367 MJ: el balance cierra en 2284 K. Los tests van
+  contra el balance; la nota del ejemplo dice «revisá en tu edición».
+  - Δh̄ contra las tablas A-18 a A-21 de Cengel (JANAF), 1000–2000 K: < 0,05 %
+    (H₂O contra la A-23: hasta 0,5 % a 2000 K, NASA usa datos más nuevos); contra
+    el gas ideal de CoolProp de `core/ideal_gas.py`: < 0,03 %.
+  - PCS a 25 °C contra ISO 6976:2016 (CH₄, C₂H₆, C₃H₈, n-C₄H₁₀, H₂, CO): < 0,01 %.
+    PCI del metano 50 027 kJ/kg (el de la turbina de gas); octano líquido
+    44 422 y 47 889 kJ/kg (A-27: 44 430 y 47 890).
+  - Llama de equilibrio contra Cantera 3.2 (fuera del proyecto, con los mismos
+    polinomios y p° = 1 bar): metano con λ de 0,6 a 3, de 0,5 a 10 atm, aire a
+    25 y 427 °C, a presión y a volumen constante, octano, hidrógeno y gas
+    natural: 0,004 K como máximo; fracciones a 6·10⁻⁸.
+  - Balances de elementos a 1e-12 y de energía en todos los ejemplos; el
+    reparto del PCI es una identidad; X_dest = T₀·S_gen.
+- **Mensajes al alumno**: λ fuera de rango, hollín con defecto de aire, O₂
+  medido imposible (más que el del aire o menos que con λ = 1), combustible
+  fuera de sus tablas o sin nada que se queme, análisis que no suma 100 % o PCI
+  negativo, aire ambiente que condensaría antes del quemador, humos más
+  calientes que la llama, calor entregado a una temperatura que daría
+  S_gen < 0, llama completa que pasaría 6000 K (carbón con O₂ puro), Orsat
+  incoherente o con λ < 1. Notas: defecto de aire y CO, disociación, NO de
+  equilibrio, oxígeno puro, humedad del aire y del combustible, rocío ácido,
+  condensación (η sobre el PCI > 100 %), aire precalentado, volumen
+  constante y la exergía destruida.
+- **Tests**: de 2921 a 3231 passed (10 skipped), sin warnings.
+  - `tests/test_combustion_thermo.py` (43), `tests/test_combustion.py` (125),
+    `tests/test_combustion_procedure.py` (73) y `tests/test_page_combustion.py`
+    (43, AppTest), más la página en `test_navigation.py` y las unidades
+    molares en `test_units_system.py`.
+  - LaTeX: 14 745 expresiones distintas (procedimiento y teoría) validan con
+    KaTeX estricto y entran en 321 px como máximo en los tres sistemas.
+  - Smoke test en Chromium a 1280 y 390 px: diez casos en los dos modos (el
+    15-1, la caldera de gas natural, la bomba del 15-7, el fueloil, el
+    hidrógeno, el bagazo con el barrido de precalentamiento, el 15-10 en SI, la
+    caldera de condensación en inglés, el Orsat del fueloil y el 15-4 en
+    inglés), con el procedimiento y la teoría abiertos: sin errores, sin
+    desborde y ninguna ecuación se pasa del borde de su expansor. Los barridos
+    de λ y de la temperatura de los humos se revisaron en capturas.
+- **Dependencias**: ninguna nueva (Cantera solo validó, fuera del proyecto).
+
 ---
 
 ## Pendientes / próximas fases
@@ -1009,8 +1106,10 @@
   sensible (recta de la sala, aire de impulsión), serpentín con ADP y factor
   de bypass, número de Merkel para dimensionar torres, niebla (mezclas
   sobresaturadas), aire húmedo en la turbina de gas y en el ciclo combinado.
-- **Fase 5** — Combustión: estequiometría, exceso de aire, productos
-  de combustión, temperatura adiabática de llama.
+- **Combustión (continuación)**: hollín (carbono sólido en el equilibrio),
+  NOx con cinética (Zeldovich), inquemados sólidos en las cenizas, la llama
+  completa más allá de 6000 K (hoy un error con O₂ puro y carbón), los
+  polinomios NASA en la turbina de gas y el ciclo combinado (hoy CoolProp).
 - **Fase 6** — Poder calorífico por composición última (Dulong, Boie,
   Channiwala-Parikh) y próxima (Parikh).
 - **Fase 7** — Exergía física y química (Szargut), diagrama de
