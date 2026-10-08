@@ -38,6 +38,7 @@ from scipy.optimize import brentq
 
 from core.combustion.equilibrium import adiabatic_equilibrium
 from core.combustion.fuels import FUELS, Fuel, component_entropy
+from core.combustion.heating_value import CORRELATIONS
 from core.combustion.stoichiometry import (
     AirSpec,
     OrsatResult,
@@ -1200,6 +1201,8 @@ def _fuel_dict(fuel: Fuel) -> dict[str, Any]:
     else:
         assert fuel.analysis is not None
         out["analisis_elemental"] = fuel.analysis.as_dict()
+        if fuel.hhv_correlation is not None:
+            out["PCS_estimado_con"] = CORRELATIONS[fuel.hhv_correlation].name
     return out
 
 

@@ -10,8 +10,9 @@ Tres clases de combustible:
   CoolProp a la temperatura del combustible).
 - **Análisis elemental** (sólidos y líquidos pesados: carbón, bagazo, fueloil):
   las fracciones másicas de C, H, O, N y S, la humedad W y las cenizas A, tal
-  cual se queman, y el PCS como dato (las correlaciones para estimarlo son la
-  Fase 6). Los resultados van por kg de combustible.
+  cual se queman, y el PCS como dato o estimado con una correlación
+  (:mod:`core.combustion.heating_value`, Fase 6). Los resultados van por kg de
+  combustible.
 
 Los combustibles con especies dan los resultados por mol (kmol) de combustible,
 como Cengel y el vademecum; su PCS y PCI salen de las entalpías de formación
@@ -253,6 +254,9 @@ class Fuel:
     analysis: UltimateAnalysis | None = None
     hhv_J_per_kg: float | None = None
     cp_J_per_kg_K: float | None = None
+    #: Correlación con que se estimó el PCS (clave de ``heating_value.CORRELATIONS``);
+    #: ``None``: el PCS es un dato.
+    hhv_correlation: str | None = None
 
     # --- construcción -------------------------------------------------
     @classmethod
@@ -292,8 +296,12 @@ class Fuel:
         analysis: UltimateAnalysis,
         hhv_J_per_kg: float,
         cp_J_per_kg_K: float = 1500.0,
+        hhv_correlation: str | None = None,
     ) -> Fuel:
         """Combustible por su análisis elemental y su PCS tal cual se quema.
+
+        ``hhv_correlation`` dice con qué correlación se estimó el PCS (Fase 6,
+        :mod:`core.combustion.heating_value`), para el procedimiento.
 
         Raises
         ------
@@ -309,6 +317,7 @@ class Fuel:
             analysis=analysis,
             hhv_J_per_kg=hhv_J_per_kg,
             cp_J_per_kg_K=cp_J_per_kg_K,
+            hhv_correlation=hhv_correlation,
         )
         if fuel.lhv_per_kg <= 0.0:
             raise ValueError(

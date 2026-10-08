@@ -1,0 +1,7 @@
+# Carbones del Argonne Premium Coal Sample Program: Vorres, K. S. (1990), Energy & Fuels 4(5), 420-426 (doi:10.1021/ef00023a001), y su Users Handbook (ANL/PCSP-93/1, 1993). Inmediato tal cual (humedad, cenizas y materia volatil, %), elemental en base seca (C, H, N, S, Cl y cenizas, %; el O es por diferencia) y PCS tal cual (Btu/lb; 1 Btu/lb = 2,326 kJ/kg). Pocahontas N.o 3 solo con el inmediato.
+key,name,rank,region,moisture_ar,ash_ar,vm_ar,C_d,H_d,N_d,S_d,Cl_d,ash_d,hhv_ar_btu_lb
+pittsburgh8,Pittsburgh N.º 8,bituminoso alto en volátiles A,Pensilvania,1.65,9.10,37.20,75.50,4.83,1.49,2.19,0.11,9.25,13404
+illinois6,Illinois N.º 6,bituminoso alto en volátiles C,Illinois,7.97,14.25,36.86,65.65,4.23,1.16,4.83,0.05,15.48,10999
+wyodak,Wyodak-Anderson,subbituminoso,Wyoming,28.09,6.31,32.17,68.43,4.88,1.02,0.63,0.03,8.77,8426
+beulahzap,Beulah-Zap,lignito,Dakota del Norte,32.24,6.59,30.45,65.85,4.36,1.04,0.80,0.04,9.72,7454
+pocahontas3,Pocahontas N.º 3,bituminoso bajo en volátiles,Virginia,0.65,4.74,18.48,,,,,,,14926

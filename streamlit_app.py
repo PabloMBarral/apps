@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.21.0"
+PAGE_VERSION = "0.22.0"
 
 
 def _home_page() -> None:
@@ -109,6 +109,14 @@ def _home_page() -> None:
           rendimiento) y la exergía destruida; y al revés, el **análisis de
           humos** (el O₂ de un analizador o un Orsat) con el diagrama de
           combustión (ejemplos de Cengel cap. 15).
+        - 🪵 **Poder calorífico** — el PCS de un carbón, una biomasa o un
+          combustible líquido estimado con su **análisis elemental**
+          (Dulong, Boie, Channiwala y Parikh) o **inmediato** (Parikh,
+          Cordero), en cualquier base (tal cual, seca o sin cenizas), con
+          el PCI y la humedad que lo anula; la **comparación de las
+          correlaciones** entre sí y contra el PCS medido o el exacto, y
+          cuánto se equivoca cada una con **536 biomasas y cinco carbones
+          reales**.
         - 🌀 **Brayton** — turbina de gas con las tres mejoras del ciclo
           Brayton: compresión en etapas con interenfriamiento, expansión en
           etapas con recalentamiento (con metano, una segunda cámara de
@@ -150,8 +158,8 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Poder calorífico por correlaciones, exergía química y de toda la
-        planta. Ver el
+        Exergía química (Szargut) y de toda la planta, diagramas de
+        Grassmann y transferencia de calor. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -165,7 +173,7 @@ def _home_page() -> None:
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
-        Combustión, Brayton, HRSG y Ciclo combinado.
+        Combustión, Poder calorífico, Brayton, HRSG y Ciclo combinado.
         Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
@@ -185,6 +193,7 @@ pages = [
     st.Page("app_pages/6_Refrigeracion.py", title="Refrigeración", icon="❄️"),
     st.Page("app_pages/7_Psicrometria.py", title="Psicrometría", icon="🌫️"),
     st.Page("app_pages/8_Combustion.py", title="Combustión", icon="🕯️"),
+    st.Page("app_pages/9_Poder_Calorifico.py", title="Poder calorífico", icon="🪵"),
     st.Page("app_pages/13_Brayton.py", title="Brayton", icon="🌀"),
     st.Page("app_pages/10_HRSG.py", title="HRSG", icon="🏭"),
     st.Page("app_pages/12_Ciclo_Combinado.py", title="Ciclo combinado", icon="⚡"),

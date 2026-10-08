@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.21.0` — Fase 5 cerrada (2026-10-08).
+> **Versión actual**: `0.22.0` — Fase 6 cerrada (2026-10-08).
 
 ---
 
@@ -1065,6 +1065,84 @@
     de λ y de la temperatura de los humos se revisaron en capturas.
 - **Dependencias**: ninguna nueva (Cantera solo validó, fuera del proyecto).
 
+### Fase 6 — Poder calorífico por correlaciones
+- **Versión**: `0.22.0` (2026-10-08). Rama `claude/water-state-analyzer-f4fiev`
+  («sí a todo, y continuá con el plan»: se mergeó el PR de la Fase 5, se
+  aceptó seguir el PR nuevo y la Fase 6 se planeó e implementó sin esperar).
+- **Scope**:
+  - **`core/combustion/heating_value.py`** (nuevo): el PCS desde el análisis
+    elemental (Dulong; Boie, 1953; Channiwala y Parikh, 2002) o inmediato
+    (Parikh, Channiwala y Ghosal, 2005; Cordero et al., 2001), una función
+    por correlación con la cita, el tipo de combustible y el rango de ajuste
+    en el docstring, y el registro `CORRELATIONS` con los coeficientes
+    publicados (MJ/kg por %, base seca). Bases tal cual, seca y seca y sin
+    cenizas (ASTM D3180-25): `HeatingValueInputs.from_basis` acepta los datos
+    en cualquiera, con el O o el CF por diferencia. PCI = PCS − h_fg·(8,94·H
+    + W) y la humedad W* que lo anula. Avisos de rango y de tipo de
+    combustible, notas, 18 ejemplos, barrido de la humedad y export.
+  - **Datos de validación**: `data/ghugare2014_biomass.csv` (536 biomasas con
+    el PCS medido, Ghugare et al., 2014, del paquete de R `modeldata`, MIT,
+    con `data/LICENSE-modeldata.txt`) y `data/argonne_premium_coals.csv`
+    (cinco carbones de Vorres, 1990, con los dos análisis y el PCS).
+  - **`core/combustion/heating_value_procedure.py`** (nuevo): el cambio de
+    base, cada correlación con la **tabla de aportes** de cada componente,
+    el PCS en las tres bases, el PCI y los desvíos.
+  - **`ui/heating_value_charts.py`** (nuevo): la comparación de las
+    correlaciones (gráfico de puntos con la referencia), la paridad contra las
+    536 biomasas y el error contra el O.
+  - **Página `/Poder_Calorifico`** (nueva, después de Combustión): datos en
+    cualquier base, elemental, inmediato o los dos, el H aparte para el PCI,
+    el PCS medido (en cualquier base) o el exacto de una sustancia pura, la
+    correlación principal; métricas, notas, comparación, el análisis en las
+    tres bases, «¿Qué tan buenas son?», teoría, procedimiento, export y el
+    barrido de la humedad (instantáneo: sin botón).
+  - **`/Combustion`**: el PCS de un análisis elemental puede ser un dato o
+    estimarse con Channiwala y Parikh, Boie o Dulong; `Fuel` suma
+    `hhv_correlation` (`None` = dato, como en la 0.21.0) y el procedimiento y
+    el export muestran la correlación.
+- **Validación** (desvío del PCS estimado contra el medido o el exacto):
+  - Biomasa (Ghugare et al., 2014, n = 536): Channiwala y Parikh AAE 4,94 % y
+    ABE +0,12 %; Boie 5,23 % y 0,00 %; Dulong 11,46 % y −10,15 %. El sesgo de
+    Dulong crece con el O: +3,7 % con O < 10 % y −18 % con O > 45 %.
+  - Carbones de Argonne: las elementales aciertan a ±3 %; con el inmediato,
+    Parikh da −10 a −23 % y Cordero −7 a −21 %, aunque estén dentro de sus
+    rangos (una correlación con MV y CF no distingue la materia volátil del
+    carbón, más rica en H, de la de la biomasa).
+  - Sustancias puras (PCS exacto de las h_f de NASA): Boie y Channiwala y
+    Parikh a ±2 % en metano, octano, etanol y metanol; Dulong +11 % en el
+    metano (ignora la h_f) y +1,8 % en el H₂, donde las de ajuste dan −17 y
+    −18 % (no extrapolan).
+  - El fueloil (Channiwala y Parikh) y el carbón de Pensilvania (Dulong) de la
+    biblioteca de la Fase 5 reproducen su PCS a 0,2 y 0,3 %.
+- **Mensajes al alumno**: análisis que no suman 100 % en su base (dicen
+  cuánto suman y qué tiene que sumar), el O o el CF por diferencia
+  negativos, cenizas distintas entre los dos análisis, humedad o cenizas
+  fuera de rango, PCS negativo. Notas: Dulong con O > 10 %, hidrocarburos y
+  H₂, el inmediato en un carbón, fuera de rango o de tipo, sin H no hay PCI,
+  humedad alta y W*, cenizas altas, ninguna correlación a menos de 5 %.
+- **Tests**: de 3231 a 3398 passed (10 skipped), sin warnings.
+  - `tests/test_heating_value.py` (56), `tests/test_heating_value_procedure.py`
+    (72, incluido el paso del PCS estimado en /Combustion) y
+    `tests/test_page_poder_calorifico.py` (34, AppTest), más 4 en
+    `tests/test_page_combustion.py` y la página en `test_navigation.py`.
+  - LaTeX: 2078 expresiones distintas (procedimiento, teoría y el paso nuevo
+    de /Combustion) validan con KaTeX estricto y entran en 311 px como máximo
+    en los tres sistemas (la tabla de aportes reemplazó a las sumas largas, que
+    llegaban a 412 px).
+  - Smoke test en Chromium a 1280 y 390 px: ocho ejemplos (el bagazo, el
+    eucalipto, Pittsburgh con los dos análisis, Pocahontas con el inmediato,
+    el metano en SI, el hidrógeno en inglés, el lodo en SI y el lignito en
+    inglés) con la teoría, el procedimiento, los datos y el barrido abiertos:
+    sin errores, sin desborde y ninguna ecuación se pasa de su expansor. Los
+    gráficos se revisaron en capturas (la leyenda de la paridad y del error va
+    debajo del eje: arriba pisaba el título a 390 px).
+- **Dependencias**: ninguna nueva.
+- **Red**: la política del entorno bloqueó academic.hep.com.cn, sites.bu.edu,
+  en.wikipedia.org, pmc.ncbi.nlm.nih.gov, www2.et.byu.edu, zenodo.org,
+  data.mendeley.com y pubs.usgs.gov; los coeficientes de Boie y Dulong salen
+  de fuentes secundarias que coinciden, y los carbones de Argonne, de
+  reproducciones del *Users Handbook* (coherentes entre sí).
+
 ---
 
 ## Pendientes / próximas fases
@@ -1110,8 +1188,11 @@
   NOx con cinética (Zeldovich), inquemados sólidos en las cenizas, la llama
   completa más allá de 6000 K (hoy un error con O₂ puro y carbón), los
   polinomios NASA en la turbina de gas y el ciclo combinado (hoy CoolProp).
-- **Fase 6** — Poder calorífico por composición última (Dulong, Boie,
-  Channiwala-Parikh) y próxima (Parikh).
+- **Poder calorífico (continuación)**: otras correlaciones (Mendeleev, IGT,
+  Sheng y Azevedo; Goutal para carbones con el inmediato), el C, el H y el O
+  desde el inmediato, el PCS a volumen constante de la bomba contra el de
+  presión constante (ISO 18125:2017) y las bases seca al aire y libre de
+  materia mineral (Parr, para el rango ASTM D388).
 - **Fase 7** — Exergía física y química (Szargut), diagrama de
   Grassmann por componente.
 - **Fase 8** — Transferencia de calor: conducción, aletas, convección,
