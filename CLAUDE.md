@@ -70,7 +70,10 @@ apps/
 │   │                          # y con disociación (K_p), calor con condensación,
 │   │                          # segundo principio, análisis de humos (O₂ u Orsat)
 │   │                          # con el diagrama de combustión, barridos.
-│   ├── 9_Poder_Calorifico.py
+│   ├── 9_Poder_Calorifico.py  # ✅ Fase 6 — PCS por correlaciones (Dulong, Boie,
+│   │                          # Channiwala–Parikh; Parikh, Cordero) en cualquier
+│   │                          # base, PCI y W*, comparación contra el medido o el
+│   │                          # exacto, validación con 536 biomasas y 5 carbones.
 │   ├── 4_ISO6976.py           # ✅ Fase 2.3 (matriz identidad; teoría y export 1.7)
 │   ├── 10_HRSG.py             # ✅ Fase 3.3 — HRSG de una presión: diagrama T–Q
 │   │                          # (plotly) con vapor sobrecalentado o saturado,
@@ -166,6 +169,7 @@ apps/
 │   │   ├── fuels.py           # ✅ Fase 5 — Fuel: mezcla gaseosa, líquido puro
 │   │   │                      # (GLP licuado con CoolProp) o UltimateAnalysis con
 │   │   │                      # PCS dado; átomos, O₂ teórico, h, s, PCS/PCI; FUELS.
+│   │   │                      # Fase 6: hhv_correlation (PCS estimado).
 │   │   ├── stoichiometry.py   # ✅ Fase 5 — Oxidizer (técnico, seco, O₂; humedad a
 │   │   │                      # T_humidity_K), AirSpec (6 formas), products (λ < 1
 │   │   │                      # como Cengel 15-8 c), Stoichiometry (humos, GC, V_N,
@@ -179,7 +183,15 @@ apps/
 │   │   │                      # segundo principio), análisis de humos, notas,
 │   │   │                      # ejemplos, barridos y export.
 │   │   ├── combustion_procedure.py # ✅ Fase 5 — combustion_steps y flue_gas_steps.
-│   │   ├── heating_value.py   # PCI/PCS por correlaciones (último/próximo): Fase 6
+│   │   ├── heating_value.py   # ✅ Fase 6 — Una función por correlación (cita y
+│   │   │                      # rango en el docstring) y CORRELATIONS; DryUltimate,
+│   │   │                      # DryProximate, HeatingValueInputs.from_basis (tal
+│   │   │                      # cual, seca, sin cenizas), solve_heating_value, PCI y
+│   │   │                      # W*, notas, ejemplos, ghugare_dataset/dataset_fit,
+│   │   │                      # argonne_coals, estimate_hhv_as_fired (/Combustion),
+│   │   │                      # barrido de la humedad y export.
+│   │   ├── heating_value_procedure.py # ✅ Fase 6 — heating_value_steps y
+│   │   │                      # correlation_latex (tabla de aportes).
 │   │   └── iso6976.py         # ✅ Fase 2.3 — ISO 6976:2016 (matriz identidad;
 │   │                          # iso6976_to_dict, Fase 1.7)
 │   │                          # Normalization matrix: pendiente, requiere
@@ -289,11 +301,16 @@ apps/
 │   └── combustion_charts.py   # ✅ Fase 5 — composition_figure,
 │                              # combustion_diagram_figure, energy_split_figure
 │                              # (cascada del PCI) y sweep_figure.
+│   └── heating_value_charts.py # ✅ Fase 6 — comparison_figure (puntos),
+│                              # parity_figure y error_vs_oxygen_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
 │   ├── iso6976_components.csv # Valores tabulados por componente puro
 │   ├── nasa9_thermo.csv       # ✅ Fase 5 — 32 especies (60 tramos) de NASA CEA
+│   ├── ghugare2014_biomass.csv # ✅ Fase 6 — 536 biomasas (de modeldata, MIT;
+│   │                          # LICENSE-modeldata.txt al lado)
+│   ├── argonne_premium_coals.csv # ✅ Fase 6 — 5 carbones (Vorres, 1990)
 │   └── szargut_chemical_exergy.csv
 ├── scripts/
 │   └── extract_nasa9.py       # ✅ Fase 5 — thermo.inp de NASA CEA → el CSV
@@ -901,6 +918,61 @@ Notas de la Fase 5 (combustión):
   clientWidth + 2 sin barra visible, también en /Psicrometria). Lo que cuenta
   es si la ecuación se pasa del borde de su expansor (izquierda + scrollWidth
   contra el borde derecho del `stExpanderDetails` menos su padding).
+
+Notas de la Fase 6 (poder calorífico por correlaciones):
+
+- Cada correlación es una función de `core/combustion/heating_value.py` con la
+  cita, el tipo de combustible y el rango de ajuste en el docstring (la regla
+  de abajo); los coeficientes quedan en su forma publicada (MJ/kg por % en
+  masa, **base seca**) y `CORRELATIONS` los junta con el LaTeX y los rangos.
+  Dulong y Boie, en la forma que tabulan Channiwala y Parikh (2002): Dulong no
+  tiene un trabajo original y Boie (1953) es ≈ su forma en kcal/kg × 4,1868
+  (test). Cordero: 0,1708 (hay tablas secundarias con 0,17008).
+- Bases (ASTM D3180-25): el H y el O del análisis son los de la materia seca
+  (la convención de `UltimateAnalysis`); `from_basis` acepta tal cual, seca o
+  seca y sin cenizas (con las cenizas en base seca), el O o el CF por
+  diferencia, tolera 0,1 puntos en la suma y renormaliza. PCI = PCS −
+  h_fg·(8,937·H + W): M_H₂O/(2·M_H) y h_fg = 2442,6 kJ/kg de NASA (el
+  vademecum redondea a 2442); para una sustancia pura coincide con el PCI de
+  la Fase 5 a 1e-9 (test).
+- Validación con datos reales: las 536 biomasas de Ghugare et al. (2014) del
+  paquete de R `modeldata` (MIT: la licencia va en `data/`; un nombre trae un
+  espacio al final, por eso se compara con `strip`) y los carbones de Argonne
+  (Vorres, 1990; O por diferencia, con el Cl). La red bloqueó varios hosts
+  académicos: los carbones salen de reproducciones del *Users Handbook* que
+  coinciden entre sí, con las cenizas y el S del inmediato pasados a seco
+  iguales a los del elemental.
+- Lo didáctico: Dulong subestima la biomasa (−10 %, −18 % con O > 45 %)
+  porque supone el O unido al H; las del inmediato subestiman los carbones
+  bituminosos 10–23 % aunque estén dentro de los rangos de cada variable
+  (estar en rango no garantiza que la correlación sirva); en sustancias puras
+  Dulong se pasa +11 % (metano: ignora la h_f) y acierta en el H₂, donde las
+  de ajuste no extrapolan. Una nota que explica una correlación reemplaza sus
+  avisos genéricos de rango y tipo (`explained`), que igual quedan en la tabla.
+- Página: keys `hv_{ejemplo}_…`; los campos del análisis llevan la base
+  (`{key}_{base}_{campo}`) y arrancan del último resultado pasado a esa base
+  (`{key}_last`, con `to_basis`); la humedad (`{key}_W`) es una sola; las
+  cenizas, `{key}_Aar` o `{key}_Ad` (seca y sin cenizas también usa la seca);
+  el PCS medido, `{key}_refv_{base}`. El PCS exacto de una sustancia pura se
+  deja de comparar si cambia la composición (tolerancia 1e-4: los widgets
+  redondean). El selector de la correlación principal lleva el modo de
+  análisis en la key (cambian sus opciones). El barrido de la humedad es
+  instantáneo: va sin botón.
+- /Combustion: selector «PCS» (dato o estimado con Channiwala y Parikh, Boie
+  o Dulong); `Fuel.hhv_correlation` (`None` = dato, la 0.21.0 sin cambios)
+  hace que el procedimiento muestre la correlación y el export la nombre.
+- LaTeX: la sustitución de una correlación es una **tabla de aportes** (un
+  renglón por componente, `C:\quad 0.3491 \cdot 48.64 &= 16.98`, y la suma
+  sin unidad, que dice el renglón siguiente): con dos términos por renglón
+  llegaba a 322–412 px. Las fórmulas, de a dos términos. 2078 expresiones,
+  KaTeX estricto, máx. 311 px.
+- Gráficos: la comparación es un gráfico de puntos (las diferencias son de
+  pocos %); en la paridad y el error contra el O la leyenda va debajo del eje
+  (a 390 px ocupa tres renglones y arriba pisaba el título), y el eje del
+  error va de −50 a +40 % (fuera quedan menos de 10 muestras dudosas, que la
+  página cuenta).
+- Smoke test: `pkill -f "streamlit run"` también mata al shell que lo corre
+  (su línea de comando contiene el patrón): usar `pkill -f "[s]treamlit run"`.
 
 ### Citas y licencias
 

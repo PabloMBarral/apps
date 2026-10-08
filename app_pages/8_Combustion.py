@@ -22,6 +22,7 @@ El cálculo vive en :mod:`core.combustion`; los gráficos, en
 from __future__ import annotations
 
 import json
+import math
 import re
 from typing import Any
 
@@ -60,6 +61,7 @@ from core.combustion.fuels import (
     FuelKind,
     UltimateAnalysis,
 )
+from core.combustion.heating_value import CORRELATIONS, estimate_hhv_as_fired
 from core.combustion.stoichiometry import (
     AIR_SPEC_KINDS,
     OXIDIZER_KINDS,
@@ -82,7 +84,7 @@ from ui.combustion_charts import (
 )
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.21.0"
+PAGE_VERSION = "0.22.0"
 
 # Opciones fijas de los radios y selectores: cambiarlas reiniciaría el widget.
 _MODE_COMB = "Combustión: llama y calor"
@@ -104,6 +106,13 @@ _SPEC_LIST: list[AirSpecKind] = list(AIR_SPEC_KINDS)
 _SPEC_LABELS = [AIR_SPEC_KINDS[k] for k in _SPEC_LIST]
 _COMB_NAMES = list(COMBUSTION_EXAMPLES)
 _FLUE_NAMES = list(FLUE_GAS_EXAMPLES)
+
+#: De dónde sale el PCS de un análisis elemental: dato o una correlación (Fase 6).
+_HHV_KEYS: tuple[str | None, ...] = (None, "channiwala_parikh", "boie", "dulong")
+_HHV_SOURCES = (
+    "Dato (de laboratorio)",
+    *(f"Estimado con {CORRELATIONS[k].name}" for k in _HHV_KEYS if k is not None),
+)
 
 #: Datos del análisis elemental: atributo y nombre.
 _ANALYSIS_FIELDS = (
@@ -429,20 +438,46 @@ def _read_analysis(key: str, default: Fuel, system: UnitSystem) -> Fuel:
                 / 100.0
             )
     st.caption(f"Suma: {format_value(100 * sum(values.values()), 6)} %")
+    source = st.selectbox(
+        "Poder calorífico superior (PCS)",
+        _HHV_SOURCES,
+        key=f"{akey}_hhvsrc",
+        help="Un dato del laboratorio (bomba calorimétrica) o estimado con una correlación "
+        "sobre el análisis elemental. La página Poder calorífico las compara y muestra cuánto "
+        "se equivoca cada una.",
+    )
+    correlation = _HHV_KEYS[_HHV_SOURCES.index(source)]
+    analysis = UltimateAnalysis(**values)
+    # Un error del análisis salta después de dibujar los dos campos: si no, el c_p no se
+    # dibuja en esa corrida y Streamlit lo reinicia.
+    estimate_error: ValueError | None = None
     left, right = st.columns(2)
     with left:
-        hhv = number_input_si(
-            label="PCS tal cual se quema",
-            kind="specific_enthalpy",
-            default_si=base.hhv_J_per_kg,
-            key=f"{akey}_hhv",
-            format="%.0f" if system == "SI" else "%.1f",
-            min_value_si=1e6,
-            max_value_si=150e6,
-            help="Poder calorífico superior (con el agua de los humos líquida), un dato del "
-            "laboratorio (bomba calorimétrica). Las correlaciones para estimarlo (Dulong, "
-            "Channiwala–Parikh) son de la Fase 6.",
-        )
+        if correlation is None:
+            hhv = number_input_si(
+                label="PCS tal cual se quema",
+                kind="specific_enthalpy",
+                default_si=base.hhv_J_per_kg,
+                key=f"{akey}_hhv",
+                format="%.0f" if system == "SI" else "%.1f",
+                min_value_si=1e6,
+                max_value_si=150e6,
+                help="Poder calorífico superior (con el agua de los humos líquida), un dato del "
+                "laboratorio (bomba calorimétrica).",
+            )
+        else:
+            try:
+                analysis.validate()
+                hhv = estimate_hhv_as_fired(analysis, correlation)
+            except ValueError as exc:
+                estimate_error, hhv = exc, math.nan
+            else:
+                st.metric(
+                    f"PCS tal cual estimado [{unit_label('specific_enthalpy', system)}]",
+                    _value(hhv, "specific_enthalpy", system),
+                    help="La correlación va con los % en base seca (cada fracción dividida "
+                    "por 1 − W) y el resultado se pasa a tal cual: PCS·(1 − W).",
+                )
     with right:
         cp = number_input_si(
             label="c_p del combustible",
@@ -455,10 +490,14 @@ def _read_analysis(key: str, default: Fuel, system: UnitSystem) -> Fuel:
             help="Solo cuenta si el combustible entra a otra temperatura que 25 °C (el fueloil "
             "se precalienta para pulverizarlo).",
         )
-    analysis = UltimateAnalysis(**values)
+    if estimate_error is not None:
+        raise estimate_error
     same = all(abs(v - getattr(base.analysis, a)) < 1e-9 for a, v in values.items())
-    same = same and abs(hhv - base.hhv_J_per_kg) < 1e-6 * hhv
     same = same and abs(cp - (base.cp_J_per_kg_K or 1500.0)) < 1e-6 * cp
+    if correlation is not None:
+        label = name if same else f"{name} (modificado)"
+        return Fuel.from_analysis(label, analysis, hhv, cp, hhv_correlation=correlation)
+    same = same and abs(hhv - base.hhv_J_per_kg) < 1e-6 * hhv
     return base if same else Fuel.from_analysis(f"{name} (modificado)", analysis, hhv, cp)
 
 

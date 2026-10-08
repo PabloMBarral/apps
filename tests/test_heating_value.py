@@ -443,7 +443,7 @@ def test_notes() -> None:
     assert any("W* = 88,1 %" in n for n in bag)
     assert not any(n.startswith("Dulong:") for n in bag)  # la nota del O ya lo explica
     coal = _solve("Carbón bituminoso Illinois N.º 6").notes
-    assert any("análisis inmediato se ajustaron sobre todo con biomasa" in n for n in coal)
+    assert any("análisis inmediato subestiman los carbones de Argonne" in n for n in coal)
     methane = _solve("Metano (sustancia pura)").notes
     assert any("sustancia pura" in n for n in methane)
     assert any("h_f del combustible" in n for n in methane)

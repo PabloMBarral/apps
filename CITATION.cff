@@ -37,8 +37,9 @@ keywords:
   - brayton-cycle
   - psychrometrics
   - chemical-equilibrium
+  - heating-value
 license: MIT
-version: "0.21.0"
+version: "0.22.0"
 date-released: "2026-10-08"
 references:
   - type: article
@@ -267,7 +268,9 @@ references:
     start: 71
     end: 72
   - type: article
-    scope: "PCS del fueloil de los ejemplos (correlación por análisis elemental)"
+    scope: >-
+      Correlación unificada del PCS (análisis elemental) y forma tabulada de
+      las de Dulong y Boie; PCS del fueloil de los ejemplos
     authors:
       - family-names: "Channiwala"
         given-names: "S. A."
@@ -293,6 +296,114 @@ references:
     publisher:
       name: "Elsevier"
     year: 1986
+  - type: article
+    scope: "Correlación de Boie para el PCS (análisis elemental)"
+    authors:
+      - family-names: "Boie"
+        given-names: "W."
+    title: "Fuel technology calculations"
+    journal: "Energietechnik"
+    year: 1953
+    volume: 3
+    start: 309
+    end: 316
+  - type: article
+    scope: "Correlación del PCS con el análisis inmediato"
+    authors:
+      - family-names: "Parikh"
+        given-names: "Jigisha"
+      - family-names: "Channiwala"
+        given-names: "S. A."
+      - family-names: "Ghosal"
+        given-names: "G. K."
+    title: "A correlation for calculating HHV from proximate analysis of solid fuels"
+    journal: "Fuel"
+    year: 2005
+    volume: 84
+    issue: 5
+    start: 487
+    end: 494
+  - type: article
+    scope: "Correlación del PCS de la biomasa con el análisis inmediato"
+    authors:
+      - family-names: "Cordero"
+        given-names: "T."
+      - family-names: "Marquez"
+        given-names: "F."
+      - family-names: "Rodriguez-Mirasol"
+        given-names: "J."
+      - family-names: "Rodriguez"
+        given-names: "J. J."
+    title: >-
+      Predicting heating values of lignocellulosics and carbonaceous materials
+      from proximate analysis
+    journal: "Fuel"
+    year: 2001
+    volume: 80
+    issue: 11
+    start: 1567
+    end: 1571
+    doi: "10.1016/S0016-2361(01)00034-5"
+  - type: article
+    scope: "536 biomasas con el PCS medido para validar las correlaciones"
+    authors:
+      - family-names: "Ghugare"
+        given-names: "Suhas B."
+      - family-names: "Tiwary"
+        given-names: "Shishir"
+      - family-names: "Elangovan"
+        given-names: "Vinayagam"
+      - family-names: "Tambe"
+        given-names: "Sanjeev S."
+    title: >-
+      Prediction of Higher Heating Value of Solid Biomass Fuels Using
+      Artificial Intelligence Formalisms
+    journal: "BioEnergy Research"
+    year: 2014
+    volume: 7
+    start: 681
+    end: 692
+  - type: software
+    scope: "Distribución de los datos de Ghugare et al. (2014) (licencia MIT)"
+    authors:
+      - family-names: "Kuhn"
+        given-names: "Max"
+    title: "modeldata: Data Sets Useful for Modeling Examples"
+    license: MIT
+    repository-code: "https://github.com/tidymodels/modeldata"
+  - type: article
+    scope: "Carbones de Argonne con los análisis y el PCS medido"
+    authors:
+      - family-names: "Vorres"
+        given-names: "Karl S."
+    title: "The Argonne Premium Coal Sample Program"
+    journal: "Energy & Fuels"
+    year: 1990
+    volume: 4
+    issue: 5
+    start: 420
+    end: 426
+    doi: "10.1021/ef00023a001"
+  - type: standard
+    scope: "Cambio de base de los análisis (tal cual, seca, seca y sin cenizas)"
+    authors:
+      - name: "ASTM International"
+    title: >-
+      ASTM D3180-25 Standard Practice for Calculating Coal and Coke Analyses
+      from As-Determined to Different Bases
+    year: 2025
+  - type: standard
+    scope: "Análisis elemental (último)"
+    authors:
+      - name: "ASTM International"
+    title: "ASTM D3176-24 Standard Practice for Ultimate Analysis of Coal and Coke"
+    year: 2024
+  - type: standard
+    scope: "Análisis inmediato (próximo)"
+    authors:
+      - name: "ASTM International"
+    title: "ASTM D3172-13(2021)e1 Standard Practice for Proximate Analysis of Coal and Coke"
+    year: 2021
   - type: software
     scope: "Repositorio hermano: hoja de fórmulas teóricas"
     authors:

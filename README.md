@@ -333,6 +333,25 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   818 400 kJ/kmol de exergía destruida, el libro 871 400 y 818 000), y la
   llama de equilibrio coincide con Cantera dentro de 0,004 K. _Fase 5
   cerrada._
+- ✅ **Poder calorífico por correlaciones** (página `/Poder_Calorifico`): el
+  PCS de un carbón, una biomasa o un combustible líquido estimado con su
+  análisis **elemental** (Dulong; Boie, 1953; Channiwala y Parikh, 2002) o
+  **inmediato** (Parikh, Channiwala y Ghosal, 2005; Cordero et al., 2001),
+  con los datos en cualquier base (tal cual, seca o seca y sin cenizas, con
+  el O o el carbono fijo por diferencia). Resultados: el PCS de cada
+  correlación en las tres bases, el PCI (el agua que forma el H y la
+  humedad, con h_fg a 25 °C) y la humedad con la que el PCI se anula, la
+  **comparación de las correlaciones** entre sí y contra el PCS medido o el
+  exacto (las h_f de una sustancia pura), y avisos cuando una correlación
+  se usa fuera de su rango o de su tipo de combustible. «¿Qué tan buenas
+  son?» las prueba contra **536 biomasas** con el PCS medido (Ghugare et
+  al., 2014) y **cinco carbones** del Argonne Premium Coal Sample Program
+  (Vorres, 1990): en biomasa Channiwala y Parikh se equivoca 4,9 % en
+  promedio, Boie 5,2 % y Dulong 11,5 % (subestima 10 % porque supone el O
+  ya unido al H); con el inmediato, los carbones bituminosos quedan 10–23 %
+  abajo. Procedimiento en los tres sistemas, export y barrido de la
+  humedad. En `/Combustion`, el PCS de un análisis elemental se puede
+  estimar con una de estas correlaciones. _Fase 6 cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -352,10 +371,10 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
 - **Combustión (continuación)**: hollín (carbono sólido en el equilibrio),
   NOx con cinética (mecanismo de Zeldovich), inquemados sólidos en las
   cenizas, los polinomios NASA en la turbina de gas y el ciclo combinado.
-- **Poder calorífico** a partir de:
-  - composición **última** (Dulong, Boie, Channiwala-Parikh),
-  - composición **próxima** (correlaciones de Parikh y similares),
-  - composición molar según **ISO 6976:2016** para gases combustibles.
+- **Poder calorífico (continuación)**: otras correlaciones (Mendeleev,
+  IGT, Sheng y Azevedo; Goutal para carbones con el análisis inmediato),
+  el C, el H y el O estimados desde el inmediato, y el PCS a volumen
+  constante de la bomba contra el de presión constante (ISO 18125:2017).
 - **Exergía**: exergía física de cualquier estado, exergía química
   (tablas estándar), destrucción exergética por componente y diagrama
   de Grassmann para los ciclos.
@@ -407,6 +426,8 @@ apps/
 │   │   ├── equilibrium.py # equilibrio químico (Gibbs, como NASA CEA)
 │   │   ├── combustion.py  # llama, calor, segundo principio, análisis de humos
 │   │   ├── combustion_procedure.py  # su procedimiento «como en el pizarrón»
+│   │   ├── heating_value.py  # PCS por correlaciones (elemental e inmediato), bases, validación
+│   │   ├── heating_value_procedure.py  # su procedimiento, con el aporte de cada componente
 │   │   └── iso6976.py
 │   ├── cycles/
 │   │   ├── tespy_utils.py # red de TESPy en SI y errores en castellano
@@ -430,9 +451,10 @@ apps/
 │   └── plots.py
 ├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, gráficos
 │                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica,
-│                          # gráficos de la combustión, créditos
+│                          # gráficos de la combustión y del poder calorífico, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
-├── data/                  # tablas: ISO 6976, polinomios NASA-9
+├── data/                  # tablas: ISO 6976, polinomios NASA-9, biomasas (Ghugare)
+│                          # y carbones de Argonne con el PCS medido
 ├── scripts/               # extracción de datos (los polinomios de thermo.inp de NASA CEA)
 ├── requirements.txt
 ├── CITATION.cff
@@ -448,7 +470,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.21.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.22.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -663,6 +685,74 @@ químico por minimización de la energía libre de Gibbs, el punto de rocío
   year      = {1986}
 }
 ```
+
+**Poder calorífico por correlaciones** — las correlaciones (Dulong y Boie en
+la forma que tabulan Channiwala y Parikh, 2002, citada arriba) y los datos
+con que se validan: las biomasas de Ghugare et al. (2014), tal como las
+distribuye el paquete de R `modeldata` (Posit, licencia MIT, ver
+`data/LICENSE-modeldata.txt`), y los carbones de Argonne (Vorres, 1990):
+
+```bibtex
+@article{boie1953fuel,
+  author  = {Boie, W.},
+  title   = {Fuel technology calculations},
+  journal = {Energietechnik},
+  volume  = {3},
+  pages   = {309--316},
+  year    = {1953}
+}
+
+@article{parikh2005proximate,
+  author  = {Parikh, Jigisha and Channiwala, S. A. and Ghosal, G. K.},
+  title   = {A correlation for calculating {HHV} from proximate analysis of
+             solid fuels},
+  journal = {Fuel},
+  volume  = {84},
+  number  = {5},
+  pages   = {487--494},
+  year    = {2005}
+}
+
+@article{cordero2001proximate,
+  author  = {Cordero, T. and Marquez, F. and Rodriguez-Mirasol, J. and
+             Rodriguez, J. J.},
+  title   = {Predicting heating values of lignocellulosics and carbonaceous
+             materials from proximate analysis},
+  journal = {Fuel},
+  volume  = {80},
+  number  = {11},
+  pages   = {1567--1571},
+  year    = {2001},
+  doi     = {10.1016/S0016-2361(01)00034-5}
+}
+
+@article{ghugare2014biomass,
+  author  = {Ghugare, Suhas B. and Tiwary, Shishir and Elangovan, Vinayagam
+             and Tambe, Sanjeev S.},
+  title   = {Prediction of Higher Heating Value of Solid Biomass Fuels Using
+             Artificial Intelligence Formalisms},
+  journal = {BioEnergy Research},
+  volume  = {7},
+  pages   = {681--692},
+  year    = {2014}
+}
+
+@article{vorres1990argonne,
+  author  = {Vorres, Karl S.},
+  title   = {The {Argonne} Premium Coal Sample Program},
+  journal = {Energy \& Fuels},
+  volume  = {4},
+  number  = {5},
+  pages   = {420--426},
+  year    = {1990},
+  doi     = {10.1021/ef00023a001}
+}
+```
+
+**Normas de las bases y los análisis**: ASTM D3180-25 (*Calculating Coal and
+Coke Analyses from As-Determined to Different Bases*), ASTM D3176-24
+(*Ultimate Analysis of Coal and Coke*) y ASTM D3172-13(2021)e1 (*Proximate
+Analysis of Coal and Coke*), ASTM International.
 
 ---
 

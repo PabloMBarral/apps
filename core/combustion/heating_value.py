@@ -16,7 +16,7 @@ devuelve J/kg (SI), con la cita, el tipo de combustible y el rango de ajuste
 en el docstring. El registro :data:`CORRELATIONS` las junta con sus datos
 para la página y el procedimiento.
 
-**Bases** (ASTM D3180, ISO 1170): *tal cual* (como se recibe, con la humedad
+**Bases** (ASTM D3180-25): *tal cual* (como se recibe, con la humedad
 W), *seca* y *seca y sin cenizas*:
 
     x_s = x_tc / (1 − W)        x_sscz = x_s / (1 − Cz_s)
@@ -108,7 +108,7 @@ _GHUGARE_CSV = _DATA / "ghugare2014_biomass.csv"
 _ARGONNE_CSV = _DATA / "argonne_premium_coals.csv"
 
 Basis = Literal["ar", "d", "daf"]
-#: Bases del análisis (ASTM D3180): tal cual, seca y seca y sin cenizas.
+#: Bases del análisis (ASTM D3180-25): tal cual, seca y seca y sin cenizas.
 BASES: dict[Basis, str] = {
     "ar": "tal cual (como se recibe)",
     "d": "base seca",
@@ -1039,10 +1039,11 @@ def heating_value_notes(result: HeatingValueResult) -> list[str]:
             explained.update({"channiwala_parikh", "boie", "dulong"})
     if inp.fuel_type == "coal" and inp.proximate is not None:
         notes.append(
-            "Las correlaciones con el análisis inmediato se ajustaron sobre todo con biomasa: en "
-            "los carbones de Argonne (Vorres, 1990) subestiman 10–23 %, aunque sus valores "
-            "estén dentro de los rangos. La materia volátil de un carbón bituminoso tiene mucho "
-            "más H (y vale más) que la de la biomasa: para carbón conviene el elemental."
+            "Las correlaciones con el análisis inmediato subestiman los carbones de Argonne "
+            "(Vorres, 1990) entre 10 y 23 %, aunque sus valores estén dentro de los rangos de "
+            "ajuste: la materia volátil de un carbón bituminoso tiene mucho más H (y vale más) "
+            "que la de la biomasa, y una correlación con MV y CF no las distingue. Para carbón "
+            "conviene el elemental."
         )
         explained.update({"parikh", "cordero"})
     out_type = [e.name for e in result.estimates if not e.in_type and e.key not in explained]

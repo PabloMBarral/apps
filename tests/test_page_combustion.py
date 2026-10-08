@@ -20,6 +20,7 @@ from core.combustion.combustion import (
     solve_flue_gas,
 )
 from core.combustion.fuels import FUEL_KINDS, FUELS, Fuel
+from core.combustion.heating_value import CORRELATIONS, estimate_hhv_as_fired
 from core.combustion.stoichiometry import AIR_SPEC_KINDS
 
 PAGE = str(Path(__file__).resolve().parents[1] / "app_pages" / "8_Combustion.py")
@@ -139,6 +140,42 @@ def test_fuel_classes() -> None:
     _no_problems(at)
     ethanol = FUELS["Etanol (líquido)"].lhv_per_kg / 1e3
     assert _metric(at, "PCI [kJ/kg]") == pytest.approx(ethanol, rel=1e-4)
+
+
+@pytest.mark.parametrize("key", ["channiwala_parikh", "boie", "dulong"])
+def test_hhv_can_be_estimated_with_a_correlation(key: str) -> None:
+    """Fase 6: el PCS de un análisis elemental, dato o estimado con una correlación."""
+    at = _app()
+    prefix = _example(at, FUEL_OIL)
+    akey = f"{prefix}_an0"
+    assert at.selectbox(key=f"{akey}_hhvsrc").value == "Dato (de laboratorio)"
+    at.selectbox(key=f"{akey}_hhvsrc").set_value(f"Estimado con {CORRELATIONS[key].name}").run()
+    _no_problems(at)
+    oil = FUELS["Fueloil"]
+    assert oil.analysis is not None
+    hhv = estimate_hhv_as_fired(oil.analysis, key)
+    assert _metric(at, "PCS tal cual estimado [kJ/kg]") == pytest.approx(hhv / 1e3, rel=1e-4)
+    expected = Fuel.from_analysis("x", oil.analysis, hhv, 2000.0, hhv_correlation=key)
+    assert _metric(at, "PCI [kJ/kg]") == pytest.approx(expected.lhv_per_kg / 1e3, rel=1e-4)
+    assert f"{akey}_hhv@Técnico" not in [n.key for n in at.number_input]
+    procedure = next(e for e in at.expander if "Procedimiento" in e.label)
+    assert any(CORRELATIONS[key].name in m.value for m in procedure.markdown)
+
+
+def test_estimated_hhv_with_a_bad_analysis_keeps_the_cp_field() -> None:
+    """Con una correlación y un análisis que no suma 100 %: el error a la vista y el c_p sigue."""
+    at = _app()
+    prefix = _example(at, FUEL_OIL)
+    akey = f"{prefix}_an0"
+    at.selectbox(key=f"{akey}_hhvsrc").set_value("Estimado con Boie (1953)").run()
+    at.number_input(key=f"{akey}_cp@Técnico").set_value(2.5).run()
+    at.number_input(key=f"{akey}_C").set_value(80.0).run()
+    assert not at.exception
+    assert any("tiene que dar 100 %" in e.value for e in at.error)
+    assert at.number_input(key=f"{akey}_cp@Técnico").value == pytest.approx(2.5)
+    at.number_input(key=f"{akey}_C").set_value(85.6).run()
+    _no_problems(at)
+    assert at.number_input(key=f"{akey}_cp@Técnico").value == pytest.approx(2.5)
 
 
 def test_gas_composition_can_be_edited() -> None:
