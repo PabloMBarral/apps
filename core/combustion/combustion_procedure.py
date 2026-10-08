@@ -28,6 +28,8 @@ from collections.abc import Sequence
 
 from core.combustion.combustion import CombustionResult, FlueGasResult
 from core.combustion.fuels import Fuel, component_info
+from core.combustion.heating_value import CORRELATIONS, dry_ultimate_from_analysis
+from core.combustion.heating_value_procedure import correlation_latex
 from core.combustion.stoichiometry import (
     AIR_SPEC_KINDS,
     P_NORMAL_PA,
@@ -786,6 +788,40 @@ def _heating_value_step(fuel: Fuel, system: UnitSystem) -> ProcedureStep:
             "productos a 25 °C; el PCI con el agua como vapor y el PCS como líquida. El "
             "combustible es h̄_f,comb = Σ yₖ·h̄_f,k (el O₂ y el N₂ valen cero)."
         )
+    elif fuel.hhv_correlation is not None:
+        assert fuel.analysis is not None
+        W = fuel.analysis.W
+        dry = dry_ultimate_from_analysis(fuel.analysis)
+        hhv_d = fuel.hhv_per_kg / (1.0 - W)
+        latex += correlation_latex(fuel.hhv_correlation, dry.pct(), hhv_d, system)
+        latex.append(
+            latex_chain(
+                r"PCS",
+                r"PCS_\mathrm{s}\,(1 - W)",
+                rf"{latex_number(convert_from_si(hhv_d, _EH, system), 5)} \cdot "
+                rf"(1 - {latex_number(W, 4)})",
+                _q(fuel.hhv_per_kg, _EH, system),
+            )
+        )
+        latex.append(
+            latex_chain(
+                r"PCI",
+                r"PCS - n_w\,\bar{h}_{fg}",
+                rf"{latex_number(convert_from_si(fuel.hhv_per_kg, _EH, system), 5)}"
+                rf" \\ &\quad - {_n(w, fuel, system)} \cdot {_hm(hfg, system)}",
+                _q(fuel.lhv_per_kg, _EH, system),
+            )
+        )
+        corr = CORRELATIONS[fuel.hhv_correlation]
+        dry_text = f"{1.0 - W:.4g}".replace(".", ",")
+        text = (
+            f"El PCS se estimó con {corr.name}, una correlación de la Fase 6 (página "
+            "/Poder_Calorifico) que va con los % en masa en base seca: cada fracción tal cual "
+            "dividida por "
+            f"1 − W = {dry_text}. Después se pasa a tal cual. El PCI resta el calor latente del "
+            "agua que se forma más la humedad, n_w = n_H/2 + n_W, con h̄_fg = 44 004 kJ/kmol a "
+            "25 °C (vademecum §16.9)."
+        )
     else:
         latex.append(rf"PCS = {_q(fuel.hhv_per_kg, _EH, system)}\ \text{{(dato)}}")
         latex.append(
@@ -798,9 +834,10 @@ def _heating_value_step(fuel: Fuel, system: UnitSystem) -> ProcedureStep:
             )
         )
         text = (
-            "El PCS de un combustible por su análisis es un dato (de laboratorio o de una "
-            "correlación, Fase 6). El PCI resta el calor latente del agua que se forma más la "
-            "humedad, n_w = n_H/2 + n_W, con h̄_fg = 44 004 kJ/kmol a 25 °C (vademecum §16.9)."
+            "El PCS de un combustible por su análisis es un dato (de laboratorio) o sale de una "
+            "correlación (Fase 6, /Poder_Calorifico). El PCI resta el calor latente del agua "
+            "que se forma más la humedad, n_w = n_H/2 + n_W, con h̄_fg = 44 004 kJ/kmol a "
+            "25 °C (vademecum §16.9)."
         )
     latex.append(
         latex_chain(
