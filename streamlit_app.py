@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.20.0"
+PAGE_VERSION = "0.21.0"
 
 
 def _home_page() -> None:
@@ -96,6 +96,19 @@ def _home_page() -> None:
           de acondicionamiento** (calentar, enfriar y secar, humidificar,
           mezclar) con el calor, el agua y la exergía destruida en cada
           uno, y la **torre de enfriamiento** (ejemplos de Cengel cap. 14).
+        - 🕯️ **Combustión** — un combustible gaseoso (gas natural, GLP,
+          hidrógeno, biogás o una mezcla a medida), líquido (octano,
+          alcoholes, querosén, propano líquido) o sólido por su análisis
+          elemental (carbón, bagazo, fueloil) con aire técnico, aire seco u
+          oxígeno, húmedo y precalentado: el aire (λ, exceso, AC o el O₂
+          medido en los humos), los **humos** en base húmeda y seca, los
+          **puntos de rocío** del agua y ácido, el PCS y el PCI, la
+          **temperatura adiabática de llama** con combustión completa y con
+          **disociación** (equilibrio químico, con los polinomios NASA), el
+          **calor** con los humos a una temperatura dada (con condensación y
+          rendimiento) y la exergía destruida; y al revés, el **análisis de
+          humos** (el O₂ de un analizador o un Orsat) con el diagrama de
+          combustión (ejemplos de Cengel cap. 15).
         - 🌀 **Brayton** — turbina de gas con las tres mejoras del ciclo
           Brayton: compresión en etapas con interenfriamiento, expansión en
           etapas con recalentamiento (con metano, una segunda cámara de
@@ -137,8 +150,8 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Combustión, poder calorífico por correlaciones, exergía de toda
-        la planta. Ver el
+        Poder calorífico por correlaciones, exergía química y de toda la
+        planta. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -152,7 +165,7 @@ def _home_page() -> None:
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
-        Brayton, HRSG y Ciclo combinado.
+        Combustión, Brayton, HRSG y Ciclo combinado.
         Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
@@ -171,6 +184,7 @@ pages = [
     st.Page("app_pages/5_Rankine.py", title="Rankine", icon="♨️"),
     st.Page("app_pages/6_Refrigeracion.py", title="Refrigeración", icon="❄️"),
     st.Page("app_pages/7_Psicrometria.py", title="Psicrometría", icon="🌫️"),
+    st.Page("app_pages/8_Combustion.py", title="Combustión", icon="🕯️"),
     st.Page("app_pages/13_Brayton.py", title="Brayton", icon="🌀"),
     st.Page("app_pages/10_HRSG.py", title="HRSG", icon="🏭"),
     st.Page("app_pages/12_Ciclo_Combinado.py", title="Ciclo combinado", icon="⚡"),
