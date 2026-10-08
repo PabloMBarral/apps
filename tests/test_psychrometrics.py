@@ -38,6 +38,7 @@ from core.psychrometrics import (
     coolprop_comparison,
     default_altitude_values,
     dew_point,
+    moist_air_notes,
     moist_air_state,
     moist_air_to_dict,
     moist_enthalpy,
@@ -487,3 +488,20 @@ def test_export_is_serializable(system: str) -> None:
     assert data["omega"] == pytest.approx(s.omega)
     assert data["recinto"]["m_aire_seco_kg"] > 0
     assert data["psi"]["valor"] >= 0
+
+
+@pytest.mark.parametrize(
+    ("p", "T_C", "phi", "fragment"),
+    [
+        (P, 20.0, 1.0, "saturado"),
+        (P, 35.0, 0.1, "muy seco"),
+        (P, -10.0, 0.5, "escarcha"),
+        (P, 120.0, 0.05, "hierve"),
+        (P, 24.0, 0.5, "zona de confort"),
+        (pressure_from_altitude(3440.0), 20.0, 0.3, "veces el vapor"),
+        (7.0e5, 35.0, 0.3, "factor de mejora"),
+    ],
+)
+def test_state_notes(p: float, T_C: float, phi: float, fragment: str) -> None:
+    notes = moist_air_notes(state_from_T_phi(p, T_C + C, phi))
+    assert any(fragment in note for note in notes), notes

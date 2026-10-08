@@ -35,9 +35,10 @@ keywords:
   - gas-turbine
   - combined-cycle
   - brayton-cycle
+  - psychrometrics
 license: MIT
-version: "0.19.0"
-date-released: "2026-10-07"
+version: "0.20.0"
+date-released: "2026-10-08"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"
@@ -150,6 +151,69 @@ references:
     publisher:
       name: "PennWell"
     year: 2009
+  - type: article
+    scope: "Presión de sublimación del hielo (aire húmedo bajo 0 °C)"
+    authors:
+      - family-names: "Wagner"
+        given-names: "Wolfgang"
+      - family-names: "Riethmann"
+        given-names: "Thomas"
+      - family-names: "Feistel"
+        given-names: "Rainer"
+      - family-names: "Harvey"
+        given-names: "Allan H."
+    title: >-
+      New Equations for the Sublimation Pressure and Melting Pressure of
+      H2O Ice Ih
+    journal: "Journal of Physical and Chemical Reference Data"
+    year: 2011
+    volume: 40
+    issue: 4
+    start: "043103"
+    doi: "10.1063/1.3657937"
+  - type: article
+    scope: "Aire húmedo real (ASHRAE RP-1485), el modelo de CoolProp de la comparación"
+    authors:
+      - family-names: "Herrmann"
+        given-names: "Sebastian"
+      - family-names: "Kretzschmar"
+        given-names: "Hans-Joachim"
+      - family-names: "Gatley"
+        given-names: "Donald P."
+    title: >-
+      Thermodynamic Properties of Real Moist Air, Dry Air, Steam, Water,
+      and Ice (RP-1485)
+    journal: "HVAC&R Research"
+    year: 2009
+    volume: 15
+    issue: 5
+    start: 961
+    end: 986
+    doi: "10.1080/10789669.2009.10390874"
+  - type: article
+    scope: "Exergía del aire húmedo y del agua en procesos de acondicionamiento"
+    authors:
+      - family-names: "Wepfer"
+        given-names: "William J."
+      - family-names: "Gaggioli"
+        given-names: "Richard A."
+      - family-names: "Obert"
+        given-names: "Edward F."
+    title: "Proper evaluation of available energy for HVAC"
+    journal: "ASHRAE Transactions"
+    year: 1979
+    volume: 85
+    issue: 1
+    start: 214
+    end: 230
+  - type: book
+    scope: "Psicrometría: atmósfera estándar, hielo y bulbo húmedo termodinámico"
+    authors:
+      - name: "ASHRAE"
+    title: "ASHRAE Handbook—Fundamentals (cap. 1, Psychrometrics)"
+    publisher:
+      name: "ASHRAE"
+    year: 2017
   - type: software
     scope: "Repositorio hermano: hoja de fórmulas teóricas"
     authors:

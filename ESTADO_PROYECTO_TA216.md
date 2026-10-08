@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.19.0` — Fase 3.7 cerrada (2026-10-07).
+> **Versión actual**: `0.20.0` — Fase 4 cerrada (2026-10-08).
 
 ---
 
@@ -888,6 +888,86 @@
     y TESPy abiertos; sin ecuaciones con scroll ni desborde.
 - **Dependencias**: ninguna nueva.
 
+### Fase 4 — Psicrometría: aire húmedo, procesos de acondicionamiento y torre
+- **Versión**: `0.20.0` (2026-10-08). Rama `claude/water-state-analyzer-f4fiev`
+  («sí, mergeá y seguí con todo»: el plan se mandó y se implementó sin esperar).
+- **Scope**:
+  - **`core/psychrometrics.py`** (nuevo): el modelo del vademecum §14 (gas
+    ideal, c_p constantes) con p_vs de IAPWS (sobre líquido con CoolProp, la
+    tabla A-4; sobre hielo con la sublimación de IAPWS 2011, la A-8). Estado
+    con la presión y **13 pares de datos** (T, φ, T_bh, T_pr, ω y h), bulbo
+    húmedo = saturación adiabática (de hielo bajo 0 °C), rocío o escarcha, μ,
+    v, ρ, R, c_p, s y **exergía** ψ_tm + ψ_qu (con el ambiente que se elija),
+    presión por altura (atmósfera estándar de ASHRAE), masas en un recinto,
+    comparación con `HAPropsSI` (RP-1485), líneas y grilla de la carta, notas,
+    ejemplos (Cengel 14-1 a 14-4, Buenos Aires y La Quiaca), barrido de la
+    altura y export.
+  - **`core/hvac.py`** (nuevo): tren de hasta 4 procesos (§14.12:
+    calentamiento o enfriamiento sensible, calentamiento con humidificación,
+    serpentín de enfriamiento y deshumidificación, humidificación adiabática y
+    mezcla) numerado en el sentido del flujo, con el calor, el agua y la
+    **exergía destruida** de cada proceso (la del agua, de Wepfer et al. 1979;
+    la del calor, con la temperatura de la fuente o del serpentín); **torre de
+    enfriamiento** (caudal de aire, reposición, rango, aproximación,
+    efectividad, L/G, exergía); notas, ejemplos (Cengel 14-5 a 14-9, verano con
+    recalentamiento, invierno en Bariloche, condensador de 100 MW), barridos y
+    export.
+  - **`core/psychrometrics_procedure.py`** (nuevo): el procedimiento del
+    estado (presión por altura, los datos del par, ω, φ, μ, h en tres pasos, v,
+    ρ, rocío, bulbo húmedo con su verificación, s y ψ), de cada proceso
+    (balances de masa y energía y exergía) y de la torre.
+  - **`ui/psychro_chart.py`** (nuevo): la **carta psicrométrica** en plotly a
+    cualquier presión (φ, h, v y T_bh constantes, zona de confort de Cengel
+    §14-6), con los estados y los procesos en la paleta validada. Una grilla
+    invisible muestra el estado de cualquier punto al pasar el mouse y, al
+    tocarlo, lo carga como dato.
+  - **Página `/Psicrometria`** (nueva, después de Refrigeración): tres modos
+    (estado, procesos y torre), con recalculo automático, notas, carta,
+    tablas, comparación con CoolProp, exergía, procedimiento, teoría, export y
+    barridos.
+- **Validación** (modelo del vademecum; el libro lee la carta):
+
+  | Ejemplo | App | Cengel |
+  |---|---|---|
+  | 14-1: 25 °C, 75 %, 100 kPa | p_a 97,62 kPa; ω 0,01515; m_a 85,56 kg | 97,62 kPa; 0,0152; 85,61 kg |
+  | 14-2: 20 °C, 75 % | T_pr 15,44 °C | 15,4 °C |
+  | 14-3: psicrómetro 25 y 15 °C | ω 0,006526; φ 33,2 %; h 41,75 kJ/kg | 0,00653; 33,2 %; 41,8 |
+  | 14-4: 35 °C, 40 % | ω 0,01414; T_bh 23,9 °C; v 0,8927 | 0,0142; 24 °C; 0,893 |
+  | 14-5: calentar y humidificar | Q̇ 668 kJ/min; ṁ_w 0,538 kg/min | 673; 0,539 |
+  | 14-6: serpentín | Q̇ 511 kJ/min; ṁ_w 0,131 kg/min | 511; 0,131 |
+  | 14-7: enfriador evaporativo | T₂ 70,3 °F | 70 °F |
+  | 14-8: mezcla | ω₃ 0,01216; φ₃ 88,8 %; T₃ 18,9 °C | 0,0122; 89 %; 19,0 °C |
+  | 14-9: torre | reposición 1,80 kg/s | 1,80 kg/s |
+
+  - IAPWS 2011: 230 K → 8,94735 Pa; continuidad en el punto triple.
+  - ASHRAE: 1000 m → 89,875 kPa; 3000 m → 70,108 kPa.
+  - CoolProp (RP-1485): a 1 atm ω +0,4 % (factor de mejora), T_bh y T_pr
+    < 0,02 K, v < 0,1 % (de −30 a 45 °C); a 7 bar, ω_s 2 %.
+  - Ida y vuelta de los 13 pares en una grilla (de −30 a 150 °C, de 0,58 a
+    7 bar): T a 1e-6 K y ω a 1e-7.
+  - Exergía: X_dest (balance con ψ) = T₀·S_gen a 1e-10 en los procesos sin
+    agua y a 3e-4 con agua (los redondeos 0,622 y 1,608); X_dest > 0 en todos
+    los procesos y en la torre.
+- **Mensajes al alumno**: φ > 100 % (niebla), T_bh o T_pr por encima de T,
+  humedad negativa, vapor por encima de la presión total («el agua hierve a…»),
+  pares que dicen lo mismo, enfriamiento sensible bajo el rocío, serpentín que
+  no condensa o que escarcharía, fuente de calor más fría que el aire,
+  humidificador que no humidifica, mezcla en la niebla, torre con el agua bajo
+  el bulbo húmedo del aire o el aire más caliente que el agua; los errores de
+  un tren nombran el proceso.
+- **Tests**: de 2576 a 2921 passed (10 skipped), sin warnings.
+  - `tests/test_psychrometrics.py` (181), `tests/test_hvac.py` (59),
+    `tests/test_psychrometrics_procedure.py` (62) y
+    `tests/test_page_psicrometria.py` (42, AppTest), más la página en
+    `test_navigation.py`.
+  - LaTeX: 3466 expresiones distintas (procedimiento y teoría) validan con
+    KaTeX estricto y entran en 316 px como máximo en los tres sistemas.
+  - Smoke test en Chromium a 1280 y 390 px: los tres modos en siete casos
+    (con SI e Inglés), con el procedimiento y la teoría abiertos; sin
+    ecuaciones con scroll ni desborde. Hover y toque de la carta: el punto
+    tocado queda cargado como dato.
+- **Dependencias**: ninguna nueva (CoolProp ya trae `HAPropsSI`).
+
 ---
 
 ## Pendientes / próximas fases
@@ -925,7 +1005,10 @@
 - **Refrigeración (continuación)**: ciclo transcrítico de CO₂,
   intercambiador líquido–vapor, economizador cerrado (subenfriador),
   refrigeración por gas y por absorción.
-- **Fase 4** — Psicrometría (carta interactiva, procesos HVAC).
+- **Psicrometría (continuación)**: cargas del local y factor de calor
+  sensible (recta de la sala, aire de impulsión), serpentín con ADP y factor
+  de bypass, número de Merkel para dimensionar torres, niebla (mezclas
+  sobresaturadas), aire húmedo en la turbina de gas y en el ciclo combinado.
 - **Fase 5** — Combustión: estequiometría, exceso de aire, productos
   de combustión, temperatura adiabática de llama.
 - **Fase 6** — Poder calorífico por composición última (Dulong, Boie,

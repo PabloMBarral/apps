@@ -58,7 +58,11 @@ apps/
 │   │                          # refrigerantes), refrigerador o bomba de calor,
 │   │                          # niveles por p o por T_sat, ciclo real, segundo
 │   │                          # principio (barras), pestañas por fluido, barridos.
-│   ├── 7_Psicrometria.py
+│   ├── 7_Psicrometria.py      # ✅ Fase 4 — Aire húmedo (vademecum §14): estado con
+│   │                          # 13 pares de datos, presión por altura, carta
+│   │                          # psicrométrica interactiva (tocar carga el estado),
+│   │                          # comparación con CoolProp, tren de procesos de
+│   │                          # acondicionamiento y torre de enfriamiento.
 │   ├── 8_Combustion.py
 │   ├── 9_Poder_Calorifico.py
 │   ├── 4_ISO6976.py           # ✅ Fase 2.3 (matriz identidad; teoría y export 1.7)
@@ -131,6 +135,20 @@ apps/
 │   │                          # combustion_products(aire, átomos, λ).
 │   │                          # Fase 3.7: bajo la T mínima de CoolProp (el agua
 │   │                          # bajo 0,01 °C), gas ideal con c_p constante.
+│   ├── psychrometrics.py      # ✅ Fase 4 — Aire húmedo (vademecum §14): p_vs de IAPWS
+│   │                          # (líquido con CoolProp, hielo con IAPWS 2011),
+│   │                          # MoistAirState, moist_air_state (13 pares), bulbo
+│   │                          # húmedo y rocío, exergía ψ_tm + ψ_qu, DeadState,
+│   │                          # water_exergy, altura (ASHRAE), comparación con
+│   │                          # HAPropsSI, líneas y grilla de la carta, notas,
+│   │                          # ejemplos, barrido de la altura y export.
+│   ├── hvac.py                # ✅ Fase 4 — Procesos (§14.12): SensibleProcess,
+│   │                          # HeatingHumidification, CoolingDehumidification,
+│   │                          # AdiabaticHumidification, AdiabaticMixing; solve_hvac
+│   │                          # (tren numerado, exergía por proceso), torre de
+│   │                          # enfriamiento, notas, ejemplos, barridos y export.
+│   ├── psychrometrics_procedure.py # ✅ Fase 4 — moist_air_steps, hvac_steps y
+│   │                          # cooling_tower_steps.
 │   ├── exergy.py              # Exergía física y química
 │   ├── combustion/
 │   │   ├── __init__.py
@@ -239,6 +257,10 @@ apps/
 │                              # bottoming_exergy_figure y configuration_figure.
 │                              # Fase 3.7: gas_turbine_cycle_figure,
 │                              # improvement_figure y gas_turbine_exergy_figure.
+│   └── psychro_chart.py       # ✅ Fase 4 — psychrometric_chart_figure (carta a
+│                              # cualquier presión, grilla para tocar),
+│                              # grid_point_from_selection, hvac_chart_items y
+│                              # hvac_exergy_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
@@ -729,6 +751,57 @@ Notas de la Fase 3.7 (turbina de gas con interenfriamiento, recalentamiento y re
   `\\` dentro de `\frac` no es válido); la exergía de cada cámara, un término
   por renglón; los subíndices por componente (x_{d,C1}, x_{d,\text{cám}},
   x_{d,\text{RH}}).
+
+Notas de la Fase 4 (psicrometría):
+
+- Modelo del vademecum §14 (gas ideal, c_p constantes: 1,005 y 1,864 kJ/(kg·K),
+  r₀ = 2501 kJ/kg, 0,622 y 1,608) para que el alumno reproduzca los números a
+  mano. R_v = 1,608·R_a = 461,5 J/(kg·K) (Cengel A-1: 0,4615; el vademecum
+  redondea a 0,462): así s (§14.10) y ψ (§14.11) son coherentes y el balance de
+  exergía con ψ da T₀·S_gen a 1e-10 en los procesos sin agua (con agua difiere
+  hasta 3e-4 por el redondeo 0,622 vs 1/1,608).
+- p_vs(T): sobre líquido desde el punto triple con un `AbstractState` de
+  CoolProp **por hilo** (`threading.local`: Streamlit corre cada sesión en un
+  hilo; ~100 veces más rápido que `PropsSI`), y sobre hielo con la ecuación de
+  sublimación de IAPWS R14-08(2011) (230 K → 8,94735 Pa, test). Bajo 0 °C el
+  rocío es de escarcha y el bulbo húmedo, de hielo (h = −333,4 + 2,1·t, ASHRAE).
+  ω < 1e-12 se trata como aire seco (sin rocío): con una ω de 1e-17 el `brentq`
+  del rocío fallaba con un error crudo.
+- Bulbo húmedo = saturación adiabática, con `brentq` entre el rocío y T. Los
+  pares sin T (h–φ, T_bh–φ) buscan T con `brentq`; los demás son cerrados.
+  ω con T_pr o ω son la misma información, y h con T_bh son casi paralelas: no
+  se aceptan (13 pares).
+- h_w del agua que entra o sale (condensado, humidificador, torre) de tablas
+  (IAPWS), como Cengel y el vademecum. Exergía del agua (Wepfer et al., 1979)
+  contra el vapor del ambiente con el vapor del **modelo** a T₀ y p_v0: queda
+  coherente con la ψ del aire.
+- `coolprop_comparison`: los mismos datos a `HAPropsSI` (RP-1485). A 1 atm ω
+  da 0,4 % más (factor de mejora) y T_bh/T_pr difieren < 0,02 K; a 7 bar, 2 %.
+  Con ω = 0, HAPropsSI devuelve un rocío de 149 K: se muestra «—».
+- Procesos: el tren numera en el sentido del flujo (la corriente que se mezcla
+  va antes de la mezcla, como 14-8). La exergía del calor usa T_b: la fuente
+  (por defecto 60 °C o 10 K sobre la salida) o la superficie del serpentín (=
+  el condensado). Un enfriamiento sensible con el serpentín bajo el rocío es
+  error. En 14-5 el libro no hace el balance del humidificador: con vapor
+  saturado a 100 °C hace falta además ~1,6 kW (nota).
+- Carta (`ui/psychro_chart.py`): ω a la derecha, familias en gris (la paleta
+  validada queda para los procesos: calentar naranja, enfriar azul,
+  humidificar aguamarina, mezcla gris), T_bh apagada en la leyenda (casi
+  paralela a h). La **primera traza es una grilla invisible**: hover con el
+  estado completo y `on_select` (callback) que carga T y φ en los widgets; la
+  key del gráfico cambia después de cada toque para que no quede la selección.
+  Rótulos de φ sobre una diagonal y solo 10, 20, 30, 40, 60 y 80 % (en 390 px
+  se pisaban); sin rótulos de h que nacen arriba del 85 % de ω_máx.
+- Página: recalcula sola (cada estado tarda ms; la carta se cachea con
+  `st.cache_data`); barridos con botón. Keys `ps_{ejemplo}_…`, `hv_…`, `ct_…`;
+  al cambiar de par, los datos nuevos salen del último estado
+  (`{key}_last`). Los valores en °C usan `number_input_si` (key `…@sistema`).
+- LaTeX: 3466 expresiones distintas, KaTeX estricto, máx. 316 px. Lo que hizo
+  falta: h en tres renglones (h_a, h_v, h = h_a + ω·h_v); ω por bulbo húmedo
+  con h_fg* y h_g − h_w* (Cengel ec. 14-14); lados izquierdos cortos (en un
+  `aligned` el ancho del lado izquierdo se suma al del renglón más ancho:
+  h*, Δh_a, Ẋ_Q); búsquedas en tabla en dos renglones con ×10ⁿ o negativos
+  (`_is_wide` detecta también los negativos entre paréntesis); ω con 4 cifras.
 
 ### Citas y licencias
 
