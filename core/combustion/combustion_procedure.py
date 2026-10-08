@@ -323,12 +323,17 @@ def _oxidizer_step(s: Stoichiometry, system: UnitSystem) -> ProcedureStep:
         M_a = s.M_dry_air * 1000
         latex.append(rf"M_a = \textstyle\sum y_i\,M_i = {latex_number(M_a, 5)}\ \mathrm{{kg/kmol}}")
         if y.get("H2O", 0.0) > 0.0:
-            p_vs = saturation_pressure(ox.T_K)
+            p_vs = saturation_pressure(ox.T_phi_K)
             yv = y["H2O"]
             text += (
-                f" Con humedad: a {_degC(ox.T_K)} la presión de saturación es la de la tabla A-4 y "
-                "el vapor ocupa y_v = φ·p_vs/p de los moles (vademecum §14.1, Cengel 15-3)."
+                f" Con humedad: a {_degC(ox.T_phi_K)} la presión de saturación es la de la tabla "
+                "A-4 y el vapor ocupa y_v = φ·p_vs/p de los moles (vademecum §14.1, Cengel 15-3)."
             )
+            if ox.T_humidity_K is not None and abs(ox.T_K - ox.T_humidity_K) > 1e-9:
+                text += (
+                    f" La φ es la del aire ambiente: al llevarlo a {_degC(ox.T_K)} el vapor no "
+                    "cambia (ω constante)."
+                )
             latex.append(
                 latex_chain(
                     r"y_v",

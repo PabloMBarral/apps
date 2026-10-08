@@ -100,15 +100,27 @@ def _pct(x: float) -> str:
 
 @dataclass(frozen=True)
 class Oxidizer:
-    """Aire (técnico o seco) u oxígeno, a T y con humedad relativa φ."""
+    """Aire (técnico o seco) u oxígeno, a T y con humedad relativa φ.
+
+    ``T_humidity_K`` es la temperatura a la que se da φ: la del aire ambiente,
+    antes de precalentarlo (``None``: la del comburente, como Cengel 15-3).
+    Precalentar no cambia la cantidad de vapor (ω constante), solo la
+    temperatura.
+    """
 
     kind: OxidizerKind = "technical"
     T_K: float = 298.15
     phi: float = 0.0
+    T_humidity_K: float | None = None
 
     @property
     def label(self) -> str:
         return OXIDIZER_KINDS[self.kind]
+
+    @property
+    def T_phi_K(self) -> float:
+        """Temperatura a la que se da la humedad relativa φ."""
+        return self.T_K if self.T_humidity_K is None else self.T_humidity_K
 
     def check(self, p_Pa: float) -> None:
         if self.kind not in _DRY_COMPOSITION:
@@ -120,20 +132,38 @@ class Oxidizer:
             )
         if not (math.isfinite(self.phi) and 0.0 <= self.phi <= 1.0):
             raise ValueError("La humedad relativa del aire tiene que estar entre 0 y 100 %.")
+        if self.T_humidity_K is not None and not (
+            math.isfinite(self.T_humidity_K) and 223.15 <= self.T_humidity_K <= 373.15
+        ):
+            raise ValueError(
+                "La temperatura del aire ambiente (a la que se da la humedad) tiene que estar "
+                "entre −50 °C y 100 °C."
+            )
         if self.phi > 0.0 and self.kind != "oxygen":
-            p_v = self.phi * saturation_pressure(self.T_K) if self.T_K < 647.0 else math.inf
+            T_phi = self.T_phi_K
+            p_v = self.phi * saturation_pressure(T_phi) if T_phi < 647.0 else math.inf
             if p_v >= 0.5 * p_Pa:
                 raise ValueError(
-                    f"Con φ = {_pct(self.phi)} a {self.T_K - 273.15:.0f} °C el vapor tendría "
+                    f"Con φ = {_pct(self.phi)} a {T_phi - 273.15:.0f} °C el vapor tendría "
                     "más de la mitad de la presión: no es aire húmedo. Bajá la humedad o la "
                     "temperatura."
                 )
+            if self.T_K < 647.0 and p_v > saturation_pressure(self.T_K) * (1.0 + 1e-9):
+                raise ValueError(
+                    f"El aire ambiente ({T_phi - 273.15:.0f} °C y φ = {_pct(self.phi)}) entra "
+                    f"a {self.T_K - 273.15:.0f} °C, por debajo de su punto de rocío: parte del "
+                    "vapor condensaría antes de llegar al quemador."
+                )
 
     def vapor_fraction(self, p_Pa: float) -> float:
-        """Fracción molar del vapor de agua: y_v = φ·p_vs(T)/p (vademecum §14.1)."""
+        """Fracción molar del vapor de agua: y_v = φ·p_vs(T)/p (vademecum §14.1).
+
+        p_vs a la temperatura a la que se da φ (la del ambiente si el aire se
+        precalienta).
+        """
         if self.phi <= 0.0 or self.kind == "oxygen":
             return 0.0
-        return self.phi * saturation_pressure(self.T_K) / p_Pa
+        return self.phi * saturation_pressure(self.T_phi_K) / p_Pa
 
     def composition(self, p_Pa: float) -> dict[str, float]:
         """Fracciones molares del comburente, con el vapor de agua."""

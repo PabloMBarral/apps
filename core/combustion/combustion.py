@@ -667,8 +667,9 @@ def combustion_notes(result: CombustionResult) -> list[str]:
         )
     if inp.oxidizer.phi > 0.0 and inp.oxidizer.kind != "oxygen":
         notes.append(
-            f"El aire entra con {_pct(inp.oxidizer.phi)} de humedad: ese vapor pasa a los "
-            "humos y sube el punto de rocío (Cengel 15-3)."
+            f"El aire tiene {_pct(inp.oxidizer.phi)} de humedad relativa a "
+            f"{_degC(inp.oxidizer.T_phi_K)}: ese vapor pasa a los humos y sube el punto de "
+            "rocío (Cengel 15-3)."
         )
     if fuel.elements()["S"] > 0.0 and s.products.get("H2O", 0.0) > 0.0:
         acid = s.acid_dew_point_K(inp.so3_conversion)
@@ -910,7 +911,7 @@ COMBUSTION_EXAMPLES: dict[str, CombustionInputs] = {
         Fuel.mixture("Etano", {"C2H6": 1.0}), air=AirSpec("excess", 0.2), p_Pa=100e3
     ),
     "Cengel 15-3: gas natural con aire húmedo": CombustionInputs(
-        _GN_CENGEL, oxidizer=Oxidizer("technical", 293.15, 0.8)
+        _GN_CENGEL, oxidizer=Oxidizer("technical", 293.15, 0.8), T0_K=293.15
     ),
     "Cengel 15-6: propano líquido con CO en los humos": CombustionInputs(
         FUELS["Propano líquido"],
@@ -918,6 +919,7 @@ COMBUSTION_EXAMPLES: dict[str, CombustionInputs] = {
         air=AirSpec("excess", 0.5),
         co_fraction=0.1,
         T_products_K=1500.0,
+        T0_K=280.15,
         m_fuel_kg_s=0.05 / 60.0,
     ),
     "Cengel 15-7: metano y oxígeno en un recipiente rígido": CombustionInputs(
@@ -939,6 +941,7 @@ COMBUSTION_EXAMPLES: dict[str, CombustionInputs] = {
         air=AirSpec("o2_dry", 0.03),
         T_products_K=423.15,
         T_sink_K=453.15,
+        T0_K=293.15,
         m_fuel_kg_s=0.05,
     ),
     "Caldera de condensación (humos a 45 °C)": CombustionInputs(
@@ -947,6 +950,7 @@ COMBUSTION_EXAMPLES: dict[str, CombustionInputs] = {
         air=AirSpec("o2_dry", 0.03),
         T_products_K=318.15,
         T_sink_K=313.15,
+        T0_K=293.15,
         m_fuel_kg_s=0.002,
     ),
     "Fueloil en una caldera (rocío ácido)": CombustionInputs(
@@ -1124,7 +1128,8 @@ def air_temperature_sweep(
     out: dict[str, list[float | None]] = {"T_air": [], "T_ad": [], "T_ad_eq": []}
     for T in values:
         try:
-            ox = replace(inputs.oxidizer, T_K=float(T))
+            # Precalentar no cambia el vapor del aire: φ queda dada a la T del ambiente.
+            ox = replace(inputs.oxidizer, T_K=float(T), T_humidity_K=inputs.oxidizer.T_phi_K)
             r = solve_combustion(
                 replace(inputs, oxidizer=ox, T_products_K=None, equilibrium=equilibrium)
             )
@@ -1137,8 +1142,14 @@ def air_temperature_sweep(
 
 
 def default_products_temperature_values(inputs: CombustionInputs, n: int = 40) -> list[float]:
-    """De 30 °C a 400 °C de salida de los humos."""
-    return [303.15 + 370.0 * k / (n - 1) for k in range(n)]
+    """De 30 °C a 400 °C de salida de los humos, con la mitad de los puntos bajo 100 °C.
+
+    Ahí está el punto de rocío y la condensación cambia rápido el rendimiento.
+    """
+    low = n // 2
+    cold = [303.15 + 70.0 * k / low for k in range(low)]
+    hot = [373.15 + 300.0 * k / (n - low - 1) for k in range(n - low)]
+    return cold + hot
 
 
 def products_temperature_sweep(
@@ -1206,6 +1217,7 @@ def combustion_to_dict(result: CombustionResult, system: UnitSystem) -> dict[str
             "tipo": inp.oxidizer.label,
             "T": _value(inp.oxidizer.T_K, "temperature", system),
             "phi": inp.oxidizer.phi,
+            "T_de_phi": _value(inp.oxidizer.T_phi_K, "temperature", system),
             "composicion_molar": s.air,
         },
         "p": _value(inp.p_Pa, "pressure", system),

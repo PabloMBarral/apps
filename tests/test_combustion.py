@@ -422,6 +422,14 @@ def test_analysis_fuels_have_no_second_law() -> None:
         ),
         (CombustionInputs(METHANE, co_fraction=1.2), "CO tiene que estar"),
         (CombustionInputs(METHANE, oxidizer=Oxidizer("technical", 360.0, 1.0)), "aire húmedo"),
+        (
+            CombustionInputs(METHANE, oxidizer=Oxidizer("technical", 283.15, 0.9, 303.15)),
+            "punto de rocío",
+        ),
+        (
+            CombustionInputs(METHANE, oxidizer=Oxidizer("technical", 473.15, 0.5, 400.0)),
+            "aire ambiente",
+        ),
         (CombustionInputs(METHANE, m_fuel_kg_s=-1.0), "caudal"),
     ],
 )
@@ -506,6 +514,30 @@ def test_results_pickle() -> None:
     assert back.flame.T_K == r.flame.T_K
     f = solve_flue_gas(FLUE_GAS_EXAMPLES["Cengel 15-4: Orsat del octano"])
     assert pickle.loads(pickle.dumps(f)).lam == f.lam
+
+
+def test_preheated_humid_air_keeps_its_vapor() -> None:
+    """φ dada a la T del ambiente: precalentar no cambia el vapor (ω constante)."""
+    ambient = Oxidizer("technical", 293.15, 0.6)
+    hot = Oxidizer("technical", 473.15, 0.6, T_humidity_K=293.15)
+    assert hot.T_phi_K == 293.15 and ambient.T_phi_K == 293.15
+    assert hot.vapor_fraction(ATM) == ambient.vapor_fraction(ATM)
+    cold = solve_combustion(CombustionInputs(METHANE, oxidizer=ambient))
+    warm = solve_combustion(CombustionInputs(METHANE, oxidizer=hot))
+    assert warm.stoich.products == cold.stoich.products
+    assert warm.flame.T_K > cold.flame.T_K + 100.0
+    # Sin T_humidity_K, φ = 60 % a 200 °C sería vapor a más de media atmósfera.
+    with pytest.raises(ValueError, match="aire húmedo"):
+        solve_combustion(CombustionInputs(METHANE, oxidizer=Oxidizer("technical", 473.15, 0.6)))
+
+
+def test_air_preheating_sweep_with_humid_air_covers_every_temperature() -> None:
+    inputs = COMBUSTION_EXAMPLES["Caldera de gas natural (3 % de O₂, humos a 150 °C)"]
+    assert inputs.oxidizer.phi > 0.0
+    values = default_air_temperature_values()
+    sweep = air_temperature_sweep(inputs, values, equilibrium=False)
+    assert sweep["T_air"] == values[1:]  # 0 °C queda bajo el rocío del aire a 20 °C y 60 %
+    assert sweep["T_ad"] == sorted(sweep["T_ad"])  # type: ignore[type-var]
 
 
 def test_humid_air_and_pressure_raise_the_dew_point() -> None:
