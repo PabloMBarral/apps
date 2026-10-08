@@ -504,8 +504,10 @@ def fuel_ratio_figure(rows: Sequence[SpeciesExergy], *, current: str | None = No
 def component_efficiency_figure(components: Sequence[ComponentExergy]) -> go.Figure:
     """El rendimiento exergético ε = P/F de cada componente que tiene producto."""
     rows = [c for c in components if c.efficiency is not None]
-    names = [c.name for c in rows]
+    # los nombres largos en dos renglones: a 390 px el eje se comía el gráfico
+    names = [_wrap_label(c.name) for c in rows]
     values = [100.0 * (c.efficiency or 0.0) for c in rows]
+    two_lines = any("<br>" in n for n in names)
     fig = go.Figure(
         go.Scatter(
             x=values,
@@ -522,7 +524,7 @@ def component_efficiency_figure(components: Sequence[ComponentExergy]) -> go.Fig
     )
     lo = min([*values, 100.0])
     fig.update_layout(
-        height=80 + 30 * max(1, len(rows)),
+        height=80 + (36 if two_lines else 30) * max(1, len(rows)),
         margin={"l": 10, "r": 20, "t": 20, "b": 10},
         xaxis={
             "title": "ε = Ẋ_P / Ẋ_F [%]",
@@ -533,6 +535,7 @@ def component_efficiency_figure(components: Sequence[ComponentExergy]) -> go.Fig
             "categoryorder": "array",
             "categoryarray": list(reversed(names)),
             "automargin": True,
+            "tickfont": {"size": 11},
         },
         separators=", ",
     )
