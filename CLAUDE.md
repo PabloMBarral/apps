@@ -82,7 +82,15 @@ apps/
 │   │                          # Fase 3.5: selector de 1, 2 o 3 presiones (cascada),
 │   │                          # T–Q en serrucho, exergía por sección, comparación
 │   │                          # 1/2/3 presiones, procedimiento por nivel.
-│   ├── 11_Exergia.py
+│   ├── 11_Exergia.py          # ✅ Fase 7 — Exergía (vademecum §11 y §16.13):
+│   │                          # física de un fluido (ψ, φ, térmica y mecánica,
+│   │                          # cinética y potencial; masa o caudal; proceso 1 → 2),
+│   │                          # de un calor y de un cuerpo; química de una
+│   │                          # sustancia (Szargut/Ahrendts y método de Szargut),
+│   │                          # de una mezcla y de un combustible (Szargut y
+│   │                          # Styrylska); una planta por componente (Rankine,
+│   │                          # refrigeración, turbina de gas, ciclo combinado)
+│   │                          # con el diagrama de Grassmann.
 │   ├── 12_Ciclo_Combinado.py  # ✅ Fase 3.4 — Turbina de gas (metano o aire estándar)
 │   │                          # + HRSG de una presión (por pinch o por chimenea) +
 │   │                          # Rankine con desaireador: métricas, Sankey, T–s de
@@ -110,6 +118,8 @@ apps/
 │   │                          # Fase 3.2: + caudal volumétrico (volume_flow).
 │   │                          # Fase 5: + entalpía y entropía molares (J/mol,
 │   │                          # kJ/kmol, Btu/lbmol).
+│   │                          # Fase 7: + masa (kg, lb), energía (J, kJ, Btu)
+│   │                          # y longitud (m, ft).
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
@@ -160,7 +170,25 @@ apps/
 │   │                          # enfriamiento, notas, ejemplos, barridos y export.
 │   ├── psychrometrics_procedure.py # ✅ Fase 4 — moist_air_steps, hvac_steps y
 │   │                          # cooling_tower_steps.
-│   ├── exergy.py              # Exergía física y química
+│   ├── exergy/                # ✅ Fase 7 (reemplaza al placeholder exergy.py)
+│   │   ├── physical.py        # Ambient (T₀, p₀), PhysicalExergy /
+│   │   │                      # physical_exergy (ψ, φ, térmica y mecánica, V²/2,
+│   │   │                      # g·z, por kg, masa o caudal), ProcessExergy,
+│   │   │                      # heat_exergy, finite_source_exergy, notas,
+│   │   │                      # ejemplos (Cengel cap. 8 y 10-8) y export.
+│   │   ├── chemical.py        # Tabla de data/szargut_chemical_exergy.csv
+│   │   │                      # (modelos II y I), szargut_method (Δg_f NASA +
+│   │   │                      # elementos), species_exergy / species_available,
+│   │   │                      # fuel_ratio_table, mixture_chemical_exergy (con el
+│   │   │                      # agua que condensa), fuel_chemical_exergy (β de
+│   │   │                      # Szargut y Styrylska), ejemplos y export.
+│   │   ├── plant.py           # ComponentExergy (F, P, D, L), StreamExergy,
+│   │   │                      # PlantExergy; rankine_exergy, refrigeration_exergy,
+│   │   │                      # gas_turbine_plant_exergy, combined_plant_exergy;
+│   │   │                      # grassmann_rows, notas y export.
+│   │   └── exergy_procedure.py # physical_steps, heat_steps, finite_source_steps,
+│   │                          # species_steps, mixture_steps, fuel_steps y
+│   │                          # plant_steps (un paso por componente).
 │   ├── combustion/
 │   │   ├── __init__.py
 │   │   ├── thermo.py          # ✅ Fase 5 — Polinomios NASA-9 (McBride et al., 2002)
@@ -221,6 +249,8 @@ apps/
 │   │   │                      # RefrigerationResult: layout fijo por ciclo (numeración
 │   │   │                      # de Cengel), red de TESPy, validaciones, ExergyAnalysis,
 │   │   │                      # SingleStage, notas, ejemplos, barridos y export.
+│   │   │                      # Fase 7: default_reservoirs y check_reservoirs
+│   │   │                      # públicas (las usa core.exergy.plant).
 │   │   ├── refrigeration_procedure.py # ✅ Fase 3.2 — refrigeration_steps (reexportado):
 │   │   │                      # estados, cámara, mezcla, cascada, COP, Carnot,
 │   │   │                      # potencias y exergía destruida por componente.
@@ -242,6 +272,8 @@ apps/
 │   │   │                      # notas, ejemplos, barridos y multi_hrsg_to_dict.
 │   │   │                      # Fase 3.6: Reheater (en paralelo con el SH de
 │   │   │                      # alta), reheat_system (2×2), eta_pump.
+│   │   │                      # Fase 7: HRSGExergy.gained_W (lo que gana el
+│   │   │                      # agua en cada sección, para el producto).
 │   │   ├── hrsg_multi_procedure.py # ✅ Fase 3.5 — multi_hrsg_steps (por nivel)
 │   │   │                      # y exergy_step (también para la de una presión).
 │   │   ├── brayton.py         # ✅ Fase 3.4 — Fuel (ISO 6976), BraytonInputs /
@@ -260,6 +292,8 @@ apps/
 │   │   │                      # MultiCombinedResult: turbina con admisiones
 │   │   │                      # (TurbineSection, Admission, MultiSteamCycle),
 │   │   │                      # desaireador, Baumann, from_combined (= 3.4),
+│   │   │                      # from_combined_with_pinch (Fase 7: también el
+│   │   │                      # diseño por chimenea, con el pinch que resulta),
 │   │   │                      # configuration_comparison, bottoming_exergy,
 │   │   │                      # notas, ejemplos, barridos, export y
 │   │   │                      # combined_multi_tespy (control).
@@ -303,6 +337,10 @@ apps/
 │                              # (cascada del PCI) y sweep_figure.
 │   └── heating_value_charts.py # ✅ Fase 6 — comparison_figure (puntos),
 │                              # parity_figure y error_vs_oxygen_figure.
+│   └── exergy_charts.py       # ✅ Fase 7 — grassmann_figure (banda vertical),
+│                              # mollier_exergy_figure (ψ en el h–s),
+│                              # carnot_factor_figure, finite_source_figure,
+│                              # fuel_ratio_figure y component_efficiency_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
@@ -311,7 +349,8 @@ apps/
 │   ├── ghugare2014_biomass.csv # ✅ Fase 6 — 536 biomasas (de modeldata, MIT;
 │   │                          # LICENSE-modeldata.txt al lado)
 │   ├── argonne_premium_coals.csv # ✅ Fase 6 — 5 carbones (Vorres, 1990)
-│   └── szargut_chemical_exergy.csv
+│   └── szargut_chemical_exergy.csv # ✅ Fase 7 — 42 sustancias, modelos II
+│                              # (Szargut et al., 1988) y I (Ahrendts, 1980)
 ├── scripts/
 │   └── extract_nasa9.py       # ✅ Fase 5 — thermo.inp de NASA CEA → el CSV
 ├── requirements.txt
@@ -972,7 +1011,82 @@ Notas de la Fase 6 (poder calorífico por correlaciones):
   error va de −50 a +40 % (fuera quedan menos de 10 muestras dudosas, que la
   página cuenta).
 - Smoke test: `pkill -f "streamlit run"` también mata al shell que lo corre
-  (su línea de comando contiene el patrón): usar `pkill -f "[s]treamlit run"`.
+  (su línea de comando contiene el patrón): usar `pkill -f "[s]treamlit run"`,
+  y nunca en el mismo comando que lo vuelve a arrancar (esa línea contiene
+  «streamlit run» y el shell se mata a sí mismo).
+
+Notas de la Fase 7 (exergía física, química y por componente):
+
+- `core/exergy/` es un paquete (el `exergy.py` de antes era un placeholder). Física: el
+  estado muerto a (T₀, p₀) con CoolProp; ψ = (h − h₀) − T₀(s − s₀), φ con
+  p₀(v − v₀); la parte térmica y la mecánica pasan por el estado a T₀ y p
+  (Kotas, 1985); si (T₀, p) cae en la campana (p = p_sat(T₀)), ese estado es el
+  líquido saturado (PX con x = 0). Las diferencias de CoolProp en el estado
+  muerto dan ruido (Δs = −1,3e-14): `_noise` las pasa a 0 si son ≤ 1e-11
+  relativas. `Ambient` valida −50 a 60 °C y 0,4 a 10 bar. Reproduce Cengel 10-8
+  (ψ = 1162,1 y 449,0 kJ/kg) y los ejemplos del cap. 8 (tanque 281 MJ, R-134a
+  38,0 kJ/kg, viento 70,7 kW, hogar 2195 Btu/s, bloque de hierro 8191 kJ).
+- Química: `data/szargut_chemical_exergy.csv` (42 sustancias) con los dos
+  modelos de la tabla A-26 de Moran y Shapiro: II = Szargut, Morris y Steward
+  (1988), p₀ = 1 atm; I = Ahrendts (1980), p₀ = 1,019 atm. Valores digitales de
+  `tespy/data/ChemEx` (TESPy 0.7.9, MIT); grafito y azufre, de la A-26. Lo que
+  la tabla no trae sale del **método de Szargut**, ē = Δḡ_f + Σν·ē_elemento, con
+  los polinomios NASA y s° del grafito (5,74) y del azufre rómbico (32,054), que
+  no están en el CSV de NASA: reproduce la tabla dentro de 0,15 % en los
+  hidrocarburos; el NO da 1,2 % (h_f de NASA actualizada) y el agua líquida 5 %
+  relativo pero 0,05 kJ/mol (la página muestra los dos). El modelo I no incluye
+  He, Ne, Kr ni Xe, ni los hidrocarburos sin datos de NASA (`species_available`;
+  el error dice «elegí» el otro modelo). Gases del aire: x⁰⁰ = exp(−ē/R̄T₀).
+- Mezclas: Σx·ē + R̄T₀·Σx·ln x; si el vapor supera p_sat(25 °C), la parte que
+  condensa entra como líquido con su ē (como el «ideal-cond» de TESPy).
+- Combustibles sólidos y líquidos (Szargut y Styrylska, 1964; Kotas, 1985): β
+  en masa y base seca, con tres formas (carbón o/c ≤ 0,667; madera y biomasa
+  hasta 2,67, que con o/c → 0 da la de carbón; líquidos);
+  e = β·(PCI + W·h_fg) + (e_S − PCI_S)·S + e_w·W. La de líquidos contra
+  sustancias puras: octano +0,6 %, etanol +1,2 %, metanol +2,7 % (aviso con
+  mucho O); con las biomasas de Ghugare, e/PCS ≈ 1,054. Con humedad, e/PCI tal
+  cual sube (el PCI descuenta W·h_fg y la exergía no): la página lo explica.
+- Por componente (Bejan, Tsatsaronis y Moran, 1996): Ẋ_F = Ẋ_P + Ẋ_D + Ẋ_L,
+  ε = Ẋ_P/Ẋ_F, y_D y y*_D. Convención: el calor que va al ambiente a T₀
+  (condensador, interenfriadores) no lleva exergía, así que lo que pierde el
+  fluido ahí se **destruye** (Cengel 10-8: caldera 1110 y condensador 414 kJ/kg);
+  si el sumidero está más caliente que T₀, la exergía del calor es una
+  **pérdida**; el escape y la chimenea (física + química) también. Válvulas y
+  condensador son disipativos (sin producto). El Rankine usa por defecto el
+  ambiente de 10-8 (290 K, 100 kPa) y la fuente a 1600 K con agua (T_máx + 50 K
+  en un ORC). En la refrigeración, las mezclas toman el caudal de cada entrada y
+  la cámara el de cada salida (con el de la mezcla, el balance quedaba 0,6 %
+  abierto); la D coincide con la de la Fase 3.2. En la turbina de gas, la
+  numeración de los caudales es explícita (`_mass_factors`: con regenerador el
+  estado 5 es aire); con e_comb ≈ PCI, η_II = η térmico. Ciclo combinado: la HRSG
+  por sección (`HRSGExergy.gained_W`), turbinas, mezclas, desaireador, bombas,
+  condensador y chimenea. Todos los balances cierran a ≤ 7,5e-10 (tests).
+- Grassmann (`ui/exergy_charts.py`): una banda vertical dibujada con `shapes`
+  de plotly (el Sankey, en bucle, desenrollado o en cascada, no se leía a
+  390 px). Azul la exergía que entra, gris lo destruido y violeta lo perdido
+  (cada rama con su rótulo en su renglón), naranja el producto abajo; alto
+  120 + 62·n px; las ramas de menos de 0,5 % se juntan en «Otros (n)» y como
+  mucho van 10 (`grassmann_rows`). Los rótulos arrancan en x = 0,55 y se parten
+  a 26 caracteres sin separar un número de su unidad (`_wrap_label`, espacio
+  duro); el título y el producto pasan a dos renglones con más de 52 caracteres.
+  A 390 px se cortaba «Escape (gases a 581,4 °C) (pérdida)». El gráfico de ε
+  por componente parte los nombres igual: con «Mezcla del vapor de media
+  (recalentamiento frío)» en un renglón, el eje se comía el gráfico. En el ciclo
+  combinado la turbina de gas se llama así, junto a «Turbina de vapor de alta».
+- Página: tres modos (`ex_mode`) con keys `xf_…` (fluido), `xh_…` (calor),
+  `xs_…` (cuerpo), `xq_…` (química) y `xp_…` (planta). «El último que
+  calculaste» lee `rk_inputs`, `rf_inputs`, `bt_inputs` y `cc_inputs` (lo que
+  guarda cada página de ciclo) y lleva una huella de los datos en la key
+  (`xp_{c}_last_{sha1[:8]}`): otro ciclo arranca con sus valores por defecto
+  (T_H, T_L). Un `CombinedInputs` de la 3.4 se pasa al modelo de varias
+  presiones adentro de la función cacheada con `from_combined_with_pinch`
+  (Cengel 10-9 se diseña por chimenea: mismo ciclo a 1e-9). Con aire estándar
+  no hay modelo de combustible para elegir (el calor entra con Q̇·(1 − T₀/T)).
+- LaTeX: 6338 expresiones del procedimiento y 505 de la teoría y del ciclo
+  combinado de una presión, KaTeX estricto, máx. 310 px. Lo que hizo falta: las
+  búsquedas en tabla siempre en dos renglones, p₀·Δv con `_wrap`, las β de a un
+  término por renglón, PCI* para PCI + W·h_fg, T₀ y p₀ en renglones propios, y
+  en la teoría φ y e^{ch} de los combustibles en dos renglones (362 y 410 px).
 
 ### Citas y licencias
 

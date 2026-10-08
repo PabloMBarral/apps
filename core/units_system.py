@@ -74,6 +74,9 @@ QuantityKind = Literal[
     "volume_flow",
     "molar_enthalpy",
     "molar_entropy",
+    "mass",
+    "energy",
+    "length",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -201,6 +204,24 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "J/(mol·K)"),
         "Técnico": (1.0, 0.0, "kJ/(kmol·K)"),
         "Inglés": (1000.0 / _BTU_PER_LB_R_J_PER_KG_K, 0.0, "Btu/(lbmol·°R)"),
+    },
+    # Fase 7 (exergía): una masa (sistema cerrado), su exergía y la altura de
+    # la energía potencial. Coherentes con la energía específica de cada
+    # sistema: kg · kJ/kg = kJ y lb · Btu/lb = Btu (0,45359237 · 2326 J = 1 Btu).
+    "mass": {
+        "SI": (1.0, 0.0, "kg"),
+        "Técnico": (1.0, 0.0, "kg"),
+        "Inglés": (1.0 / _LB_PER_KG, 0.0, "lb"),
+    },
+    "energy": {
+        "SI": (1.0, 0.0, "J"),
+        "Técnico": (1.0e-3, 0.0, "kJ"),
+        "Inglés": (1.0 / _BTU_IT_J, 0.0, "Btu"),
+    },
+    "length": {
+        "SI": (1.0, 0.0, "m"),
+        "Técnico": (1.0, 0.0, "m"),
+        "Inglés": (1.0 / _FT_PER_M, 0.0, "ft"),
     },
 }
 

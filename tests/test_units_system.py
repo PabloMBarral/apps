@@ -41,6 +41,9 @@ _KINDS = (
     "volume_flow",
     "molar_enthalpy",
     "molar_entropy",
+    "mass",
+    "energy",
+    "length",
 )
 
 
@@ -107,6 +110,13 @@ class TestUnitLabels:
             ("molar_entropy", "SI", "J/(mol·K)"),
             ("molar_entropy", "Técnico", "kJ/(kmol·K)"),
             ("molar_entropy", "Inglés", "Btu/(lbmol·°R)"),
+            ("mass", "Técnico", "kg"),
+            ("mass", "Inglés", "lb"),
+            ("energy", "SI", "J"),
+            ("energy", "Técnico", "kJ"),
+            ("energy", "Inglés", "Btu"),
+            ("length", "Técnico", "m"),
+            ("length", "Inglés", "ft"),
         ],
     )
     def test_label(self, kind: str, system: str, expected: str) -> None:
@@ -135,6 +145,9 @@ class TestRoundTrip:
         "volume_flow": (0.0, 1.0e-4, 0.05, 30.0),
         "molar_enthalpy": (-393_510.0, 0.0, 44_004.0, 5.0e6),
         "molar_entropy": (0.0, 69.95, 213.79, 1.0e4),
+        "mass": (0.0, 1.0, 2323.0, 1.0e6),
+        "energy": (0.0, 1.0, 2.81e8, 1.0e12),
+        "length": (0.0, 1.0, 100.0, 3000.0),
     }
 
     @pytest.mark.parametrize("kind", _KINDS)
@@ -383,3 +396,14 @@ def test_molar_units_follow_the_tables() -> None:
     )
     # s° del CO₂: 213,80 kJ/(kmol·K) = 51,07 Btu/(lbmol·°R) (A-26E)
     assert convert_from_si(213.80, "molar_entropy", "Inglés") == pytest.approx(51.07, rel=1e-3)
+
+
+def test_mass_and_energy_are_coherent_with_specific_energy() -> None:
+    """kg · kJ/kg = kJ y lb · Btu/lb = Btu, sin factores (como caudal · trabajo = potencia)."""
+    for system in SUPPORTED_SYSTEMS:
+        m, e = 2.5, 1.2e5
+        product = convert_from_si(m, "mass", system) * convert_from_si(
+            e, "specific_enthalpy", system
+        )
+        assert product == pytest.approx(convert_from_si(m * e, "energy", system), rel=1e-12)
+    assert convert_from_si(0.3048, "length", "Inglés") == pytest.approx(1.0)

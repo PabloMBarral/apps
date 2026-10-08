@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.22.0` — Fase 6 cerrada (2026-10-08).
+> **Versión actual**: `0.23.0` — Fase 7 cerrada (2026-10-08).
 
 ---
 
@@ -1143,6 +1143,93 @@
   de fuentes secundarias que coinciden, y los carbones de Argonne, de
   reproducciones del *Users Handbook* (coherentes entre sí).
 
+### Fase 7 — Exergía física, química y por componente (diagrama de Grassmann)
+- **Versión**: `0.23.0` (2026-10-08). Rama `claude/water-state-analyzer-f4fiev`
+  («mergeá todo y avanzá»: se mergeó el PR de la Fase 6 y la Fase 7 se planeó
+  e implementó sin esperar).
+- **Scope**:
+  - **`core/exergy/`** (paquete nuevo; reemplaza al placeholder `exergy.py`):
+    - `physical.py`: `Ambient` (T₀, p₀), la exergía de flujo ψ y la de la masa
+      φ de cualquier estado (los pares de Propiedades), con la parte térmica y
+      la mecánica (Kotas, 1985), V²/2 y g·z, por kg, para una masa o un caudal;
+      `ProcessExergy` (el trabajo reversible de 1 → 2), la exergía de un calor
+      (factor de Carnot) y la de una fuente finita; notas, ejemplos (Cengel cap.
+      8 y 10-8) y export.
+    - `chemical.py` + `data/szargut_chemical_exergy.csv`: 42 sustancias en los
+      dos modelos de la tabla A-26 de Moran y Shapiro (II: Szargut, Morris y
+      Steward, 1988; I: Ahrendts, 1980; los valores digitales de TESPy 0.7.9,
+      MIT), el método de Szargut (Δḡ_f de los polinomios NASA + la exergía de
+      los elementos), `species_available`, φ = e/PCI de los combustibles,
+      mezclas de gases (con el agua que condensa a 25 °C) y combustibles
+      sólidos y líquidos por su análisis elemental (β de Szargut y Styrylska,
+      1964, con la humedad y el azufre como Kotas).
+    - `plant.py`: la exergía por componente (combustible, producto,
+      destrucción y pérdida; Bejan, Tsatsaronis y Moran, 1996) de un Rankine,
+      una refrigeración, una turbina de gas y un ciclo combinado, la exergía de
+      cada corriente, `grassmann_rows`, notas y export.
+    - `exergy_procedure.py`: el procedimiento de cada cálculo, con un paso por
+      componente en la planta.
+  - **`ui/exergy_charts.py`** (nuevo): el diagrama de Grassmann (una banda
+    vertical: el Sankey no se leía a 390 px), ψ en el h–s, el factor de Carnot,
+    la curva de la fuente finita, φ de los combustibles y ε por componente.
+  - **Página `/Exergia`** (nueva, después de Ciclo combinado): exergía física
+    (un fluido, un calor o un cuerpo), química (una sustancia, una mezcla o un
+    combustible, en los dos ambientes) y de una planta componente por
+    componente, con un ejemplo o con el último ciclo que se calculó en su
+    página; teoría (vademecum §11 y §16.13), procedimiento y export.
+  - Cambios chicos: `units_system` suma masa, energía y longitud;
+    `refrigeration` hace públicas `default_reservoirs` y `check_reservoirs`;
+    `HRSGExergy.gained_W` (lo que gana el agua en cada sección);
+    `combined_multi.from_combined_with_pinch` (el diseño por chimenea de la
+    3.4, como Cengel 10-9, con el pinch que resulta: mismo ciclo a 10⁻⁹).
+- **Validación**:
+  - Cengel 10-8: ψ = 1162,1 y 449,0 kJ/kg; 1110 kJ/kg destruidos en la
+    caldera y 414 en el condensador. Cap. 8: tanque de aire comprimido 280,6 MJ
+    (libro 281), compresor de R-134a 38,04 kJ/kg (38,0), viento 70,70 kW
+    (70,7), hogar 2195 Btu/s, bloque de hierro 8191 kJ.
+  - Química: el método de Szargut reproduce la tabla dentro de 0,15 % en los
+    hidrocarburos (NO +1,2 %, por la h_f actualizada de NASA; agua líquida +5 %
+    relativo, 0,05 kJ/mol). Las β de los líquidos contra sustancias puras:
+    octano +0,6 %, etanol +1,2 %, metanol +2,7 %; el grafito da β = 1,0437
+    contra 1,0426 de la tabla. Con las biomasas de Ghugare, e/PCS = 1,054 en
+    promedio.
+  - Plantas: todos los balances (Ẋ_F = Ẋ_P + Ẋ_D + Ẋ_L, por componente y de
+    la planta) cierran a ≤ 7,5·10⁻¹⁰; la destrucción de la refrigeración es la
+    de la Fase 3.2 y la de la turbina de gas con e_comb ≈ PCI, la de la 3.7
+    (η_II = η térmico).
+- **Mensajes al alumno**: ambiente fuera de −50 a 60 °C o de 0,4 a 10 bar,
+  fuente de calor no más caliente que el vapor, sumidero más frío que el
+  ambiente o más caliente que el condensador, fuentes de la refrigeración que
+  invierten el calor, sustancias que el modelo I no trae («elegí» el otro),
+  mezclas vacías o con fracciones negativas, análisis que no suman 100 %, o/c
+  fuera de las formas de Szargut y Styrylska. Notas: el fluido más frío que
+  el ambiente (también tiene exergía), ψ < 0 y la exergía del vacío, el
+  estado muerto líquido, la cinética y la potencial como exergía pura, el
+  calor bajo T₀, la mezcla que condensa, la humedad que sube e/PCI tal cual,
+  la convención del condensador y lo que destruye cada componente.
+- **Tests**: de 3398 a 3879 passed (10 skipped), sin warnings.
+  - `tests/test_exergy_physical.py` (108), `tests/test_exergy_chemical.py`
+    (67), `tests/test_exergy_plant.py` (73), `tests/test_exergy_procedure.py`
+    (76), `tests/test_exergy_charts.py` (3) y `tests/test_page_exergia.py`
+    (115, AppTest), más `from_combined_with_pinch` en
+    `tests/test_combined_multi.py` y la página en `test_navigation.py`.
+  - LaTeX: 6338 expresiones distintas del procedimiento y 505 de la teoría y
+    del ciclo combinado de una presión validan con KaTeX estricto y entran en
+    310 px como máximo en los tres sistemas.
+  - Smoke test en Chromium a 1280 y 390 px: 13 casos (el fluido de 10-8, el
+    viento en inglés, el calor en SI, el cuerpo, una sustancia en SI, los humos
+    en inglés, el bagazo, y las plantas: Rankine 10-1 y 10-6, refrigeración 11-5
+    en inglés, la combustión secuencial, el ciclo combinado de tres presiones y
+    Cengel 10-9 por chimenea en SI) con la teoría, el procedimiento y las
+    tablas abiertos: sin errores, sin desborde y ninguna ecuación se pasa de su
+    expansor. Los gráficos se revisaron en capturas: a 390 px se cortaban los
+    rótulos largos del Grassmann, que ahora se parten.
+- **Dependencias**: ninguna nueva (TESPy 0.7.9 fue solo la fuente de los
+  valores tabulados).
+- **Red**: la política del entorno bloqueó doi.org (el DOI de Ahrendts, 1980,
+  sale de RePEc) y los sitios académicos de las tablas; los valores digitales
+  salen de la rueda de TESPy 0.7.9 en PyPI y se contrastaron con la tabla A-26.
+
 ---
 
 ## Pendientes / próximas fases
@@ -1168,9 +1255,8 @@
 - **Ciclo combinado (continuación)**: aire húmedo, gas natural con otros
   componentes en la página (el núcleo ya los acepta), generador y pérdidas
   mecánicas, cogeneración; con varias presiones, el diseño por chimenea,
-  pérdidas de carga (HRSG y recalentador), recirculación del precalentador
-  por el punto de rocío, y la exergía de toda la planta con la química del
-  combustible (en la página de Exergía).
+  pérdidas de carga (HRSG y recalentador) y recirculación del precalentador
+  por el punto de rocío.
 - **Turbina de gas (continuación)**: refrigeración de álabes con aire del
   compresor, pérdidas mecánicas y del generador, la turbina con etapas
   (combustión secuencial) en el ciclo combinado, inyección de vapor o de
@@ -1193,8 +1279,10 @@
   desde el inmediato, el PCS a volumen constante de la bomba contra el de
   presión constante (ISO 18125:2017) y las bases seca al aire y libre de
   materia mineral (Parr, para el rango ASTM D388).
-- **Fase 7** — Exergía física y química (Szargut), diagrama de
-  Grassmann por componente.
+- **Exergía (continuación)**: exergoeconomía (el costo de la exergía en
+  cada componente, SPECO), el ambiente a elección para la exergía química
+  (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
+  psicrometría y la combustión en el diagrama de Grassmann.
 - **Fase 8** — Transferencia de calor: conducción, aletas, convección,
   radiación, intercambiadores (LMTD, ε-NTU).
 

@@ -352,6 +352,34 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   abajo. Procedimiento en los tres sistemas, export y barrido de la
   humedad. En `/Combustion`, el PCS de un análisis elemental se puede
   estimar con una de estas correlaciones. _Fase 6 cerrada._
+- ✅ **Exergía: física, química y por componente** (página `/Exergia`, vademecum
+  §11 y §16.13). **Física**: la exergía de flujo ψ y la de la masa φ de
+  cualquier estado de un fluido (los pares de Propiedades, con CoolProp), con su
+  parte térmica y mecánica (Kotas, 1985), la cinética y la potencial, por kg,
+  para una masa o para un caudal, y el trabajo reversible de un proceso 1 → 2; la
+  exergía de un calor a temperatura T (factor de Carnot) y la de un cuerpo que se
+  enfría hasta el ambiente (fuente finita); el estado se ve en el h–s con la
+  recta h₀ + T₀·(s − s₀), cuya distancia vertical es ψ. **Química**: la exergía
+  química estándar de 42 sustancias en los dos ambientes de referencia de la
+  tabla A-26 de Moran y Shapiro (Szargut, Morris y Steward, 1988, modelo II, y
+  Ahrendts, 1980, modelo I) y el **método de Szargut** (Δg_f con los polinomios
+  NASA + la exergía de los elementos), que reproduce la tabla dentro de 0,15 % en
+  los hidrocarburos; la de una mezcla de gases (con el agua que condensa a 25 °C)
+  y la de un combustible sólido o líquido por su análisis elemental, con las β
+  de Szargut y Styrylska (1964) para carbones, madera y biomasa, y líquidos (con
+  la humedad y el azufre como Kotas): con las biomasas de Ghugare de la Fase 6,
+  e/PCS ≈ 1,05 en promedio. **Por componente**: un Rankine, una refrigeración,
+  una turbina de gas o un ciclo combinado (un ejemplo o el último que calculaste
+  en su página), con la exergía que gasta (Ẋ_F), produce (Ẋ_P), destruye
+  (Ẋ_D = T₀·Ṡ_gen) y pierde (Ẋ_L) cada componente, su rendimiento ε y las
+  razones y_D e y*_D (Bejan, Tsatsaronis y Moran, 1996), el **diagrama de
+  Grassmann** y la exergía de cada corriente; el combustible entra con su
+  exergía química (Szargut) o ≈ PCI (así η_II = η térmico). Todos los balances
+  cierran a 10⁻⁹. Reproduce Cengel 10-8 (ψ = 1162 kJ/kg a la entrada de la
+  turbina; 1110 kJ/kg destruidos en la caldera y 414 kJ/kg en el condensador)
+  y los ejemplos del cap. 8 (tanque de aire comprimido, 281 MJ; compresor de
+  R-134a, 38,0 kJ/kg; viento, 70,7 kW; hogar, 2195 Btu/s; bloque de hierro,
+  8191 kJ). Procedimiento en los tres sistemas y export. _Fase 7 cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -360,9 +388,8 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
 ### En desarrollo (roadmap)
 - **Ciclo combinado (continuación)**: secciones intercaladas en la HRSG,
   quemadores suplementarios, pérdidas de carga, recirculación del
-  precalentador, la turbina de gas con etapas (combustión secuencial) en el
-  ciclo combinado y la exergía de toda la planta (con la química del
-  combustible).
+  precalentador y la turbina de gas con etapas (combustión secuencial) en el
+  ciclo combinado.
 - **Ciclos termodinámicos**: cogeneración, refrigeración de álabes de la
   turbina de gas, turbinas de propulsión.
 - **Psicrometría (continuación)**: cargas del local y factor de calor
@@ -375,9 +402,10 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
   IGT, Sheng y Azevedo; Goutal para carbones con el análisis inmediato),
   el C, el H y el O estimados desde el inmediato, y el PCS a volumen
   constante de la bomba contra el de presión constante (ISO 18125:2017).
-- **Exergía**: exergía física de cualquier estado, exergía química
-  (tablas estándar), destrucción exergética por componente y diagrama
-  de Grassmann para los ciclos.
+- **Exergía (continuación)**: exergoeconomía (el costo de la exergía en cada
+  componente, SPECO), el ambiente a elección para la exergía química
+  (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
+  psicrometría y la combustión en el diagrama de Grassmann.
 - **Transferencia de calor**: conducción multicapa, aletas, correlaciones
   de convección, radiación entre superficies, intercambiadores
   por LMTD y ε-NTU.
@@ -418,7 +446,11 @@ apps/
 │   ├── psychrometrics_procedure.py  # su procedimiento «como en el pizarrón»
 │   ├── interpolation.py
 │   ├── isentropic.py
-│   ├── exergy.py
+│   ├── exergy/
+│   │   ├── physical.py    # exergía física: estado muerto, ψ, φ, calor, fuente finita
+│   │   ├── chemical.py    # exergía química: Szargut y Ahrendts, mezclas, combustibles
+│   │   ├── plant.py       # exergía por componente (F, P, D, L) y diagrama de Grassmann
+│   │   └── exergy_procedure.py  # su procedimiento «como en el pizarrón»
 │   ├── combustion/
 │   │   ├── thermo.py      # polinomios NASA-9: c_p, h, s°, g° de cada especie
 │   │   ├── fuels.py       # combustibles: mezclas, líquidos y análisis elemental
@@ -451,10 +483,12 @@ apps/
 │   └── plots.py
 ├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, gráficos
 │                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica,
-│                          # gráficos de la combustión y del poder calorífico, créditos
+│                          # gráficos de la combustión, del poder calorífico y de la
+│                          # exergía (Grassmann), créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
-├── data/                  # tablas: ISO 6976, polinomios NASA-9, biomasas (Ghugare)
-│                          # y carbones de Argonne con el PCS medido
+├── data/                  # tablas: ISO 6976, polinomios NASA-9, biomasas (Ghugare),
+│                          # carbones de Argonne con el PCS medido y exergías
+│                          # químicas estándar (Szargut, Ahrendts)
 ├── scripts/               # extracción de datos (los polinomios de thermo.inp de NASA CEA)
 ├── requirements.txt
 ├── CITATION.cff
@@ -470,7 +504,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.22.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.23.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -753,6 +787,68 @@ distribuye el paquete de R `modeldata` (Posit, licencia MIT, ver
 Coke Analyses from As-Determined to Different Bases*), ASTM D3176-24
 (*Ultimate Analysis of Coal and Coke*) y ASTM D3172-13(2021)e1 (*Proximate
 Analysis of Coal and Coke*), ASTM International.
+
+**Exergía** — las exergías químicas estándar de los dos ambientes de referencia
+(los valores digitales, de `tespy/data/ChemEx` de TESPy 0.7.9, licencia MIT,
+contrastados con la tabla A-26 de Moran y Shapiro), las β de los combustibles
+sólidos y líquidos, la parte térmica y mecánica de ψ y el análisis por
+componente (combustible, producto, destrucción y pérdida):
+
+```bibtex
+@book{szargut1988exergy,
+  author    = {Szargut, Jan and Morris, David R. and Steward, Frank R.},
+  title     = {Exergy Analysis of Thermal, Chemical, and Metallurgical Processes},
+  publisher = {Hemisphere},
+  address   = {New York},
+  year      = {1988}
+}
+
+@article{ahrendts1980reference,
+  author  = {Ahrendts, Joachim},
+  title   = {Reference states},
+  journal = {Energy},
+  volume  = {5},
+  number  = {8--9},
+  pages   = {666--677},
+  year    = {1980},
+  doi     = {10.1016/0360-5442(80)90087-0}
+}
+
+@article{szargut1964fuels,
+  author  = {Szargut, Jan and Styrylska, Teresa},
+  title   = {Angen{\"a}herte {B}estimmung der {E}xergie von {B}rennstoffen},
+  journal = {Brennstoff-W{\"a}rme-Kraft},
+  volume  = {16},
+  number  = {12},
+  pages   = {589--596},
+  year    = {1964}
+}
+
+@book{kotas1985exergy,
+  author    = {Kotas, Tadeusz J.},
+  title     = {The Exergy Method of Thermal Plant Analysis},
+  publisher = {Butterworths},
+  address   = {London},
+  year      = {1985}
+}
+
+@book{bejan1996thermal,
+  author    = {Bejan, Adrian and Tsatsaronis, George and Moran, Michael},
+  title     = {Thermal Design and Optimization},
+  publisher = {Wiley},
+  address   = {New York},
+  year      = {1996}
+}
+
+@book{moran2014fundamentals,
+  author    = {Moran, Michael J. and Shapiro, Howard N. and Boettner, Daisie D.
+               and Bailey, Margaret B.},
+  title     = {Fundamentals of Engineering Thermodynamics},
+  edition   = {8},
+  publisher = {Wiley},
+  year      = {2014}
+}
+```
 
 ---
 

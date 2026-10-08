@@ -1,0 +1,44 @@
+# Exergía química molar estándar (kJ/mol) a T0 = 298,15 K. Modelo II: Szargut, Morris y Steward (1988), Exergy Analysis of Thermal, Chemical, and Metallurgical Processes, tabla I (p0 = 1 atm). Modelo I: Ahrendts (1977, 1980) (p0 = 1,019 atm). Son los dos modelos de la tabla A-26 de Moran y Shapiro y de la C.2 de Bejan, Tsatsaronis y Moran (1996). Valores digitales de TESPy 0.7.9 (tespy/data/ChemEx, licencia MIT); el grafito y el azufre, de la tabla A-26. Vacío = el modelo no lo tabula (lo calcula el método de Szargut, Δg_f + Σν·e de los elementos).
+key,name,formula,phase,e_szargut1988,e_ahrendts1980,group,nasa_key,iso6976_name
+N2,nitrógeno,N2,g,0.72,0.639,aire,N2,nitrogen
+O2,oxígeno,O2,g,3.97,3.951,aire,O2,oxygen
+CO2,dióxido de carbono,CO2,g,19.87,14.176,aire,CO2,carbon dioxide
+H2O,agua (vapor),H2O,g,9.50,8.636,aire,H2O,water
+H2O(l),agua líquida,H2O,l,0.90,0.045,aire,H2O(l),
+Ar,argón,Ar,g,11.69,11.627,aire,Ar,argon
+He,helio,He,g,30.37,,aire,,helium
+Ne,neón,Ne,g,27.19,,aire,,neon
+Kr,criptón,Kr,g,34.36,,aire,,
+Xe,xenón,Xe,g,40.33,,aire,,
+C(s),carbono (grafito),C,s,410.26,404.59,elemento,,
+S(s),azufre (rómbico),S,s,609.6,598.16,elemento,,
+H2,hidrógeno,H2,g,236.10,235.249,combustible gaseoso,H2,hydrogen
+CO,monóxido de carbono,CO,g,275.10,269.412,combustible gaseoso,CO,carbon monoxide
+CH4,metano,CH4,g,831.65,824.348,combustible gaseoso,CH4,methane
+C2H6,etano,C2H6,g,1495.84,1482.033,combustible gaseoso,C2H6,ethane
+C3H8,propano,C3H8,g,2154.0,,combustible gaseoso,C3H8,propane
+n-C4H10,n-butano,C4H10,g,2805.8,,combustible gaseoso,n-C4H10,n-butane
+i-C4H10,isobutano,C4H10,g,,,combustible gaseoso,i-C4H10,2-methylpropane
+n-C5H12,n-pentano (vapor),C5H12,g,3463.3,,combustible gaseoso,n-C5H12,n-pentane
+n-C6H14,n-hexano (vapor),C6H14,g,4118.5,,combustible gaseoso,,n-hexane
+C2H4,etileno,C2H4,g,1361.1,,combustible gaseoso,C2H4,ethene
+C3H6,propileno,C3H6,g,2003.9,,combustible gaseoso,,propene
+C2H2,acetileno,C2H2,g,1265.8,,combustible gaseoso,C2H2,ethyne
+C6H6,benceno (vapor),C6H6,g,3303.6,,combustible gaseoso,,benzene
+NH3,amoníaco,NH3,g,337.9,336.684,combustible gaseoso,NH3,ammonia
+H2S,sulfuro de hidrógeno,H2S,g,812.0,799.89,combustible gaseoso,H2S,hydrogen sulfide
+CH3OH,metanol (vapor),CH3OH,g,722.3,,combustible gaseoso,CH3OH,methanol
+C2H5OH,etanol (vapor),C2H6O,g,1363.9,1348.328,combustible gaseoso,C2H5OH,
+n-C5H12(l),n-pentano líquido,C5H12,l,3461.8,,combustible líquido,,
+n-C6H14(l),n-hexano líquido,C6H14,l,4114.5,,combustible líquido,,
+n-C7H16(l),n-heptano,C7H16,l,4761.7,,combustible líquido,,
+C8H18(l),n-octano,C8H18,l,5413.1,,combustible líquido,C8H18(l),
+n-C12H26(l),n-dodecano,C12H26,l,8029.4,,combustible líquido,,
+C6H6(l),benceno líquido,C6H6,l,3298.5,,combustible líquido,,
+C7H8(l),tolueno,C7H8,l,3931.0,,combustible líquido,,
+CH3OH(l),metanol,CH3OH,l,718.0,715.069,combustible líquido,CH3OH(l),
+C2H5OH(l),etanol,C2H6O,l,1357.7,1342.086,combustible líquido,C2H5OH(l),
+C12H23(l),querosén Jet-A,C12H23,l,,,combustible líquido,C12H23(l),
+SO2,dióxido de azufre,SO2,g,313.4,301.939,producto,SO2,sulfur dioxide
+NO,óxido nítrico,NO,g,88.9,,producto,NO,
+N2O,óxido nitroso,N2O,g,106.9,106.807,producto,,

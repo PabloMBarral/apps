@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.22.0"
+PAGE_VERSION = "0.23.0"
 
 
 def _home_page() -> None:
@@ -145,6 +145,17 @@ def _home_page() -> None:
           más presiones y recalentamiento** (con la regla de Baumann para
           la humedad), la **exergía del ciclo de fondo**, procedimiento y
           barridos (ejemplos de Cengel cap. 9 y 10 y de Kehlhofer cap. 5).
+        - 🔋 **Exergía** — la exergía **física** de un fluido (de flujo y
+          de la masa, con su parte térmica y mecánica, la cinética y la
+          potencial), de un calor a temperatura T y de un cuerpo que se
+          enfría; la **química** de una sustancia (las tablas de Szargut y
+          de Ahrendts y el método de Szargut), de una mezcla de gases y de
+          un combustible sólido o líquido por su análisis elemental
+          (Szargut y Styrylska); y la de **una planta, componente por
+          componente** (Rankine, refrigeración, turbina de gas o ciclo
+          combinado): cuánto gasta, produce, destruye y pierde cada uno,
+          con el **diagrama de Grassmann** (ejemplos de Cengel cap. 8 y
+          10-8).
         - 📈 **Diagramas** — Propiedades, Isoentrópicos, Rankine,
           Refrigeración y Ciclo combinado incluyen
           gráficos interactivos con isolíneas (log p–h, T–s, h–s,
@@ -158,8 +169,8 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Exergía química (Szargut) y de toda la planta, diagramas de
-        Grassmann y transferencia de calor. Ver el
+        Exergoeconomía (el costo de la exergía en cada componente) y
+        transferencia de calor. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -173,7 +184,8 @@ def _home_page() -> None:
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
-        Combustión, Poder calorífico, Brayton, HRSG y Ciclo combinado.
+        Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado y
+        Exergía.
         Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
@@ -197,6 +209,7 @@ pages = [
     st.Page("app_pages/13_Brayton.py", title="Brayton", icon="🌀"),
     st.Page("app_pages/10_HRSG.py", title="HRSG", icon="🏭"),
     st.Page("app_pages/12_Ciclo_Combinado.py", title="Ciclo combinado", icon="⚡"),
+    st.Page("app_pages/11_Exergia.py", title="Exergía", icon="🔋"),
 ]
 pg = st.navigation(pages)
 pg.run()
