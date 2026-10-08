@@ -1304,3 +1304,51 @@ def moist_air_to_dict(
         m_a, m_v = room_masses(state, room_volume_m3)
         data["recinto"] = {"volumen_m3": room_volume_m3, "m_aire_seco_kg": m_a, "m_vapor_kg": m_v}
     return data
+
+
+def moist_air_notes(state: MoistAirState) -> list[str]:
+    """Observaciones sobre el estado (markdown): saturación, escarcha, confort, presión."""
+    notes: list[str] = []
+    p = state.p_Pa
+    if state.saturated:
+        notes.append(
+            "Aire **saturado**: T = T_bh = T_pr. Si se enfría un poco, el vapor condensa "
+            "(niebla o rocío)."
+        )
+    elif state.phi < 0.2:
+        notes.append(
+            f"Aire **muy seco** (φ = {_pct(state.phi)}): el agua se evapora rápido; el bulbo "
+            f"húmedo queda {state.T_K - state.T_wb_K:.3g} K por debajo de la temperatura del "
+            "aire. Sirve para enfriar por evaporación."
+        )
+    if state.dew_over_ice and state.T_dp_K is not None:
+        notes.append(
+            f"El punto de rocío está bajo 0 °C ({_degC(state.T_dp_K)}): es de **escarcha**, el "
+            "vapor pasa directo a hielo (presión de saturación sobre hielo, tabla A-8)."
+        )
+    if state.omega_s is None:
+        notes.append(
+            f"A {_degC(state.T_K)} el agua hierve a la presión total ({_bar(p)}): el aire no se "
+            f"puede saturar; como mucho, φ = p/p_vs = {_pct(p / state.p_vs_Pa)}."
+        )
+    T_lo, T_hi = COMFORT_T_K
+    phi_lo, phi_hi = COMFORT_PHI
+    if T_lo <= state.T_K <= T_hi and phi_lo <= state.phi <= phi_hi:
+        notes.append(
+            "Está en la **zona de confort** de Cengel §14-6 (22 a 27 °C y φ de 40 a 60 %)."
+        )
+    if abs(p - P_SEA_LEVEL_PA) > 0.02 * P_SEA_LEVEL_PA and state.omega_s is not None:
+        sea = saturation_humidity_ratio(state.T_K, P_SEA_LEVEL_PA)
+        if sea is not None:
+            notes.append(
+                f"A {_bar(p)} (nivel del mar: {_bar(P_SEA_LEVEL_PA)}), con la misma T y φ el "
+                f"aire lleva {state.omega_s / sea:.3g} veces el vapor por kg de aire seco que al "
+                "nivel del "
+                "mar: ω_s = 0,622·p_vs/(p − p_vs) depende de la presión total."
+            )
+    if p > 2.0e5:
+        notes.append(
+            "A presión alta el aire húmedo se aparta del gas ideal (el aire «ayuda» a que entre "
+            "más vapor: factor de mejora). Mirá la comparación con CoolProp."
+        )
+    return notes

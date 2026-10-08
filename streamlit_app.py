@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.19.0"
+PAGE_VERSION = "0.20.0"
 
 
 def _home_page() -> None:
@@ -87,6 +87,15 @@ def _home_page() -> None:
           bomba de calor: COP, estados, ciclo sobre el diagrama log p–h,
           procedimiento con las tablas, exergía destruida en cada
           componente y barridos (ejemplos de Cengel cap. 11).
+        - 🌫️ **Psicrometría** — aire húmedo con el modelo del vademecum
+          §14: el estado con dos datos cualquiera (T, φ, bulbo húmedo,
+          punto de rocío, ω o h) a nivel del mar, por altura o a otra
+          presión, con todas sus propiedades, la exergía y la comparación
+          con el modelo de gas real de CoolProp; una **carta psicrométrica
+          interactiva** (tocás un punto y lo carga); un tren de **procesos
+          de acondicionamiento** (calentar, enfriar y secar, humidificar,
+          mezclar) con el calor, el agua y la exergía destruida en cada
+          uno, y la **torre de enfriamiento** (ejemplos de Cengel cap. 14).
         - 🌀 **Brayton** — turbina de gas con las tres mejoras del ciclo
           Brayton: compresión en etapas con interenfriamiento, expansión en
           etapas con recalentamiento (con metano, una segunda cámara de
@@ -128,8 +137,8 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Psicrometría, combustión, poder calorífico por correlaciones,
-        exergía de toda la planta. Ver el
+        Combustión, poder calorífico por correlaciones, exergía de toda
+        la planta. Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -142,8 +151,8 @@ def _home_page() -> None:
         (K, Pa, J/kg, J/(kg·K)), **Técnico** (°C, bar, kJ/kg, kJ/(kg·K))
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
-        Propiedades, Isoentrópicos, Rankine, Refrigeración, Brayton, HRSG y
-        Ciclo combinado.
+        Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
+        Brayton, HRSG y Ciclo combinado.
         Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
@@ -161,6 +170,7 @@ pages = [
     st.Page("app_pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
     st.Page("app_pages/5_Rankine.py", title="Rankine", icon="♨️"),
     st.Page("app_pages/6_Refrigeracion.py", title="Refrigeración", icon="❄️"),
+    st.Page("app_pages/7_Psicrometria.py", title="Psicrometría", icon="🌫️"),
     st.Page("app_pages/13_Brayton.py", title="Brayton", icon="🌀"),
     st.Page("app_pages/10_HRSG.py", title="HRSG", icon="🏭"),
     st.Page("app_pages/12_Ciclo_Combinado.py", title="Ciclo combinado", icon="⚡"),
