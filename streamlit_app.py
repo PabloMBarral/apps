@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.24.0"
+PAGE_VERSION = "0.25.0"
 
 
 def _home_page() -> None:
@@ -164,6 +164,20 @@ def _home_page() -> None:
           y el coeficiente de **convección** h de las correlaciones de
           Nusselt: forzada externa, en un tubo y natural, comparadas entre sí
           (ejemplos de Cengel y Ghajar e Incropera).
+        - ☀️ **Radiación** — el **cuerpo negro** (Planck, Wien y
+          Stefan–Boltzmann, la fracción en una banda) y las **superficies
+          reales** (ε por bandas y la absortividad para el sol), los
+          **factores de forma** de ocho geometrías, el intercambio entre
+          **dos superficies** con pantallas, los **recintos** de superficies
+          grises por radiosidades y la radiación **junto con la convección**
+          (con el sol y el error de una termocupla).
+        - 🔄 **Intercambiadores** — la **verificación** (ε-NTU), el
+          **dimensionamiento** (por ε-NTU y por la LMTD con el factor F), el
+          **ensayo** con las cuatro temperaturas y el **coeficiente global U**
+          con ensuciamiento; doble tubo, casco y tubos y flujo cruzado, con
+          c_p de CoolProp o dado y una corriente que cambia de fase, la
+          comparación de los tipos y la exergía destruida (ejemplos de Cengel
+          y Ghajar cap. 11).
         - 📈 **Diagramas** — Propiedades, Isoentrópicos, Rankine,
           Refrigeración y Ciclo combinado incluyen
           gráficos interactivos con isolíneas (log p–h, T–s, h–s,
@@ -177,9 +191,7 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Exergoeconomía (el costo de la exergía en cada componente) y la
-        segunda entrega de transferencia de calor (radiación e
-        intercambiadores). Ver el
+        Exergoeconomía (el costo de la exergía en cada componente). Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -194,7 +206,7 @@ def _home_page() -> None:
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
         Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado,
-        Exergía y Transferencia de calor.
+        Exergía, Transferencia de calor, Radiación e Intercambiadores.
         Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
@@ -220,6 +232,8 @@ pages = [
     st.Page("app_pages/12_Ciclo_Combinado.py", title="Ciclo combinado", icon="⚡"),
     st.Page("app_pages/11_Exergia.py", title="Exergía", icon="🔋"),
     st.Page("app_pages/14_Transferencia_de_Calor.py", title="Transferencia de calor", icon="🧱"),
+    st.Page("app_pages/15_Radiacion.py", title="Radiación", icon="☀️"),
+    st.Page("app_pages/16_Intercambiadores.py", title="Intercambiadores", icon="🔄"),
 ]
 pg = st.navigation(pages)
 pg.run()

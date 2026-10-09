@@ -44,7 +44,7 @@ from ui.heat_transfer_charts import (
 )
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.24.0"
+PAGE_VERSION = "0.25.0"
 
 # Opciones fijas de los radios: cambiarlas reiniciaría el widget.
 _M_COND = "Conducción: paredes, caños y esferas"
@@ -1266,7 +1266,7 @@ st.markdown(
     "La **conducción** a través de paredes, caños y esferas de varias capas (la red de "
     "resistencias térmicas y el radio crítico de aislación), las **aletas** (con su eficiencia "
     "y su efectividad) y el coeficiente de **convección** h de las correlaciones de Nusselt, "
-    "forzada y natural. La radiación y los intercambiadores llegan en la próxima entrega."
+    "forzada y natural. La radiación y los intercambiadores tienen sus propias páginas."
 )
 _render_theory()
 st.markdown("---")

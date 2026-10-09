@@ -38,6 +38,7 @@ __all__ = [
     "C2",
     "C3",
     "ENCLOSURE_EXAMPLES",
+    "ENCLOSURE_LAYOUTS",
     "SIGMA",
     "SURFACE_EXAMPLES",
     "THERMOCOUPLE_EXAMPLES",
@@ -47,7 +48,10 @@ __all__ = [
     "VIEW_FACTOR_EXAMPLES",
     "BlackbodyInputs",
     "BlackbodyResult",
+    "EnclosureCase",
     "EnclosureInputs",
+    "EnclosureLayout",
+    "EnclosureLayoutInfo",
     "EnclosureResult",
     "EnclosureSurface",
     "NetworkResistance",
@@ -69,9 +73,11 @@ __all__ = [
     "blackbody_notes",
     "blackbody_to_dict",
     "cylindrical_furnace",
+    "enclosure_from_layout",
     "enclosure_notes",
     "enclosure_to_dict",
     "fraction_inverse",
+    "layout_geometry",
     "open_cylindrical_cavity",
     "parallel_plates_with_surroundings",
     "planck",
@@ -81,6 +87,7 @@ __all__ = [
     "solve_thermocouple",
     "solve_two_surface",
     "solve_view_factor",
+    "surface_balance_curve",
     "surface_balance_notes",
     "surface_to_dict",
     "thermocouple_notes",
@@ -439,8 +446,11 @@ VIEW_FACTORS: dict[ViewGeometry, ViewFactor] = {
         "Rectángulos paralelos alineados",
         ("X", "Y", "L"),
         ("Ancho X", "Largo Y", "Separación L"),
-        r"F_{ij} = \frac{2}{\pi \bar{X} \bar{Y}} \left\{ \ln\left[\frac{(1+\bar{X}^2)(1+\bar{Y}^2)}"
-        r"{1+\bar{X}^2+\bar{Y}^2}\right]^{1/2} + \cdots \right\}",
+        r"\begin{aligned}F_{ij} &= \frac{2}{\pi \bar{X} \bar{Y}}\,(t_1 + t_2 + t_3 - t_4) \\ "
+        r"t_1 &= \ln\left[\frac{(1+\bar{X}^2)(1+\bar{Y}^2)}{1+\bar{X}^2+\bar{Y}^2}\right]^{1/2} \\ "
+        r"t_2 &= \bar{X}\sqrt{1+\bar{Y}^2}\,\tan^{-1}\frac{\bar{X}}{\sqrt{1+\bar{Y}^2}} \\ "
+        r"t_3 &= \bar{Y}\sqrt{1+\bar{X}^2}\,\tan^{-1}\frac{\bar{Y}}{\sqrt{1+\bar{X}^2}} \\ "
+        r"t_4 &= \bar{X}\tan^{-1}\bar{X} + \bar{Y}\tan^{-1}\bar{Y}\end{aligned}",
         "Incropera, tabla 13.2",
     ),
     "coaxial_disks": ViewFactor(
@@ -455,16 +465,22 @@ VIEW_FACTORS: dict[ViewGeometry, ViewFactor] = {
         "Rectángulos perpendiculares con un borde común",
         ("X", "Y", "Z"),
         ("Borde común X", "Ancho Y (de i)", "Alto Z (de j)"),
-        r"F_{ij} = \frac{1}{\pi W}\left(W\tan^{-1}\frac{1}{W} + H\tan^{-1}\frac{1}{H} - \cdots"
-        r"\right)",
+        r"\begin{aligned}F_{ij} &= \frac{u + v}{\pi\,W} \\ "
+        r"u &= W\tan^{-1}\frac{1}{W} + H\tan^{-1}\frac{1}{H} \\ "
+        r"&\quad - \sqrt{H^2+W^2}\,\tan^{-1}\frac{1}{\sqrt{H^2+W^2}} \\ "
+        r"v &= \frac{1}{4}\ln\left(a\,b^{W^2} c^{H^2}\right) \\ "
+        r"a &= \frac{(1 + W^2)(1 + H^2)}{1 + W^2 + H^2} \\ "
+        r"b &= \frac{W^2\,(1 + W^2 + H^2)}{(1 + W^2)(W^2 + H^2)} \\ "
+        r"c &= \frac{H^2\,(1 + H^2 + W^2)}{(1 + H^2)(H^2 + W^2)}\end{aligned}",
         "Incropera, tabla 13.2",
     ),
     "parallel_plates_2d": ViewFactor(
         "Placas paralelas largas (centradas)",
         ("w_i", "w_j", "L"),
         ("Ancho w_i", "Ancho w_j", "Separación L"),
-        r"F_{ij} = \frac{\left[(W_i+W_j)^2+4\right]^{1/2} - \left[(W_j-W_i)^2+4\right]^{1/2}}"
-        r"{2W_i}",
+        r"\begin{aligned}F_{ij} &= \frac{a - b}{2\,W_i} \\ "
+        r"a &= \sqrt{(W_i + W_j)^2 + 4} \\ "
+        r"b &= \sqrt{(W_j - W_i)^2 + 4}\end{aligned}",
         "Incropera, tabla 13.1",
         True,
     ),
@@ -497,8 +513,8 @@ VIEW_FACTORS: dict[ViewGeometry, ViewFactor] = {
         "Un plano y una hilera de tubos",
         ("D", "s"),
         ("Diámetro D", "Paso s"),
-        r"F_{ij} = 1 - \left[1-\left(\frac{D}{s}\right)^2\right]^{1/2} + \frac{D}{s}"
-        r"\tan^{-1}\left(\frac{s^2-D^2}{D^2}\right)^{1/2}",
+        r"\begin{aligned}F_{ij} &= 1 - \left[1-\left(\frac{D}{s}\right)^2\right]^{1/2} \\ "
+        r"&\quad + \frac{D}{s}\tan^{-1}\left(\frac{s^2-D^2}{D^2}\right)^{1/2}\end{aligned}",
         "Incropera, tabla 13.1",
         True,
     ),
@@ -1041,6 +1057,156 @@ def solve_enclosure(inputs: EnclosureInputs) -> EnclosureResult:
     return EnclosureResult(inputs, tuple(float(x) for x in J), tuple(Q), tuple(T))
 
 
+EnclosureLayout = Literal[
+    "triangular_duct", "cylindrical_furnace", "open_cavity", "plates_surroundings"
+]
+
+
+@dataclass(frozen=True)
+class EnclosureLayoutInfo:
+    """Una configuración de recinto de tres superficies: sus medidas y sus superficies.
+
+    ``surroundings``: la tercera superficie es una abertura (la boca de una cavidad, los
+    costados entre dos placas), que se trata como una superficie negra a la temperatura
+    de los alrededores. ``per_length``: un recinto largo (2D), por metro de largo.
+    """
+
+    name: str
+    dims: tuple[str, ...]
+    surfaces: tuple[str, ...]
+    surroundings: bool = False
+    per_length: bool = False
+
+
+ENCLOSURE_LAYOUTS: dict[EnclosureLayout, EnclosureLayoutInfo] = {
+    "triangular_duct": EnclosureLayoutInfo(
+        "Ducto largo de tres lados",
+        ("Lado 1 (ancho)", "Lado 2 (ancho)", "Lado 3 (ancho)"),
+        ("Lado 1", "Lado 2", "Lado 3"),
+        per_length=True,
+    ),
+    "cylindrical_furnace": EnclosureLayoutInfo(
+        "Horno cilíndrico cerrado", ("Radio r", "Alto H"), ("Tapa", "Base", "Lateral")
+    ),
+    "open_cavity": EnclosureLayoutInfo(
+        "Cavidad cilíndrica abierta",
+        ("Radio r", "Profundidad L"),
+        ("Lateral", "Fondo", "Boca (alrededores)"),
+        surroundings=True,
+    ),
+    "plates_surroundings": EnclosureLayoutInfo(
+        "Dos placas paralelas frente a los alrededores",
+        ("Ancho X", "Largo Y", "Separación L"),
+        ("Placa 1", "Placa 2", "Alrededores"),
+        surroundings=True,
+    ),
+}
+
+
+def layout_geometry(
+    layout: EnclosureLayout, dims: tuple[float, ...]
+) -> tuple[tuple[float, ...], tuple[tuple[float, ...], ...]]:
+    """Las áreas (por metro de largo en el ducto) y la matriz F de una configuración.
+
+    Ducto: cuerdas cruzadas de Hottel (Incropera, tabla 13.1); horno y cavidad: discos
+    coaxiales (tabla 13.2) y las reglas de la suma y la reciprocidad para el lateral
+    (Cengel y Ghajar, §13-2); placas: rectángulos paralelos alineados.
+
+    Raises
+    ------
+    ValueError
+        Con un mensaje para el alumno si las medidas no forman el recinto.
+    """
+    info = ENCLOSURE_LAYOUTS[layout]
+    if len(dims) != len(info.dims):
+        raise ValueError(f"{info.name}: hacen falta {len(info.dims)} medidas.")
+    if any(d <= 0.0 for d in dims):
+        raise ValueError("Las medidas del recinto tienen que ser positivas.")
+    if layout == "triangular_duct":
+        w = dims
+        for k in range(3):
+            if w[k] >= w[(k + 1) % 3] + w[(k + 2) % 3]:
+                raise ValueError(
+                    "Con esos lados no se cierra un triángulo: cada lado tiene que ser menor "
+                    "que la suma de los otros dos."
+                )
+        F = [[0.0] * 3 for _ in range(3)]
+        for i in range(3):
+            for j in range(3):
+                if i != j:
+                    F[i][j] = _f_three_sided_2d(w[i], w[j], w[3 - i - j])
+        return tuple(w), tuple(tuple(row) for row in F)
+    if layout == "plates_surroundings":
+        X, Y, L = dims
+        F12 = _f_parallel_rectangles(X, Y, L)
+        A, A3 = X * Y, 2.0 * L * (X + Y)
+    else:
+        r, H = dims
+        F12 = _f_coaxial_disks(r, r, H)
+        A, A3 = math.pi * r * r, 2.0 * math.pi * r * H
+    F13 = 1.0 - F12
+    F31 = A * F13 / A3
+    if layout == "open_cavity":
+        # orden: lateral (el cilindro), fondo y boca (los dos discos)
+        return (A3, A, A), (
+            (1.0 - 2.0 * F31, F31, F31),
+            (F13, 0.0, F12),
+            (F13, F12, 0.0),
+        )
+    return (A, A, A3), ((0.0, F12, F13), (F12, 0.0, F13), (F31, F31, 1.0 - 2.0 * F31))
+
+
+def enclosure_from_layout(
+    layout: EnclosureLayout,
+    dims: tuple[float, ...],
+    surfaces: tuple[EnclosureSurface, ...],
+) -> EnclosureInputs:
+    """El recinto de una configuración con sus superficies (nombre, ε, T o Q̇).
+
+    Las áreas salen de la geometría: el ``area_m2`` de cada superficie se ignora.
+
+    Raises
+    ------
+    ValueError
+        Si faltan superficies o la abertura no es negra a una temperatura dada.
+    """
+    info = ENCLOSURE_LAYOUTS[layout]
+    if len(surfaces) != 3:
+        raise ValueError(f"{info.name}: el recinto tiene tres superficies.")
+    if info.surroundings:
+        opening = surfaces[2]
+        if opening.emissivity != 1.0 or opening.T_K is None:
+            raise ValueError(
+                f"«{opening.name}» es una abertura: se trata como una superficie negra (ε = 1) "
+                "a la temperatura de los alrededores, que hay que dar."
+            )
+    areas, F = layout_geometry(layout, dims)
+    return EnclosureInputs(
+        tuple(replace(s, area_m2=a) for s, a in zip(surfaces, areas, strict=True)), F
+    )
+
+
+@dataclass(frozen=True)
+class EnclosureCase:
+    """Una configuración con sus medidas y sus superficies (lo que edita la página)."""
+
+    layout: EnclosureLayout
+    dims: tuple[float, ...]
+    surfaces: tuple[EnclosureSurface, ...]
+
+    def inputs(self) -> EnclosureInputs:
+        return enclosure_from_layout(self.layout, self.dims, self.surfaces)
+
+
+def _surfaces(
+    names: tuple[str, ...],
+    eps: tuple[float, ...],
+    T: tuple[float | None, ...],
+    Q: tuple[float | None, ...] = (None, None, None),
+) -> tuple[EnclosureSurface, ...]:
+    return tuple(EnclosureSurface(names[k], 0.0, eps[k], T[k], Q[k]) for k in range(3))
+
+
 def triangular_duct(
     w: tuple[float, float, float],
     names: tuple[str, str, str],
@@ -1049,14 +1215,7 @@ def triangular_duct(
     Q: tuple[float | None, float | None, float | None] = (None, None, None),
 ) -> EnclosureInputs:
     """Un ducto largo de tres lados (por metro de largo), con F de cuerdas cruzadas."""
-    F = [[0.0] * 3 for _ in range(3)]
-    for i in range(3):
-        for j in range(3):
-            if i != j:
-                k = 3 - i - j
-                F[i][j] = _f_three_sided_2d(w[i], w[j], w[k])
-    surfaces = tuple(EnclosureSurface(names[i], w[i], eps[i], T[i], Q[i]) for i in range(3))
-    return EnclosureInputs(surfaces, tuple(tuple(row) for row in F))
+    return enclosure_from_layout("triangular_duct", w, _surfaces(names, eps, T, Q))
 
 
 def cylindrical_furnace(
@@ -1068,34 +1227,23 @@ def cylindrical_furnace(
     names: tuple[str, str, str] = ("Tapa", "Base", "Lateral"),
 ) -> EnclosureInputs:
     """Un horno cilíndrico: tapa (1), base (2) y lateral (3)."""
-    F12 = _f_coaxial_disks(r, r, H)
-    A1 = math.pi * r * r
-    A3 = 2.0 * math.pi * r * H
-    F13 = 1.0 - F12
-    F31 = A1 * F13 / A3
-    F = ((0.0, F12, F13), (F12, 0.0, F13), (F31, F31, 1.0 - 2.0 * F31))
-    areas = (A1, A1, A3)
-    surfaces = tuple(EnclosureSurface(names[i], areas[i], eps[i], T[i], Q[i]) for i in range(3))
-    return EnclosureInputs(surfaces, F)
+    return enclosure_from_layout("cylindrical_furnace", (r, H), _surfaces(names, eps, T, Q))
 
 
 def open_cylindrical_cavity(
-    r: float, L: float, eps_side: float, eps_bottom: float, T_side: float, T_bottom: float,
+    r: float,
+    L: float,
+    eps_side: float,
+    eps_bottom: float,
+    T_side: float,
+    T_bottom: float,
     T_surr: float,
-) -> EnclosureInputs:  # fmt: skip
+) -> EnclosureInputs:
     """Una cavidad cilíndrica abierta: lateral, fondo y la boca como superficie negra a la
     temperatura de los alrededores (Incropera, ejemplo 13.2)."""
-    A_side, A_disk = 2.0 * math.pi * r * L, math.pi * r * r
-    F_bm = _f_coaxial_disks(r, r, L)  # fondo → boca
-    F_bs = 1.0 - F_bm
-    F_sb = A_disk * F_bs / A_side
-    F = ((1.0 - 2.0 * F_sb, F_sb, F_sb), (F_bs, 0.0, F_bm), (F_bs, F_bm, 0.0))
-    surfaces = (
-        EnclosureSurface("Lateral", A_side, eps_side, T_side),
-        EnclosureSurface("Fondo", A_disk, eps_bottom, T_bottom),
-        EnclosureSurface("Boca (alrededores)", A_disk, 1.0, T_surr),
-    )
-    return EnclosureInputs(surfaces, F)
+    names = ENCLOSURE_LAYOUTS["open_cavity"].surfaces
+    surfaces = _surfaces(names, (eps_side, eps_bottom, 1.0), (T_side, T_bottom, T_surr))
+    return enclosure_from_layout("open_cavity", (r, L), surfaces)
 
 
 def parallel_plates_with_surroundings(
@@ -1103,18 +1251,9 @@ def parallel_plates_with_surroundings(
 ) -> EnclosureInputs:
     """Dos rectángulos paralelos frente a los alrededores (las aberturas laterales como una
     superficie negra a la temperatura de los alrededores)."""
-    F12 = _f_parallel_rectangles(X, Y, L)
-    A = X * Y
-    A3 = 2.0 * L * (X + Y)
-    F13 = 1.0 - F12
-    F31 = A * F13 / A3
-    F = ((0.0, F12, F13), (F12, 0.0, F13), (F31, F31, 1.0 - 2.0 * F31))
-    surfaces = (
-        EnclosureSurface("Placa 1", A, eps1, T1),
-        EnclosureSurface("Placa 2", A, eps2, T2),
-        EnclosureSurface("Alrededores", A3, 1.0, T_surr),
-    )
-    return EnclosureInputs(surfaces, F)
+    names = ENCLOSURE_LAYOUTS["plates_surroundings"].surfaces
+    surfaces = _surfaces(names, (eps1, eps2, 1.0), (T1, T2, T_surr))
+    return enclosure_from_layout("plates_surroundings", (X, Y, L), surfaces)
 
 
 def enclosure_notes(result: EnclosureResult) -> list[str]:
@@ -1246,6 +1385,26 @@ def solve_surface_balance(inputs: SurfaceBalanceInputs) -> SurfaceBalanceResult:
     return SurfaceBalanceResult(i, float(brentq(balance, lo, hi, xtol=1e-12)))
 
 
+def surface_balance_curve(
+    result: SurfaceBalanceResult, n: int = 61
+) -> tuple[list[float], list[float], list[float]]:
+    """q_conv y q_rad por unidad de área contra T_s: dónde pesa cada mecanismo.
+
+    q_conv = h·(T_s − T∞) crece lineal y q_rad = ε·σ·(T_s⁴ − T_alr⁴) con T⁴ (Incropera,
+    §1.2.3): a temperaturas altas manda la radiación. Va de la más baja de las
+    temperaturas a algo más que la más alta.
+    """
+    i = result.inputs
+    temps = (i.T_inf_K, i.T_surr_K, result.T_s_K)
+    lo, hi = min(temps), max(temps)
+    span = hi - lo or 50.0
+    lo, hi = max(1.0, lo - 0.1 * span), hi + 0.6 * span
+    Ts = [lo + (hi - lo) * k / (n - 1) for k in range(n)]
+    q_conv = [i.h_W_per_m2K * (T - i.T_inf_K) for T in Ts]
+    q_rad = [i.emissivity * SIGMA * (T**4 - i.T_surr_K**4) for T in Ts]
+    return Ts, q_conv, q_rad
+
+
 def surface_balance_notes(result: SurfaceBalanceResult) -> list[str]:
     """Interpretación física (markdown)."""
     notes = [
@@ -1342,8 +1501,21 @@ def thermocouple_notes(result: ThermocoupleResult) -> list[str]:
 
 @dataclass(frozen=True)
 class RadiationExample:
+    """Un ejemplo con su nota; en los recintos, también la configuración (``case``)."""
+
     inputs: Any
     note: str = ""
+    case: EnclosureCase | None = None
+
+
+def _enclosure_example(
+    layout: EnclosureLayout,
+    dims: tuple[float, ...],
+    surfaces: tuple[EnclosureSurface, ...],
+    note: str,
+) -> RadiationExample:
+    case = EnclosureCase(layout, dims, surfaces)
+    return RadiationExample(case.inputs(), note, case)
 
 
 BLACKBODY_EXAMPLES: dict[str, RadiationExample] = {
@@ -1433,9 +1605,10 @@ TWO_SURFACE_EXAMPLES: dict[str, RadiationExample] = {
 
 ENCLOSURE_EXAMPLES: dict[str, RadiationExample] = {
     "Horno de pintura: ducto triangular con una pared rerradiante (basado en Incropera)": (
-        RadiationExample(
-            triangular_duct(
-                (1.0, 1.0, 1.0),
+        _enclosure_example(
+            "triangular_duct",
+            (1.0, 1.0, 1.0),
+            _surfaces(
                 ("Calefactor", "Paneles pintados", "Pared aislada"),
                 (0.8, 0.4, 0.8),
                 (1200.0, 500.0, None),
@@ -1444,9 +1617,10 @@ ENCLOSURE_EXAMPLES: dict[str, RadiationExample] = {
             "Por metro de largo: hay que entregar 37 kW/m y la pared aislada queda a 1102 K.",
         )
     ),
-    "Ducto triangular con calor dado en la base (Cengel y Ghajar)": RadiationExample(
-        triangular_duct(
-            (1.0, 1.0, 1.0),
+    "Ducto triangular con calor dado en la base (Cengel y Ghajar)": _enclosure_example(
+        "triangular_duct",
+        (1.0, 1.0, 1.0),
+        _surfaces(
             ("Base", "Lado izquierdo", "Lado derecho"),
             (0.8, 0.5, 0.5),
             (None, 500.0, 500.0),
@@ -1454,16 +1628,30 @@ ENCLOSURE_EXAMPLES: dict[str, RadiationExample] = {
         ),
         "El libro: la base queda a 543 K.",
     ),
-    "Cavidad cilíndrica abierta: la potencia del horno (Incropera 13.2)": RadiationExample(
-        open_cylindrical_cavity(0.0375, 0.15, 1.0, 1.0, 1350.0 + _K0, 1650.0 + _K0, 300.0),
+    "Cavidad cilíndrica abierta: la potencia del horno (Incropera 13.2)": _enclosure_example(
+        "open_cavity",
+        (0.0375, 0.15),
+        _surfaces(
+            ENCLOSURE_LAYOUTS["open_cavity"].surfaces,
+            (1.0, 1.0, 1.0),
+            (1350.0 + _K0, 1650.0 + _K0, 300.0),
+        ),
         "El libro: 1830 W. La boca es una superficie negra a la temperatura del ambiente.",
     ),
-    "Horno cilíndrico de tres superficies grises": RadiationExample(
-        cylindrical_furnace(1.0, 1.0, (0.8, 0.4, 1.0), (700.0, 500.0, 400.0)),
+    "Horno cilíndrico de tres superficies grises": _enclosure_example(
+        "cylindrical_furnace",
+        (1.0, 1.0),
+        _surfaces(("Tapa", "Base", "Lateral"), (0.8, 0.4, 1.0), (700.0, 500.0, 400.0)),
         "r = H = 1 m: la tapa entrega calor y la base y el lateral lo reciben.",
     ),
-    "Dos placas frente a los alrededores": RadiationExample(
-        parallel_plates_with_surroundings(1.0, 1.0, 0.5, 0.8, 0.6, 900.0, 400.0, 300.0),
+    "Dos placas frente a los alrededores": _enclosure_example(
+        "plates_surroundings",
+        (1.0, 1.0, 0.5),
+        _surfaces(
+            ENCLOSURE_LAYOUTS["plates_surroundings"].surfaces,
+            (0.8, 0.6, 1.0),
+            (900.0, 400.0, 300.0),
+        ),
         "Placas de 1 × 1 m a 0,5 m; lo que se escapa por los costados va a los alrededores.",
     ),
 }
@@ -1482,7 +1670,7 @@ SURFACE_EXAMPLES: dict[str, RadiationExample] = {
             T_s_K=320.0,
             alpha_solar=0.9,
             G_solar_W_per_m2=400.0 * math.cos(math.radians(20.0)) + 300.0,
-        ),  # fmt: skip
+        ),
         "α_s = ε = 0,9 a 320 K con el cielo a 260 K: gana 306 W/m² (el libro: 306).",
     ),
     "Absorbedor selectivo al sol (Cengel y Ghajar)": RadiationExample(
@@ -1494,7 +1682,7 @@ SURFACE_EXAMPLES: dict[str, RadiationExample] = {
             T_s_K=320.0,
             alpha_solar=0.9,
             G_solar_W_per_m2=400.0 * math.cos(math.radians(20.0)) + 300.0,
-        ),  # fmt: skip
+        ),
         "α_s = 0,9 y ε = 0,1: gana 575 W/m² (el libro: 575).",
     ),
     "Resistencia de 1 kW en un cuarto: ¿a qué temperatura queda?": RadiationExample(

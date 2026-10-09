@@ -127,9 +127,12 @@ def test_band_emissivity_and_selective_absorber() -> None:
 
 def test_blackbody_messages() -> None:
     with pytest.raises(ValueError, match="crecer"):
-        solve_blackbody(BlackbodyInputs(500.0, bands=(SpectralBand(0.5, 3 * UM),
-                                                      SpectralBand(0.3, 2 * UM),
-                                                      SpectralBand(0.1))))  # fmt: skip
+        solve_blackbody(
+            BlackbodyInputs(
+                500.0,
+                bands=(SpectralBand(0.5, 3 * UM), SpectralBand(0.3, 2 * UM), SpectralBand(0.1)),
+            )
+        )
     with pytest.raises(ValueError, match="última banda"):
         solve_blackbody(BlackbodyInputs(500.0, bands=(SpectralBand(0.5, 3 * UM),)))
     with pytest.raises(ValueError, match="entre 0 y 1"):
@@ -382,6 +385,54 @@ def test_enclosure_messages() -> None:
         solve_enclosure(EnclosureInputs((a, cold_q), ((0.0, 1.0), (1.0, 0.0))))
 
 
+@pytest.mark.parametrize("layout", list(rd.ENCLOSURE_LAYOUTS))
+def test_layout_geometry_closes(layout: str) -> None:
+    """Cada configuración cumple la regla de la suma y la reciprocidad."""
+    dims = {
+        "triangular_duct": (0.6, 0.8, 1.0),
+        "cylindrical_furnace": (0.5, 1.2),
+        "open_cavity": (0.04, 0.2),
+        "plates_surroundings": (1.0, 2.0, 0.4),
+    }[layout]
+    areas, F = rd.layout_geometry(layout, dims)  # type: ignore[arg-type]
+    for i in range(3):
+        assert sum(F[i]) == pytest.approx(1.0, abs=1e-12)
+        for j in range(3):
+            assert areas[i] * F[i][j] == pytest.approx(areas[j] * F[j][i], rel=1e-12)
+            assert F[i][j] >= 0.0
+
+
+def test_examples_carry_their_layout() -> None:
+    """Cada ejemplo de recinto guarda su configuración, y rearmarla da lo mismo."""
+    for ex in rd.ENCLOSURE_EXAMPLES.values():
+        assert ex.case is not None
+        assert ex.case.inputs() == ex.inputs
+    # los armadores de siempre dan lo mismo que la configuración
+    duct = rd.triangular_duct(
+        (1.0, 1.0, 1.0), ("a", "b", "c"), (0.8, 0.4, 0.8), (1200.0, 500.0, None), (None, None, 0.0)
+    )
+    assert duct.F[0][1] == pytest.approx(0.5)
+    assert [s.area_m2 for s in duct.surfaces] == [1.0, 1.0, 1.0]
+
+
+def test_layout_messages() -> None:
+    with pytest.raises(ValueError, match="no se cierra un triángulo"):
+        rd.layout_geometry("triangular_duct", (1.0, 1.0, 2.5))
+    with pytest.raises(ValueError, match="positivas"):
+        rd.layout_geometry("cylindrical_furnace", (1.0, 0.0))
+    with pytest.raises(ValueError, match="2 medidas"):
+        rd.layout_geometry("open_cavity", (1.0, 2.0, 3.0))
+    surfaces = (
+        EnclosureSurface("Lateral", 0.0, 0.8, 1000.0),
+        EnclosureSurface("Fondo", 0.0, 0.8, 1000.0),
+        EnclosureSurface("Boca", 0.0, 0.9, 300.0),
+    )
+    with pytest.raises(ValueError, match="abertura"):
+        rd.enclosure_from_layout("open_cavity", (0.05, 0.1), surfaces)
+    with pytest.raises(ValueError, match="tres superficies"):
+        rd.enclosure_from_layout("cylindrical_furnace", (0.05, 0.1), surfaces[:2])
+
+
 # ---------------------------------------------------------------------
 # Radiación y convección juntas
 # ---------------------------------------------------------------------
@@ -404,6 +455,20 @@ def test_cengel_solar_surfaces(alpha: float, eps: float, expected: float) -> Non
     base = _ex(rd.SURFACE_EXAMPLES, "Absorbedor gris").inputs
     r = solve_surface_balance(replace(base, alpha_solar=alpha, emissivity=eps))
     assert -r.Q_lost_W == pytest.approx(expected, abs=0.1)
+
+
+def test_surface_balance_curve() -> None:
+    """q_conv se anula en T∞ y q_rad en T_alr; la curva pasa por los datos."""
+    r = solve_surface_balance(_ex(rd.SURFACE_EXAMPLES, "Caño de vapor").inputs)
+    Ts, q_conv, q_rad = rd.surface_balance_curve(r, n=41)
+    assert len(Ts) == len(q_conv) == len(q_rad) == 41
+    assert Ts[0] < r.inputs.T_inf_K and Ts[-1] > r.T_s_K
+    i = r.inputs
+    for T, qc, qr in zip(Ts, q_conv, q_rad, strict=True):
+        assert qc == pytest.approx(i.h_W_per_m2K * (T - i.T_inf_K))
+        assert qr == pytest.approx(i.emissivity * SIGMA * (T**4 - i.T_surr_K**4))
+    # a temperatura alta manda la radiación
+    assert q_rad[-1] > q_conv[-1]
 
 
 def test_equilibrium_temperature() -> None:

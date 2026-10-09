@@ -800,9 +800,20 @@ def _build(
     ntu = UA / C_min
     F = correction_factor(arr, eps, cr, mixed_is_cmin)
     probe = ExchangerResult(
-        inputs, hot, cold, Q, eps, ntu, UA, A, UA / A, F, 0.0, mixed_is_cmin,
+        inputs,
+        hot,
+        cold,
+        Q,
+        eps,
+        ntu,
+        UA,
+        A,
+        UA / A,
+        F,
+        0.0,
+        mixed_is_cmin,
         _exergy(hot, cold, Q, inputs.T0_K),
-    )  # fmt: skip
+    )
     dT1, dT2 = probe.end_differences_K
     result = replace(probe, dT_lm_K=lmtd(dT1, dT2))
     return replace(result, warnings=_warnings(result))
@@ -1591,7 +1602,7 @@ U_EXAMPLES: dict[str, ExchangerExample] = {
             L_m=1.0,
             R_f_i_m2K_per_W=0.0004,
             R_f_o_m2K_per_W=0.0001,
-        ),  # fmt: skip
+        ),
         "El libro: R = 0,0532 °C/W por metro, U_i = 399 y U_o = 315 W/(m²·K).",
     ),
     "Agua y aire en un tubo de cobre: el lado del gas manda": ExchangerExample(
@@ -1608,7 +1619,7 @@ U_EXAMPLES: dict[str, ExchangerExample] = {
             A_m2=1.0,
             R_f_i_m2K_per_W=0.0001,
             R_f_o_m2K_per_W=0.0001,
-        ),  # fmt: skip
+        ),
         "Placas delgadas y h altos de los dos lados: el ensuciamiento pesa mucho.",
     ),
 }

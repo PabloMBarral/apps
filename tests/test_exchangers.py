@@ -446,9 +446,10 @@ def test_validation_messages() -> None:
         solve_rating(RatingInputs(arr, replace(hot, phase_change=True), cold, 100.0, 1.0))
     with pytest.raises(ValueError, match="deslizamiento"):
         solve_rating(
-            RatingInputs(arr, Stream("R-410A", 40.0 + C, fluid="R410A", phase_change=True),
-                         cold, 100.0, 1.0)
-        )  # fmt: skip
+            RatingInputs(
+                arr, Stream("R-410A", 40.0 + C, fluid="R410A", phase_change=True), cold, 100.0, 1.0
+            )
+        )
     # agua a 1 atm calentada a más de 100 °C
     water = Stream("agua", 20.0 + C, 0.2, fluid="Water")
     steam = Stream("gases", 400.0 + C, 2.0, cp_J_per_kgK=1100.0)
