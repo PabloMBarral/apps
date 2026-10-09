@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.24.0` — Fase 8.1 cerrada (2026-10-09).
+> **Versión actual**: `0.25.0` — Fase 8.2 cerrada (2026-10-09).
 
 ---
 
@@ -1334,6 +1334,102 @@
   DOI de las referencias se verificaron con búsquedas web (solo se citan los
   DOI confirmados).
 
+### Fase 8.2 — Transferencia de calor: radiación e intercambiadores
+- **Versión**: `0.25.0` (2026-10-09). Rama `claude/water-state-analyzer-f4fiev`
+  («seguí mergeando y con el plan»: el PR de la 8.1 se mergeó, el plan de la 8.2
+  se mandó y se implementó sin esperar). Dos páginas nuevas en vez de más modos
+  en /Transferencia_de_Calor.
+- **Scope**:
+  - **`core/heat_transfer/radiation.py`** (nuevo): Planck, Wien y
+    Stefan–Boltzmann con CODATA 2018; la fracción del cuerpo negro f(λT) (serie
+    de Chang y Rhee) y su inversa; ε(λ) en bandas: la ε total y la α para un
+    cuerpo negro a otra temperatura. Ocho factores de forma (rectángulos
+    paralelos y perpendiculares y discos coaxiales; placas, placas con un borde
+    común, recinto de tres lados, cilindros paralelos y una hilera de tubos en
+    2D) con la reciprocidad, la regla de la suma y F contra la separación. Dos
+    superficies (placas, cilindros y esferas concéntricos, objeto chico,
+    general) con hasta tres pantallas: la red, las radiosidades y la T de cada
+    pantalla. Recintos de N superficies grises por radiosidades (T dada, Q̇ dado
+    o rerradiante) y cuatro configuraciones de tres superficies armadas desde la
+    geometría (`ENCLOSURE_LAYOUTS`). La superficie con convección y radiación
+    (h_rad, el sol, la T de equilibrio para un calor dado) y la termocupla.
+    Notas, 28 ejemplos y export.
+  - **`core/heat_transfer/exchangers.py`** (nuevo): ε(NTU, C_r) y NTU(ε, C_r)
+    del doble tubo, casco y tubos (1 a n pasos de casco) y flujo cruzado (los
+    dos sin mezclar con la serie exacta de Mason; uno mezclado), con C_r = 0;
+    F = NTU_cc/NTU, P y R, la LMTD. Corrientes con c_p dado o de CoolProp
+    (iterado a la T media, una sola fase) o que cambian de fase (h_fg de
+    CoolProp o dado). Verificación, dimensionamiento (salida o Q̇ → A y largo) y
+    ensayo con las cuatro temperaturas (U → Q̇ y caudales; un caudal → U). La
+    exergía (Δs = C·ln(T₂/T₁), T₀·Ṡ_gen, η_ex del vademecum §11.10), la
+    comparación de tipos, las curvas ε–NTU y F–P, el perfil del doble tubo y el
+    U global de un tubo o una placa con el ensuciamiento de TEMA. Notas, 16
+    ejemplos y export.
+  - `radiation_procedure.py` y `exchangers_procedure.py`: los procedimientos en
+    los tres sistemas.
+  - **`ui/radiation_charts.py`** y **`ui/exchanger_charts.py`** (nuevos): Planck
+    con la banda y la emisión real, los espectros normalizados con ε(λ), F
+    contra la separación, el peso de cada resistencia de la red, el calor de
+    cada superficie del recinto, q_conv y q_rad contra T_s; ε–NTU y F–P con la
+    curva y el punto de los datos, el perfil del doble tubo, la comparación de
+    los tipos y las resistencias del U.
+  - **Páginas `/Radiacion` (☀️) e `/Intercambiadores` (🔄)**, en el menú
+    después de Transferencia de calor, con la teoría, el procedimiento y el
+    export; la home y /Transferencia_de_Calor las nombran.
+  - Cambios chicos: `units_system` suma seis magnitudes (T absoluta en K o °R,
+    λ en μm, λT, E_bλ por μm, R″_f y Ṡ).
+- **Validación**:
+  - Intercambiadores, contra Cengel y Ghajar: 11-2 (U_i = 399,3 y U_o = 315,3
+    W/(m²·K)), 11-3 (ΔT_ml = 11,54 °C, 1,091 MW, 32,6 kg/s de agua), 11-4 y
+    11-8 (A = 5,113 m², 108,5 m de tubo), 11-5 (F = 0,911, 1832 W), 11-6
+    (F = 0,970 con la serie; la fórmula aproximada da 0,933), 11-7 (501,6 kW) y
+    11-9 (ε = 0,462, 38,4 kW); Incropera 11.1 (65,9 m). ε(1, 1) de la serie del
+    flujo cruzado = 0,4762 (Kays y London); F contra la fórmula de Bowman; ida y
+    vuelta NTU → ε → NTU en todos los tipos; LMTD y ε-NTU dan la misma área.
+  - Radiación: f(λT) contra `quad` (5·10⁻⁹); los factores de forma contra Monte
+    Carlo, las cuerdas cruzadas y una caja cerrada; Cengel y Ghajar (bola negra
+    23,23 kW/m² y 3846 W/(m²·μm); bandas 0,5206 y 12,09 kW/m²; placas 3626 y
+    806 W/m² con una pantalla; ducto con la base a 543,4 K; termocupla 715,0 K;
+    superficies al sol 306,4, 34,0, 574,7 y −234,3 W/m²) e Incropera (cavidad
+    13.2, 1831 W; caño 1.2, 577 + 421 = 998 W/m; horno de pintura 36,98 kW/m y
+    la pared aislada a 1102 K). Todos los recintos cierran ΣQ̇ = 0.
+- **Mensajes al alumno**: un ε mayor que el máximo del tipo («probá con
+  contracorriente o con más pasos de casco»), temperaturas que se cruzan, una
+  corriente que hierve o condensa en el intercambiador («subí» o «bajá» la
+  presión), un pseudo-puro que cambia de fase (deslizamiento), falta de h_fg o
+  de c_p; bandas que no crecen, emisividades fuera de (0, 1], radios de las
+  pantallas desordenados, F₁₂ imposible por reciprocidad, filas de F que no
+  suman 1, un triángulo que no cierra, la abertura que no es negra, un recinto
+  sin ninguna temperatura y uno que pediría temperaturas bajo el cero absoluto.
+  Avisos: F < 0,75 y ε cerca del máximo. Notas: el C_mín, el NTU alto, la serie
+  contra la aproximada, la exergía destruida y cuándo no se define η_ex.
+- **Tests**: de 4348 a 4786 passed (10 skipped), sin warnings.
+  - `tests/test_exchangers.py` (80), `tests/test_radiation.py` (56),
+    `tests/test_exchangers_procedure.py` (67),
+    `tests/test_radiation_procedure.py` (90),
+    `tests/test_radiation_exchanger_charts.py` (12),
+    `tests/test_page_radiacion.py` (39) y `tests/test_page_intercambiadores.py`
+    (26, AppTest), más las unidades en `tests/test_units_system.py` y las dos
+    páginas en `test_navigation.py`.
+  - LaTeX: 3094 expresiones distintas (los procedimientos con los ejemplos y
+    sus variantes, y la teoría) validan con KaTeX estricto y entran en 321 px
+    como máximo en los tres sistemas.
+  - Smoke test en Chromium a 1280 px: 25 casos (14 de radiación y 11 de
+    intercambiadores, en los tres sistemas) con la teoría y el procedimiento
+    abiertos, sin errores, sin desborde y sin ecuaciones que se pasen de su
+    expansor. Las capturas y los gráficos sueltos a 390 px encontraron cuatro
+    detalles que se corrigieron: los ejes logarítmicos rotulaban 0,2 como «2»
+    (ahora van marcas 1-2-5), las barras del recinto decían «3,698e+04» y el
+    rótulo de la negativa se pisaba con el nombre (ahora van adentro y sin
+    exponente), la leyenda de las barras pisaba el título del eje (ahora va al
+    pie) y los nombres largos de los tipos de intercambiador aplastaban el eje
+    de la comparación (ahora van nombres cortos; la tabla conserva los
+    completos).
+- **Dependencias**: ninguna nueva (`gammainc` y `brentq` son de SciPy).
+- **Red**: doi.org, Crossref y las editoriales siguen bloqueados; el DOI de
+  CODATA 2018 se confirmó en NIST, los de Chang y Rhee y de Shah y Sekulić no, y
+  se citan sin DOI.
+
 ---
 
 ## Pendientes / próximas fases
@@ -1387,14 +1483,13 @@
   cada componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Fase 8.2** — Transferencia de calor: radiación (cuerpo negro, factores de
-  forma, superficies grises en red, pantallas) e intercambiadores (LMTD con el
-  factor F, ε-NTU, dimensionamiento y verificación, con el U armado con las
-  correlaciones de la 8.1).
 - **Transferencia de calor (continuación)**: conducción transitoria (capacidad
   concentrada, solución de un término), conducción bidimensional (factores de
   forma), generación interna, bancos de tubos, ebullición y condensación,
-  aletas de perfil variable.
+  aletas de perfil variable; radiación de gases (CO₂ y H₂O, gráficos de Hottel)
+  e intensidad direccional; intercambiadores compactos (j de Colburn), la caída
+  de presión del casco (Kern, Bell–Delaware), el U armado con las
+  correlaciones de la 8.1 y la selección económica.
 
 ---
 

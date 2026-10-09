@@ -408,6 +408,51 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   9.2, Nu = 147); con las propiedades de CoolProp (k del aire 2,7 % mayor que la
   tabla A-15) h queda 1,5 a 2 % arriba del libro. Procedimiento en los tres
   sistemas y export. _Fase 8.1 cerrada._
+- ✅ **Radiación** (página `/Radiacion`, Çengel y Ghajar caps. 12 y 13; Incropera
+  caps. 12 y 13). **Cuerpo negro**: Planck, Wien y Stefan–Boltzmann con las
+  constantes de CODATA 2018, la fracción emitida en una banda (la serie de
+  Chang y Rhee) y al revés, el λ por debajo del que se emite una fracción;
+  **superficies reales** con ε(λ) en hasta cuatro bandas: la ε total y la
+  absortividad para la radiación de otra fuente (el sol), con la curva de
+  Planck y la emisión real, y los espectros comparados (por qué α ≠ ε en un
+  absorbedor selectivo). **Factores de forma** de ocho geometrías (rectángulos
+  paralelos y perpendiculares, discos coaxiales; placas, recinto de tres lados,
+  cilindros y una hilera de tubos en 2D), con la reciprocidad, la regla de la
+  suma y F contra la separación. **Dos superficies** (placas, cilindros y
+  esferas concéntricos, un objeto chico o el caso general) con hasta tres
+  pantallas: la red de resistencias, las radiosidades y la temperatura de cada
+  pantalla. **Recintos** de tres superficies grises por el método de las
+  radiosidades (ducto triangular, horno cilíndrico, cavidad abierta, dos placas
+  frente a los alrededores), cada una a T dada, con el calor dado o
+  rerradiante, con el intercambio neto entre pares. **Radiación y
+  convección** juntas (h_rad, el sol, la temperatura de equilibrio para un
+  calor dado) y el **error de una termocupla**. Reproduce Cengel y Ghajar (bola
+  negra, 23,2 kW/m² y 3846 W/(m²·μm) a 3 μm; ε por bandas, 0,521 y 12,1 kW/m²;
+  placas paralelas, 3625 W/m² y 806 con una pantalla; ducto con la base a
+  543 K; termocupla, 715 K; superficies al sol, 306, 34, 575 y −234 W/m²) e
+  Incropera (cavidad del ejemplo 13.2, 1831 W; caño de vapor del ejemplo 1.2,
+  577 + 421 = 998 W/m). Procedimiento en los tres sistemas (con la temperatura
+  absoluta en K o °R) y export. _Fase 8.2 cerrada._
+- ✅ **Intercambiadores de calor** (página `/Intercambiadores`, Çengel y Ghajar
+  cap. 11; Incropera cap. 11). Doble tubo (paralelo y contracorriente), casco y
+  tubos de 1 a 4 pasos de casco y flujo cruzado (los dos fluidos sin mezclar,
+  con la serie exacta de Mason, o uno mezclado), con c_p dado o de CoolProp a
+  la temperatura media de cada corriente y una corriente que condensa o
+  evapora (C_r = 0). **Verificación** con ε-NTU, **dimensionamiento** (el área
+  y el largo de tubo para una salida o un calor; por ε-NTU y por la LMTD con el
+  factor F, que dan lo mismo) y **ensayo** con las cuatro temperaturas (con U,
+  el calor y los caudales; con un caudal, el U); el **U global** de un tubo o
+  una placa con el ensuciamiento de TEMA. ε, NTU, C_r, F (= NTU_cc/NTU,
+  coincide con Bowman, Mueller y Nagle), P y R, la ΔT media logarítmica, la
+  exergía destruida y el rendimiento exergético (vademecum §11.10 y §13.2); los
+  gráficos ε–NTU y F–P con el punto de los datos, las temperaturas a lo largo
+  del doble tubo y la comparación de los tipos con los mismos datos.
+  Reproduce Cengel y Ghajar 11-2 (U_i = 399 y U_o = 315 W/(m²·K)), 11-3
+  (ΔT_ml = 11,5 °C, 1,09 MW), 11-4 y 11-8 (A = 5,11 m², 108,5 m de tubo), 11-5
+  (F = 0,91, 1,83 kW), 11-6 (F = 0,970 con la serie; la fórmula aproximada de
+  las tablas da 0,933) y 11-9 (ε = 0,462 y 38,4 kW con la fórmula; el libro lee
+  0,47 en el gráfico). Procedimiento en los tres sistemas y export. _Fase 8.2
+  cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -434,9 +479,10 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
   componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Transferencia de calor (Fase 8.2)**: radiación (cuerpo negro, factores de
-  forma, superficies grises en red), intercambiadores por LMTD y ε-NTU (con el
-  factor F de corrección); después, bancos de tubos y conducción transitoria.
+- **Transferencia de calor (continuación)**: conducción transitoria y
+  bidimensional, bancos de tubos, ebullición y condensación, radiación de gases
+  (CO₂ y H₂O, gráficos de Hottel), intercambiadores compactos (j de Colburn) y
+  la caída de presión del casco (Kern, Bell–Delaware).
 
 ---
 
@@ -478,6 +524,8 @@ apps/
 │   │   ├── conduction.py  # red de resistencias: capas, contacto, paralelo, radio crítico
 │   │   ├── fins.py        # aletas recta, de aguja y anular (Bessel); arreglos
 │   │   ├── convection.py  # correlaciones de Nusselt: externa, en un tubo y natural
+│   │   ├── radiation.py   # cuerpo negro, bandas, factores de forma, pantallas, recintos
+│   │   ├── exchangers.py  # intercambiadores: ε-NTU, LMTD y F, U global, exergía
 │   │   └── *_procedure.py # sus procedimientos «como en el pizarrón»
 │   ├── exergy/
 │   │   ├── physical.py    # exergía física: estado muerto, ψ, φ, calor, fuente finita
@@ -517,7 +565,8 @@ apps/
 ├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, gráficos
 │                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica,
 │                          # gráficos de la combustión, del poder calorífico, de la
-│                          # exergía (Grassmann) y de la transferencia de calor, créditos
+│                          # exergía (Grassmann), de la transferencia de calor, de la
+│                          # radiación y de los intercambiadores, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── data/                  # tablas: ISO 6976, polinomios NASA-9, biomasas (Ghugare),
 │                          # carbones de Argonne con el PCS medido y exergías
@@ -537,7 +586,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.24.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.25.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -1076,6 +1125,85 @@ lleva su cita y su rango):
   edition   = {3},
   publisher = {McGraw-Hill},
   year      = {1954}
+}
+```
+
+**Radiación e intercambiadores** — las constantes de la radiación, la fracción
+del cuerpo negro, las cuerdas cruzadas, el factor F, la serie del flujo
+cruzado y el ensuciamiento (los libros de texto son los de arriba):
+
+```bibtex
+@article{tiesinga2021codata,
+  author  = {Tiesinga, Eite and Mohr, Peter J. and Newell, David B. and
+             Taylor, Barry N.},
+  title   = {{CODATA} recommended values of the fundamental physical
+             constants: 2018},
+  journal = {Reviews of Modern Physics},
+  volume  = {93},
+  number  = {2},
+  pages   = {025010},
+  year    = {2021},
+  doi     = {10.1103/RevModPhys.93.025010}
+}
+
+@article{chang1984blackbody,
+  author  = {Chang, S. L. and Rhee, K. T.},
+  title   = {Blackbody radiation functions},
+  journal = {International Communications in Heat and Mass Transfer},
+  volume  = {11},
+  number  = {5},
+  pages   = {451--455},
+  year    = {1984}
+}
+
+@book{hottel1967radiative,
+  author    = {Hottel, Hoyt C. and Sarofim, Adel F.},
+  title     = {Radiative Transfer},
+  publisher = {McGraw-Hill},
+  year      = {1967}
+}
+
+@article{bowman1940mtd,
+  author  = {Bowman, R. A. and Mueller, A. C. and Nagle, W. M.},
+  title   = {Mean temperature difference in design},
+  journal = {Transactions of the ASME},
+  volume  = {62},
+  pages   = {283--294},
+  year    = {1940}
+}
+
+@inproceedings{mason1955crossflow,
+  author    = {Mason, J. L.},
+  title     = {Heat transfer in cross-flow},
+  booktitle = {Proceedings of the Second U.S. National Congress of Applied
+               Mechanics},
+  publisher = {ASME},
+  pages     = {801--803},
+  year      = {1955}
+}
+
+@book{kays1984compact,
+  author    = {Kays, W. M. and London, A. L.},
+  title     = {Compact Heat Exchangers},
+  edition   = {3},
+  publisher = {McGraw-Hill},
+  year      = {1984}
+}
+
+@book{shah2003fundamentals,
+  author    = {Shah, Ramesh K. and Sekuli{\'c}, Du{\v{s}}an P.},
+  title     = {Fundamentals of Heat Exchanger Design},
+  publisher = {John Wiley \& Sons},
+  year      = {2003},
+  isbn      = {978-0-471-32171-2}
+}
+
+@manual{tema1978,
+  organization = {Tubular Exchanger Manufacturers Association},
+  title        = {Standards of the Tubular Exchanger Manufacturers
+                  Association},
+  edition      = {6},
+  year         = {1978}
 }
 ```
 
