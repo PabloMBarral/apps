@@ -377,6 +377,13 @@ def _render_conduction(r: cd.ConductionResult, system: UnitSystem) -> None:
         items.append(
             (f"U₂ (cara exterior) [{_u(_H, system)}]", _val(r.U_outer_W_per_m2K, _H, system))
         )
+        uq = _u("heat_flux", system)
+        items.append(
+            (f"q″ en la cara interior [{uq}]", _val(r.q_inner_W_per_m2, "heat_flux", system))
+        )
+        items.append(
+            (f"q″ en la cara exterior [{uq}]", _val(r.q_outer_W_per_m2, "heat_flux", system))
+        )
     if r.Q_per_length_W_per_m is not None:
         items.append(
             (
@@ -404,6 +411,9 @@ def _render_conduction(r: cd.ConductionResult, system: UnitSystem) -> None:
                     "Elemento": res.label,
                     f"R [{ur}]": _val(res.R_K_per_W, "thermal_resistance", system),
                     "Del total": _pct(r.share(res)),
+                    f"ΔT [{_u('temperature_difference', system)}]": _val(
+                        res.dT_K, "temperature_difference", system
+                    ),
                     f"T desde [{ut}]": _val(res.T_from_K, _T, system),
                     f"T hasta [{ut}]": _val(res.T_to_K, _T, system),
                 }
@@ -476,16 +486,22 @@ def _render_conduction(r: cd.ConductionResult, system: UnitSystem) -> None:
                 width="stretch",
                 key="qc_sweep",
             )
-            st.caption(
-                "La capa exterior cambia de espesor y lo demás queda igual. "
-                + (
+            if heat_given:
+                effect = (
                     "Con el calor dado, la temperatura del lado 1 tiene un mínimo en r_cr: hasta "
                     "ahí, aislar enfría el alambre."
-                    if heat_given
-                    else "Con las temperaturas dadas, Q̇ tiene un máximo en r_cr: hasta ahí, "
+                )
+            elif r.Q_W >= 0.0:
+                effect = (
+                    "Con las temperaturas dadas, Q̇ tiene un máximo en r_cr: hasta ahí, "
                     "aislar aumenta la pérdida de calor."
                 )
-            )
+            else:
+                effect = (
+                    "Con las temperaturas dadas, |Q̇| tiene un máximo en r_cr (el calor entra): "
+                    "hasta ahí, una capa más gruesa deja entrar más calor."
+                )
+            st.caption("La capa exterior cambia de espesor y lo demás queda igual. " + effect)
         except Exception as exc:  # noqa: BLE001
             st.warning(f"No se pudo dibujar el barrido: {exc}")
     _render_steps(
@@ -651,6 +667,10 @@ def _render_fin(
             (f"T de la punta [{_u(_T, system)}]", _val(r.T_tip_K, _T, system)),
             ("m·L", _num(r.mL, 4)),
             ("Biot h·δ/k", _num(r.biot, 3)),
+            (
+                f"L∞ = 2,65/m [{_u('small_length', system)}]",
+                _val(r.L_infinite_m, "small_length", system),
+            ),
         ]
     )
     _notes(fn.fin_notes(r))

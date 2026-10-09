@@ -76,6 +76,30 @@ def test_insulation_figure_marks_the_critical_radius() -> None:
     assert _trace(fig, "los datos").y[0] == pytest.approx(r.T_side1_K - C)
 
 
+def test_insulation_figure_of_a_cold_tank_shows_the_heat_that_enters() -> None:
+    inputs = cd.CONDUCTION_EXAMPLES[NAMES[7]]  # el tanque de agua helada: Q̇ < 0
+    r = cd.solve_conduction(inputs)
+    assert r.Q_W < 0.0
+    points = cd.insulation_sweep(inputs, cd.default_insulation_radii(inputs))
+    fig = insulation_figure(
+        points,
+        r,
+        heat_given=False,
+        x_scale=1.0,
+        x_unit="m",
+        y_scale=1.0,
+        y_offset=0.0,
+        y_unit="W",
+    )
+    curve = _trace(fig, "|Q̇|")
+    assert all(y > 0.0 for y in curve.y)
+    # con |Q̇| el radio crítico vuelve a ser un máximo
+    highest = max(range(len(curve.y)), key=lambda k: curve.y[k])
+    assert curve.x[highest] == pytest.approx(r.critical_radius_m, rel=0.05)
+    assert _trace(fig, "los datos").y[0] == pytest.approx(-r.Q_W)
+    assert fig.layout.yaxis.title.text == "|Q̇| [W]"
+
+
 def test_fin_figures() -> None:
     ex = fn.FIN_EXAMPLES[list(fn.FIN_EXAMPLES)[4]]  # disipador, longitud corregida
     r = fn.solve_fin(ex.fin)

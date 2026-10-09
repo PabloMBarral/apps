@@ -256,6 +256,12 @@ def test_plate_regimes() -> None:
     assert "x_cr" in notes and "veces más" in notes
     assert "Sin el alambre" in " ".join(convection_notes(tripped))
     assert mixed.area_m2 == pytest.approx(1.0)
+    # la curva Nu(Re) de cada régimen no cruza Re_cr (la mixta caería a Nu < 0)
+    _, xs, nus = nu_curve(mixed)
+    assert min(xs) == pytest.approx(cv.RE_CRITICAL_PLATE) and min(nus) > 0.0
+    assert mixed.Re in xs
+    _, xs, _ = nu_curve(laminar)
+    assert max(xs) == pytest.approx(cv.RE_CRITICAL_PLATE) and laminar.Re in xs
 
 
 def test_sphere_uses_free_stream_properties() -> None:

@@ -220,9 +220,14 @@ def insulation_figure(
     y_offset: float,
     y_unit: str,
 ) -> go.Figure:
-    """Q̇ (o T del lado 1 con el calor dado) contra el radio exterior; r_cr punteado."""
-    ys = [(p.T_side1_K if heat_given else p.Q_W) * y_scale + y_offset for p in points]
-    label = "T del lado 1" if heat_given else "Q̇"
+    """Q̇ (o T del lado 1 con el calor dado) contra el radio exterior; r_cr punteado.
+
+    Si el calor entra (Q̇ < 0, un tanque frío) se dibuja |Q̇|: así el radio crítico
+    también es un máximo.
+    """
+    sign = -1.0 if not heat_given and result.Q_W < 0.0 else 1.0
+    ys = [(p.T_side1_K if heat_given else sign * p.Q_W) * y_scale + y_offset for p in points]
+    label = "T del lado 1" if heat_given else ("|Q̇|" if sign < 0.0 else "Q̇")
     hover = f"r = %{{x:.4g}} {x_unit}<br>{label} = %{{y:.4g}} {y_unit}<extra></extra>"
     fig = go.Figure()
     fig.add_trace(
@@ -235,7 +240,7 @@ def insulation_figure(
             hovertemplate=hover,
         )
     )
-    now = (result.T_side1_K if heat_given else result.Q_W) * y_scale + y_offset
+    now = (result.T_side1_K if heat_given else sign * result.Q_W) * y_scale + y_offset
     fig.add_trace(
         go.Scatter(
             x=[result.faces_m[-1] * x_scale],

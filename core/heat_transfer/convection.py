@@ -1256,6 +1256,11 @@ def nu_curve(
         if result.correlation in ("plate_mixed", "plate_turbulent"):
             lo = max(lo, RE_CRITICAL_PLATE)
     lo, hi = min(lo, x0 / 2.0), max(hi, 2.0 * x0)
+    # el margen no cruza Re_cr: abajo la placa es laminar y la mixta cae a Nu < 0
+    if result.correlation == "plate_mixed":
+        lo = max(lo, min(RE_CRITICAL_PLATE, x0))
+    elif result.correlation == "plate_laminar":
+        hi = min(hi, max(RE_CRITICAL_PLATE, x0))
     xs = sorted({lo * (hi / lo) ** (j / (n - 1)) for j in range(n)} | {x0})
     nus = [c.func({**base, var: x}) for x in xs]
     return var, xs, nus
