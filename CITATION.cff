@@ -41,8 +41,8 @@ keywords:
   - chemical-exergy
   - grassmann-diagram
 license: MIT
-version: "0.23.0"
-date-released: "2026-10-08"
+version: "0.24.0"
+date-released: "2026-10-09"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"
@@ -487,6 +487,243 @@ references:
     publisher:
       name: "Wiley"
     year: 2014
+  - type: book
+    scope: "Transferencia de calor: conducción, aletas y convección (caps. 3, 7, 8 y 9)"
+    authors:
+      - family-names: "Çengel"
+        given-names: "Yunus A."
+      - family-names: "Ghajar"
+        given-names: "Afshin J."
+    title: "Heat and Mass Transfer: Fundamentals and Applications"
+    edition: "5"
+    publisher:
+      name: "McGraw-Hill Education"
+    year: 2015
+  - type: book
+    scope: "Transferencia de calor: aletas (tabla 3.4, §3.6.4) y correlaciones de convección"
+    authors:
+      - family-names: "Incropera"
+        given-names: "Frank P."
+      - family-names: "DeWitt"
+        given-names: "David P."
+      - family-names: "Bergman"
+        given-names: "Theodore L."
+      - family-names: "Lavine"
+        given-names: "Adrienne S."
+    title: "Fundamentals of Heat and Mass Transfer"
+    edition: "6"
+    publisher:
+      name: "Wiley"
+    year: 2007
+  - type: article
+    scope: "Convección forzada: cilindro en flujo cruzado"
+    authors:
+      - family-names: "Churchill"
+        given-names: "Stuart W."
+      - family-names: "Bernstein"
+        given-names: "M."
+    title: "A Correlating Equation for Forced Convection From Gases and Liquids to a Circular Cylinder in Crossflow"
+    journal: "Journal of Heat Transfer"
+    year: 1977
+    volume: 99
+    issue: 2
+    start: 300
+    end: 306
+    doi: "10.1115/1.3450685"
+  - type: article
+    scope: "Convección natural: placa vertical"
+    authors:
+      - family-names: "Churchill"
+        given-names: "Stuart W."
+      - family-names: "Chu"
+        given-names: "Humbert H. S."
+    title: "Correlating equations for laminar and turbulent free convection from a vertical plate"
+    journal: "International Journal of Heat and Mass Transfer"
+    year: 1975
+    volume: 18
+    issue: 11
+    start: 1323
+    end: 1329
+    doi: "10.1016/0017-9310(75)90243-4"
+  - type: article
+    scope: "Convección natural: cilindro horizontal"
+    authors:
+      - family-names: "Churchill"
+        given-names: "Stuart W."
+      - family-names: "Chu"
+        given-names: "Humbert H. S."
+    title: "Correlating equations for laminar and turbulent free convection from a horizontal cylinder"
+    journal: "International Journal of Heat and Mass Transfer"
+    year: 1975
+    volume: 18
+    issue: 9
+    start: 1049
+    end: 1053
+    doi: "10.1016/0017-9310(75)90222-7"
+  - type: book
+    scope: "Convección natural: esfera (Heat Exchanger Design Handbook, sección 2.5.7)"
+    authors:
+      - family-names: "Churchill"
+        given-names: "Stuart W."
+    title: "Free convection around immersed bodies"
+    publisher:
+      name: "Hemisphere"
+    year: 1983
+  - type: article
+    scope: "Convección forzada: esfera"
+    authors:
+      - family-names: "Whitaker"
+        given-names: "Stephen"
+    title: "Forced convection heat transfer correlations for flow in pipes, past flat plates, single cylinders, single spheres, and for flow in packed beds and tube bundles"
+    journal: "AIChE Journal"
+    year: 1972
+    volume: 18
+    issue: 2
+    start: 361
+    end: 371
+  - type: article
+    scope: "Convección forzada: gotas y esferas"
+    authors:
+      - family-names: "Ranz"
+        given-names: "W. E."
+      - family-names: "Marshall"
+        given-names: "W. R."
+    title: "Evaporation from drops, Part I"
+    journal: "Chemical Engineering Progress"
+    year: 1952
+    volume: 48
+    issue: 3
+    start: 141
+    end: 146
+  - type: article
+    scope: "Convección forzada: cilindro (constantes por tramo de Re)"
+    authors:
+      - family-names: "Hilpert"
+        given-names: "R."
+    title: "Wärmeabgabe von geheizten Drähten und Rohren im Luftstrom"
+    journal: "Forschung auf dem Gebiete des Ingenieurwesens"
+    year: 1933
+    volume: 4
+    start: 215
+    end: 224
+  - type: article
+    scope: "Flujo turbulento en tubos"
+    authors:
+      - family-names: "Gnielinski"
+        given-names: "Volker"
+    title: "New equations for heat and mass transfer in turbulent pipe and channel flow"
+    journal: "International Chemical Engineering"
+    year: 1976
+    volume: 16
+    issue: 2
+    start: 359
+    end: 368
+  - type: book
+    scope: "Factor de fricción de un tubo liso (Advances in Heat Transfer, vol. 6)"
+    authors:
+      - family-names: "Petukhov"
+        given-names: "B. S."
+    title: "Heat transfer and friction in turbulent pipe flow with variable physical properties"
+    publisher:
+      name: "Academic Press"
+    year: 1970
+    volume: 6
+    start: 503
+    end: 564
+  - type: article
+    scope: "Flujo turbulento en tubos"
+    authors:
+      - family-names: "Dittus"
+        given-names: "F. W."
+      - family-names: "Boelter"
+        given-names: "L. M. K."
+    title: "Heat transfer in automobile radiators of the tubular type"
+    journal: "University of California Publications in Engineering"
+    year: 1930
+    volume: 2
+    issue: 13
+    start: 443
+    end: 461
+    notes: "Reimpreso en International Communications in Heat and Mass Transfer 12 (1985) 3-22, doi 10.1016/0735-1933(85)90003-X"
+  - type: article
+    scope: "Flujo turbulento en tubos con propiedades variables"
+    authors:
+      - family-names: "Sieder"
+        given-names: "E. N."
+      - family-names: "Tate"
+        given-names: "G. E."
+    title: "Heat transfer and pressure drop of liquids in tubes"
+    journal: "Industrial & Engineering Chemistry"
+    year: 1936
+    volume: 28
+    issue: 12
+    start: 1429
+    end: 1435
+  - type: article
+    scope: "Flujo laminar en tubos con entrada térmica"
+    authors:
+      - family-names: "Hausen"
+        given-names: "H."
+    title: "Darstellung des Wärmeüberganges in Rohren durch verallgemeinerte Potenzbeziehungen"
+    journal: "Zeitschrift des VDI, Beiheft Verfahrenstechnik"
+    year: 1943
+    volume: 4
+    start: 91
+    end: 98
+  - type: article
+    scope: "Convección natural: placas horizontales"
+    authors:
+      - family-names: "Lloyd"
+        given-names: "J. R."
+      - family-names: "Moran"
+        given-names: "W. R."
+    title: "Natural Convection Adjacent to Horizontal Surface of Various Planforms"
+    journal: "Journal of Heat Transfer"
+    year: 1974
+    volume: 96
+    issue: 4
+    start: 443
+    end: 447
+    doi: "10.1115/1.3450224"
+  - type: article
+    scope: "Convección natural: longitud característica A/P de una placa horizontal"
+    authors:
+      - family-names: "Goldstein"
+        given-names: "R. J."
+      - family-names: "Sparrow"
+        given-names: "E. M."
+      - family-names: "Jones"
+        given-names: "D. C."
+    title: "Natural convection mass transfer adjacent to horizontal plates"
+    journal: "International Journal of Heat and Mass Transfer"
+    year: 1973
+    volume: 16
+    issue: 5
+    start: 1025
+    end: 1035
+    doi: "10.1016/0017-9310(73)90041-0"
+  - type: book
+    scope: "Convección natural: cilindro horizontal (Advances in Heat Transfer, vol. 11)"
+    authors:
+      - family-names: "Morgan"
+        given-names: "Vincent T."
+    title: "The overall convective heat transfer from smooth circular cylinders"
+    publisher:
+      name: "Academic Press"
+    year: 1975
+    volume: 11
+    start: 199
+    end: 264
+  - type: book
+    scope: "Convección natural: placa vertical y cara de abajo de una placa horizontal"
+    authors:
+      - family-names: "McAdams"
+        given-names: "William H."
+    title: "Heat Transmission"
+    edition: "3"
+    publisher:
+      name: "McGraw-Hill"
+    year: 1954
   - type: software
     scope: "Repositorio hermano: hoja de fórmulas teóricas"
     authors:

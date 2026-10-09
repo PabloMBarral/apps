@@ -105,6 +105,12 @@ apps/
 │   │                          # regenerador: T–s con las etapas, estados y
 │   │                          # componentes, «¿Cuánto ganás con cada mejora?»,
 │   │                          # exergía por componente, TESPy, barridos.
+│   ├── 14_Transferencia_de_Calor.py # ✅ Fase 8.1 — Conducción (red de
+│   │                          # resistencias de pared, caño o esfera con
+│   │                          # contacto, partes en paralelo y radio crítico),
+│   │                          # aletas (recta, aguja, anular; arreglos) y
+│   │                          # convección (19 correlaciones de Nusselt:
+│   │                          # externa, en un tubo y natural).
 │   └── 99_Acerca.py           # Créditos, licencias, citas
 ├── core/                      # Lógica pura, sin dependencia de Streamlit
 │   ├── __init__.py
@@ -120,6 +126,12 @@ apps/
 │   │                          # kJ/kmol, Btu/lbmol).
 │   │                          # Fase 7: + masa (kg, lb), energía (J, kJ, Btu)
 │   │                          # y longitud (m, ft).
+│   │                          # Fase 8: + h, q″, R térmica, área, small_length
+│   │                          # (mm, in), heat_rate y linear_heat_rate (en W,
+│   │                          # no kW), heat_capacity_rate (ṁ·c_p = h·A),
+│   │                          # inverse_length (m de una aleta),
+│   │                          # expansion_coefficient (β), acceleration (g) y
+│   │                          # pressure_drop (Pa | Pa | lbf/ft²).
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
@@ -170,6 +182,26 @@ apps/
 │   │                          # enfriamiento, notas, ejemplos, barridos y export.
 │   ├── psychrometrics_procedure.py # ✅ Fase 4 — moist_air_steps, hvac_steps y
 │   │                          # cooling_tower_steps.
+│   ├── heat_transfer/         # ✅ Fase 8.1
+│   │   ├── conduction.py      # Layer (capas, ParallelPart, contacto R''_c),
+│   │   │                      # Boundary (fluido, superficie o calor dado),
+│   │   │                      # solve_conduction (red en serie, U, r_cr),
+│   │   │                      # temperature_profile, insulation_sweep, notas,
+│   │   │                      # ejemplos de Cengel y Ghajar cap. 3 y export.
+│   │   ├── fins.py            # FinInputs (recta, aguja, anular; cinco puntas),
+│   │   │                      # solve_fin (tabla 3.4; Bessel escaladas en la
+│   │   │                      # anular), fin_profile, tip_comparison,
+│   │   │                      # efficiency_curve, arreglos (η_o) y export.
+│   │   ├── convection.py      # Una función por correlación y CORRELATIONS;
+│   │   │                      # fluid_properties (CoolProp, β), solve_external,
+│   │   │                      # solve_natural, solve_internal (T_m iterada),
+│   │   │                      # dimensionless_groups, nu_curve, tube_profile,
+│   │   │                      # convection_fluids, notas, ejemplos y export.
+│   │   ├── procedure_common.py # q, n, frac, sub, times, sum_rows, numbered.
+│   │   ├── conduction_procedure.py # conduction_steps (símbolos de la red).
+│   │   ├── fins_procedure.py  # fin_steps (con γ y Bessel en la anular).
+│   │   └── convection_procedure.py # convection_steps, internal_steps,
+│   │                          # correlation_latex y big (adimensionales).
 │   ├── exergy/                # ✅ Fase 7 (reemplaza al placeholder exergy.py)
 │   │   ├── physical.py        # Ambient (T₀, p₀), PhysicalExergy /
 │   │   │                      # physical_exergy (ψ, φ, térmica y mecánica, V²/2,
@@ -341,6 +373,11 @@ apps/
 │                              # mollier_exergy_figure (ψ en el h–s),
 │                              # carnot_factor_figure, finite_source_figure,
 │                              # fuel_ratio_figure y component_efficiency_figure.
+│   └── heat_transfer_charts.py # ✅ Fase 8.1 — conduction_profile_figure (capas
+│                              # sombreadas, fluidos y película),
+│                              # insulation_figure, fin_profile_figure,
+│                              # fin_efficiency_figure, nu_curve_figure,
+│                              # correlation_figure y tube_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
@@ -1087,6 +1124,72 @@ Notas de la Fase 7 (exergía física, química y por componente):
   búsquedas en tabla siempre en dos renglones, p₀·Δv con `_wrap`, las β de a un
   término por renglón, PCI* para PCI + W·h_fg, T₀ y p₀ en renglones propios, y
   en la teoría φ y e^{ch} de los combustibles en dos renglones (362 y 410 px).
+
+Notas de la Fase 8.1 (transferencia de calor: conducción, aletas y convección):
+
+- La Fase 8 se partió: 8.1 = conducción, aletas y convección (esta entrega);
+  8.2 = radiación e intercambiadores (LMTD, ε-NTU). El vademecum todavía no
+  tiene un capítulo de transferencia de calor: la teoría cita a Çengel y
+  Ghajar (2015) e Incropera et al. (2007) y lo dice.
+- Citas **por sección**, no por número de ecuación (cambian entre ediciones):
+  Cengel y Ghajar §3-1 pared plana y U, §3-2 contacto, §3-3 redes
+  generalizadas (partes en paralelo), §3-4 cilindros y esferas, §3-5 radio
+  crítico, §3-6 aletas; Incropera §3.6.2–§3.6.5 (aletas), §7.2 placa, §7.4
+  cilindro, §7.5 esfera, §8.4–§8.5 tubos, §9.6.1–§9.6.4 convección natural
+  externa. Hasta este PR la conducción citaba §3-5 (paralelo) y §3-7 (radio
+  crítico): se corrigió con la tabla de contenidos.
+- Unidades de transferencia de calor en W (no kW) en los tres sistemas, como
+  los libros; las magnitudes nuevas hacen que cada sustitución cierre sin
+  factores (h·A y ṁ·c_p en W/K o Btu/(h·°F); en el inglés ṁ·c_p sale en
+  Btu/(s·°F) y el procedimiento lo dice: ×3600; en el técnico c_p está en
+  kJ/(kg·K): ×1000). Los espesores y diámetros se muestran en mm o in
+  (`small_length`) pero en las fórmulas van en m o ft (`length`). Un test de
+  coherencia (`test_heat_transfer_procedure_units_are_coherent`) lo vigila.
+- Conducción: Q̇ > 0 va del lado 1 al 2; un borde «calor dado» del lado 2 da
+  Q̇ = −Q̇_dato. Las temperaturas de la red se numeran T_∞,1, T₁, T₂… (dos en
+  un contacto), T_∞,2. El radio crítico solo se comenta con una capa exterior
+  aislante (k < 1 W/(m·K)): con el acero de un tanque es cierto pero no viene
+  al caso. Reproduce Cengel y Ghajar exacto (630 W, 266,2 W, 69,25 W,
+  261,9 W, 120,8 W/m, 105,0 °C).
+- Aletas: la tabla 3.4 de Incropera en forma que no desborda (exp de mL) y la
+  anular con las funciones de Bessel escaladas (`i0e`, `k0e`…) en un 2×2. Se
+  validan contra `solve_bvp` adimensional (1e-6; 1e-5 la anular). En el
+  procedimiento la anular se escribe con γ = C₁/C₂ y M = k·A_c·m·θ_b; las
+  funciones de Bessel van a 5 cifras (la resta K₁ − γ·I₁ pierde precisión:
+  con 4 el q salía 0,08 % corrido; test).
+- Convección: las propiedades salen de CoolProp a T_f (Whitaker a T∞; el tubo
+  a la T media iterada a 1e-9 K). El aire de CoolProp tiene k ~2,7 % mayor y
+  Pr ~3 % menor que la tabla A-15: h queda 1,5–2 % arriba del libro; los tests
+  piden ±3 % contra el libro y exacto contra el cálculo a mano con las
+  propiedades del libro (Incropera 7.4: Hilpert 37,3 y Churchill y Bernstein
+  40,6; Incropera 9.2: 147; Cengel y Ghajar: 124, 17,40 y 69,4). Los rangos
+  se verifican con 1 % de tolerancia (el Pr del aire a 20 °C es 0,708 y
+  Whitaker pide 0,71). La mixta de la placa da Nu < 0 con Re chico: no se
+  muestra como alternativa, y su curva Nu(Re) arranca en Re_cr (el margen
+  alrededor del punto la llevaba abajo y caía a Nu < 0). Las notas comparan las correlaciones que valen
+  (≤ 25 %: incertidumbre típica; más: se usa la más general) y en la placa
+  explican la transición (no son correlaciones rivales).
+- Tubo: error si el fluido llega a la saturación dentro del tubo (con el
+  T_sal de cada vuelta: «subí la presión» o «bajá la presión»), si q″ lo
+  llevaría bajo el cero absoluto, y aviso de ebullición o condensación en la
+  pared. El ejemplo de las resistencias de Cengel y Ghajar va a 2 bar (a 1 atm
+  la pared, a 115 °C, pasaría la saturación). R1233zd(E) no tiene viscosidad
+  en CoolProp: `convection_fluids()` lo saca de la lista.
+- LaTeX: los adimensionales entre 10³ y 10⁷ van enteros, con espacio fino
+  desde 10⁴ (`big`); las correlaciones largas se parten en factores con
+  nombre (a, b, c, ψ, φ) y Ra^{1/6} se calcula antes; con ×10ⁿ o un Q̇
+  negativo, Q̇·R va en otro renglón; las sumas de resistencias con ×10ⁿ, un
+  término por renglón (al lado de R_total no entran dos). 1865 expresiones
+  del procedimiento (ejemplos y variantes) y 37 de la teoría, KaTeX estricto,
+  máx. 308 y 311 px. Python 3.11: nada de `\` dentro de las llaves de una
+  f-string (armar los pedazos antes).
+- Página: tres modos (`ht_mode`) con keys `qc_{ejemplo}_…` (conducción; las
+  capas llevan la geometría: `qc_{e}_{geo}_{j}_…`), `qa_{e}_…` (aletas) y
+  `qv_{e|i|n}{e}_…` (convección); recalcula sola (`st.cache_data` con los
+  dataclasses). Gráficos con la paleta validada: el sólido azul con las capas
+  sombreadas y numeradas (los nombres no entraban a 390 px), los fluidos
+  naranjas con la película punteada; la comparación de correlaciones es un
+  gráfico de puntos (hueco si está fuera de rango).
 
 ### Citas y licencias
 

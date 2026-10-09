@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.23.0` — Fase 7 cerrada (2026-10-08).
+> **Versión actual**: `0.24.0` — Fase 8.1 cerrada (2026-10-09).
 
 ---
 
@@ -1230,6 +1230,110 @@
   sale de RePEc) y los sitios académicos de las tablas; los valores digitales
   salen de la rueda de TESPy 0.7.9 en PyPI y se contrastaron con la tabla A-26.
 
+### Fase 8.1 — Transferencia de calor: conducción, aletas y convección
+- **Versión**: `0.24.0` (2026-10-09). Rama `claude/water-state-analyzer-f4fiev`
+  («dale, armá el plan y seguí»: la Fase 8 se partió en dos entregas, como la
+  3.1; el plan se mandó y se implementó sin esperar). La 8.2 trae la radiación
+  y los intercambiadores.
+- **Scope**:
+  - **`core/heat_transfer/`** (paquete nuevo):
+    - `conduction.py`: la red de resistencias de una pared plana, un cilindro o
+      una esfera de una a cinco capas, con la resistencia de contacto y (en la
+      pared) partes en paralelo con las caras isotérmicas; cada borde es un
+      fluido (T∞ y h), una superficie a temperatura dada o un calor dado. Q̇,
+      q″ en cada cara, la tabla de resistencias (con su % y su ΔT), las
+      temperaturas de la red, U referido a cada cara, el perfil T(x) o T(r), el
+      radio crítico y el barrido del radio exterior; notas, 8 ejemplos y export.
+    - `fins.py`: aletas recta, de aguja y anular (funciones de Bessel
+      escaladas) con las puntas de la tabla 3.4 de Incropera (convectiva,
+      adiabática, a temperatura dada, infinita y con longitud corregida); m, M,
+      Q̇, η, ε, la T de la punta, L∞ y Bi; arreglos de N aletas (η_o, el aumento
+      y la efectividad del arreglo), el perfil, la comparación de las puntas y
+      la curva η(m·L_c); notas, 6 ejemplos y export.
+    - `convection.py`: 19 correlaciones, una función por correlación con la
+      cita y el rango, y el registro `CORRELATIONS` con el LaTeX. Placa plana
+      laminar, mixta y turbulenta desde el borde; cilindro (Churchill y
+      Bernstein, Hilpert); esfera (Whitaker, Ranz y Marshall); tubo laminar
+      desarrollado y Hausen, Dittus y Boelter, Gnielinski (f de Petukhov) y
+      Sieder y Tate; natural en placas vertical (Churchill y Chu, McAdams) y
+      horizontales (la cara de arriba y la de abajo), cilindro horizontal
+      (Churchill y Chu, Morgan) y esfera (Churchill). Las propiedades salen de
+      CoolProp para cualquier fluido del proyecto en una sola fase; el tubo
+      itera la T media, con la pared a temperatura o flujo de calor constante
+      (T de salida, ΔT_ml, T de pared a la salida, largos de entrada, f y Δp).
+      La comparación de las correlaciones que se pueden aplicar, Nu(Re) o
+      Nu(Ra), el perfil del tubo; notas, 17 ejemplos y export.
+    - `procedure_common.py` y los procedimientos `conduction_procedure.py`,
+      `fins_procedure.py` y `convection_procedure.py`.
+  - **`ui/heat_transfer_charts.py`** (nuevo): el perfil de temperatura con las
+    capas sombreadas y la película de cada fluido, el barrido del radio
+    crítico, T(x) de la aleta con las otras puntas en gris, η(m·L_c), Nu(Re) o
+    Nu(Ra) en escala logarítmica, la comparación de las correlaciones (gráfico
+    de puntos) y T_m y T_s a lo largo del tubo.
+  - **Página `/Transferencia_de_Calor`** (nueva, después de Exergía): tres
+    modos (conducción, aletas y convección: forzada externa, en un tubo y
+    natural), con la teoría (Çengel y Ghajar e Incropera: el vademecum todavía
+    no tiene el capítulo y la página lo dice), el procedimiento y el export.
+  - Cambios chicos: `units_system` suma 12 magnitudes (h, q″, resistencia
+    térmica, área, longitudes chicas en mm o in, calor y calor por metro en W
+    y no en kW como los ciclos, ṁ·c_p, 1/m, β, g y Δp); `core.fluids` hace
+    pública `fluid_with_article` (la usan los mensajes de la convección).
+- **Validación**:
+  - Conducción, exacta contra Cengel y Ghajar: pared de ladrillo 630 W,
+    ventana simple 266,2 W (cara interior a −2,2 °C), ventana doble 69,25 W,
+    pared de ladrillos con revoque 261,9 W, caño de vapor aislado 120,8 W/m y
+    alambre a 105,0 °C (r_cr = 12,5 mm).
+  - Aletas: las varillas muy largas de Incropera 3.9 (8,3; 5,6 y 1,6 W); las
+    cinco puntas contra `solve_bvp` (10⁻⁶) y la anular (10⁻⁵).
+  - Convección, con las propiedades de los libros, exacta: Incropera 7.4
+    (Hilpert 37,3; Churchill y Bernstein 40,6) y 9.2 (147); Cengel y Ghajar
+    (124; 17,40; 69,4). Con las de CoolProp (el aire tiene una k 2,7 % mayor y
+    un Pr 3 % menor que la tabla A-15) h queda 1,5 a 2 % arriba: caño de vapor
+    con viento 1115 W/m (libro 1093), caño de agua caliente 449,8 W (443),
+    agua calentada con resistencias Re = 10 758 y Nu = 69,5 con la pared a
+    115,4 °C a la salida. El tubo cierra Q̇ = ṁ·c_p·ΔT.
+- **Mensajes al alumno**: radio interior nulo (para un alambre, el de la
+  aislación es el del alambre), contacto después de la última capa, calor dado
+  en los dos bordes (sin temperatura de referencia), h nulo (usá
+  «superficie»), fracciones del paralelo que no suman 1; aletas con la base a
+  la temperatura del fluido o un arreglo que no entra en la base; un fluido
+  que cambia de fase a la temperatura de película o dentro del tubo («subí» o
+  «bajá» la presión, según hierva o condense), un flujo de calor que llevaría
+  la salida bajo el cero absoluto, el agua entre 0 y 4 °C en convección
+  natural (β ≤ 0) y los fluidos sin viscosidad en CoolProp (el R-1233zd(E) no
+  está en la lista). Avisos: Bi > 0,1 (la aleta deja de ser unidimensional),
+  correlaciones fuera de su rango (con 1 % de tolerancia) y ebullición o
+  condensación en la pared. Notas: el radio crítico (solo con una capa
+  aislante), la transición de la placa, la dispersión entre las correlaciones
+  y las propiedades de CoolProp contra las del libro.
+- **Tests**: de 3879 a 4348 passed (10 skipped), sin warnings.
+  - `tests/test_heat_transfer_conduction.py` (32),
+    `tests/test_heat_transfer_fins.py` (31),
+    `tests/test_heat_transfer_convection.py` (96),
+    `tests/test_heat_transfer_procedure.py` (178),
+    `tests/test_heat_transfer_charts.py` (11) y
+    `tests/test_page_transferencia.py` (43, AppTest), más la coherencia de las
+    unidades del procedimiento en `tests/test_units_system.py` y la página en
+    `test_navigation.py`.
+  - LaTeX: 1865 expresiones distintas del procedimiento (los ejemplos y sus
+    variantes) y 37 de la teoría validan con KaTeX estricto y entran en 308 y
+    311 px como máximo en los tres sistemas.
+  - Smoke test en Chromium a 1280 y 390 px: 20 casos (7 de las 8 redes de
+    conducción, 4 aletas, 3 externas, 3 en un tubo y 3 naturales, repartidos
+    en los tres sistemas) con la teoría y el procedimiento abiertos: sin
+    errores, sin desborde y ninguna ecuación se pasa de su expansor. En las
+    capturas, la curva Nu(Re) de la placa mixta bajaba de Re_cr y caía a
+    Nu < 0 (la fórmula mixta fuera de su rango): ahora arranca en Re_cr. Y en
+    el tanque frío (Q̇ < 0) el barrido del radio crítico mostraba un mínimo
+    mientras el texto hablaba de un máximo de la pérdida: ahora se dibuja |Q̇|
+    y el texto dice que el calor entra.
+- **Dependencias**: ninguna nueva (las funciones de Bessel y `solve_bvp` son de
+  SciPy, que ya estaba).
+- **Red**: la política del entorno bloqueó Crossref, doi.org y los sitios
+  académicos con las tablas de contenidos; las secciones de los libros y los
+  DOI de las referencias se verificaron con búsquedas web (solo se citan los
+  DOI confirmados).
+
 ---
 
 ## Pendientes / próximas fases
@@ -1283,8 +1387,14 @@
   cada componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Fase 8** — Transferencia de calor: conducción, aletas, convección,
-  radiación, intercambiadores (LMTD, ε-NTU).
+- **Fase 8.2** — Transferencia de calor: radiación (cuerpo negro, factores de
+  forma, superficies grises en red, pantallas) e intercambiadores (LMTD con el
+  factor F, ε-NTU, dimensionamiento y verificación, con el U armado con las
+  correlaciones de la 8.1).
+- **Transferencia de calor (continuación)**: conducción transitoria (capacidad
+  concentrada, solución de un término), conducción bidimensional (factores de
+  forma), generación interna, bancos de tubos, ebullición y condensación,
+  aletas de perfil variable.
 
 ---
 
