@@ -24,6 +24,18 @@ speed                  m/s         m/s            ft/s
 dynamic_viscosity      Pa·s        Pa·s           lb/(ft·s)
 thermal_conductivity   W/(m·K)     W/(m·K)        Btu/(h·ft·°F)
 diffusivity            m²/s        m²/s           ft²/s
+heat_transfer_coeff.   W/(m²·K)    W/(m²·K)       Btu/(h·ft²·°F)
+heat_flux              W/m²        W/m²           Btu/(h·ft²)
+thermal_resistance     K/W         K/W            h·°F/Btu
+area                   m²          m²             ft²
+small_length           m           mm             in
+heat_rate              W           W              Btu/h
+linear_heat_rate       W/m         W/m            Btu/(h·ft)
+heat_capacity_rate     W/K         W/K            Btu/(h·°F)
+inverse_length         1/m         1/m            1/ft
+expansion_coefficient  1/K         1/K            1/°R
+acceleration           m/s²        m/s²           ft/s²
+pressure_drop          Pa          Pa             lbf/ft²
 ====================== =========== ============== ============================
 
 ``specific_enthalpy`` también se usa para energía interna, calor latente
@@ -77,6 +89,18 @@ QuantityKind = Literal[
     "mass",
     "energy",
     "length",
+    "heat_transfer_coefficient",
+    "heat_flux",
+    "thermal_resistance",
+    "area",
+    "small_length",
+    "heat_rate",
+    "linear_heat_rate",
+    "heat_capacity_rate",
+    "inverse_length",
+    "expansion_coefficient",
+    "acceleration",
+    "pressure_drop",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -98,6 +122,8 @@ _LB_PER_FT_S_TO_PA_S: float = _LB_PER_KG / _FT_PER_M  # 1 lb/(ft·s) ≈ 1.48816
 _BTU_IT_J: float = 1055.05585262  # exacto (Btu de la tabla internacional)
 _BTU_PER_H_FT_F_TO_W_PER_M_K: float = _BTU_IT_J / (3600.0 * _FT_PER_M * 5.0 / 9.0)
 # ≈ 1.730734666 W/(m·K) por Btu/(h·ft·°F)
+_IN_PER_M: float = 0.0254  # exacto
+_BTU_PER_H_W: float = _BTU_IT_J / 3600.0  # 1 Btu/h ≈ 0.29307107 W
 
 # ---------------------------------------------------------------------
 # Tabla central (kind, system) → (factor, offset, label)
@@ -222,6 +248,74 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "m"),
         "Técnico": (1.0, 0.0, "m"),
         "Inglés": (1.0 / _FT_PER_M, 0.0, "ft"),
+    },
+    # Fase 8 (transferencia de calor): en W y no en kW, como los libros
+    # (Cengel y Ghajar, Incropera). Coherentes entre sí en cada sistema:
+    # h · A · ΔT = Q̇ (W/(m²·K) · m² · K = W y Btu/(h·ft²·°F) · ft² · °F = Btu/h),
+    # q'' · A = Q̇, ΔT / R = Q̇ y k / L = h con L en m o ft (``length``).
+    # ``small_length`` (espesores y diámetros) va en mm o in solo para mostrar.
+    "heat_transfer_coefficient": {
+        "SI": (1.0, 0.0, "W/(m²·K)"),
+        "Técnico": (1.0, 0.0, "W/(m²·K)"),
+        "Inglés": (_FT_PER_M**2 * 5.0 / 9.0 / _BTU_PER_H_W, 0.0, "Btu/(h·ft²·°F)"),
+    },
+    "heat_flux": {
+        "SI": (1.0, 0.0, "W/m²"),
+        "Técnico": (1.0, 0.0, "W/m²"),
+        "Inglés": (_FT_PER_M**2 / _BTU_PER_H_W, 0.0, "Btu/(h·ft²)"),
+    },
+    "thermal_resistance": {
+        "SI": (1.0, 0.0, "K/W"),
+        "Técnico": (1.0, 0.0, "K/W"),
+        "Inglés": (9.0 / 5.0 * _BTU_PER_H_W, 0.0, "h·°F/Btu"),
+    },
+    "area": {
+        "SI": (1.0, 0.0, "m²"),
+        "Técnico": (1.0, 0.0, "m²"),
+        "Inglés": (1.0 / _FT_PER_M**2, 0.0, "ft²"),
+    },
+    "small_length": {
+        "SI": (1.0, 0.0, "m"),
+        "Técnico": (1000.0, 0.0, "mm"),
+        "Inglés": (1.0 / _IN_PER_M, 0.0, "in"),
+    },
+    "heat_rate": {
+        "SI": (1.0, 0.0, "W"),
+        "Técnico": (1.0, 0.0, "W"),
+        "Inglés": (1.0 / _BTU_PER_H_W, 0.0, "Btu/h"),
+    },
+    "linear_heat_rate": {
+        "SI": (1.0, 0.0, "W/m"),
+        "Técnico": (1.0, 0.0, "W/m"),
+        "Inglés": (_FT_PER_M / _BTU_PER_H_W, 0.0, "Btu/(h·ft)"),
+    },
+    # Para que las sustituciones de los procedimientos cierren sin factores:
+    # ṁ·c_p y h·A en W/K o Btu/(h·°F) (NTU = h·A/(ṁ·c_p)); m de una aleta en 1/m o
+    # 1/ft; β y g de Grashof; Δp de un tubo (en el Inglés, ρ·V²/(2·g_c) da lbf/ft²).
+    "heat_capacity_rate": {
+        "SI": (1.0, 0.0, "W/K"),
+        "Técnico": (1.0, 0.0, "W/K"),
+        "Inglés": (5.0 / 9.0 / _BTU_PER_H_W, 0.0, "Btu/(h·°F)"),
+    },
+    "inverse_length": {
+        "SI": (1.0, 0.0, "1/m"),
+        "Técnico": (1.0, 0.0, "1/m"),
+        "Inglés": (_FT_PER_M, 0.0, "1/ft"),
+    },
+    "expansion_coefficient": {
+        "SI": (1.0, 0.0, "1/K"),
+        "Técnico": (1.0, 0.0, "1/K"),
+        "Inglés": (5.0 / 9.0, 0.0, "1/°R"),
+    },
+    "acceleration": {
+        "SI": (1.0, 0.0, "m/s²"),
+        "Técnico": (1.0, 0.0, "m/s²"),
+        "Inglés": (1.0 / _FT_PER_M, 0.0, "ft/s²"),
+    },
+    "pressure_drop": {
+        "SI": (1.0, 0.0, "Pa"),
+        "Técnico": (1.0, 0.0, "Pa"),
+        "Inglés": (144.0 / _PSI_PER_PA, 0.0, "lbf/ft²"),
     },
 }
 

@@ -380,6 +380,34 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   y los ejemplos del cap. 8 (tanque de aire comprimido, 281 MJ; compresor de
   R-134a, 38,0 kJ/kg; viento, 70,7 kW; hogar, 2195 Btu/s; bloque de hierro,
   8191 kJ). Procedimiento en los tres sistemas y export. _Fase 7 cerrada._
+- ✅ **Transferencia de calor: conducción, aletas y convección** (página
+  `/Transferencia_de_Calor`, Çengel y Ghajar caps. 3, 7, 8 y 9; Incropera caps.
+  3, 7, 8 y 9). **Conducción**: la red de resistencias de una pared plana, un
+  caño o una esfera de hasta cinco capas, con la resistencia de contacto (h_c),
+  partes en paralelo con las caras isotérmicas (la hilada de ladrillos y
+  revoque) y cada borde como un fluido (T∞ y h), una superficie o un calor dado
+  (un alambre); Q̇, las temperaturas de cada cara, U referido a cada cara, el
+  perfil de temperatura (recto, logarítmico o 1/r) y el **radio crítico de
+  aislación** con el barrido del radio exterior. **Aletas**: recta, de aguja o
+  anular (con las funciones de Bessel), con la punta convectiva, adiabática,
+  con longitud corregida, a temperatura dada o infinita; la eficiencia, la
+  efectividad, el Biot, T(x) con las otras puntas, η(m·L_c) y un arreglo de N
+  aletas (η_o). **Convección**: el h de 19 correlaciones de Nusselt con las
+  propiedades de CoolProp (forzada externa: placa laminar, mixta o turbulenta
+  desde el borde, cilindro de Churchill y Bernstein o Hilpert, esfera de
+  Whitaker o Ranz y Marshall; en un tubo: laminar, Hausen, Dittus y Boelter,
+  Gnielinski y Sieder y Tate, con la temperatura media iterada y T de pared o
+  flujo constante; natural: placas vertical y horizontales, cilindro y esfera),
+  comparadas entre sí con su rango, Nu(Re) o Nu(Ra), el perfil a lo largo del
+  tubo, la caída de presión y avisos de ebullición o condensación. Reproduce
+  Cengel y Ghajar (pared de ladrillo, 630 W; ventana doble, 69,2 W; caño de
+  vapor aislado, 121 W/m; alambre a 105 °C; caño de vapor con viento, Nu = 124;
+  caño de agua caliente, Nu = 17,40; agua calentada con resistencias,
+  Re = 10 750 y Nu = 69,4) e Incropera (varillas del ejemplo 3.9; cilindro del
+  ejemplo 7.4, Hilpert 37,3 y Churchill y Bernstein 40,6; pantalla del ejemplo
+  9.2, Nu = 147); con las propiedades de CoolProp (k del aire 2,7 % mayor que la
+  tabla A-15) h queda 1,5 a 2 % arriba del libro. Procedimiento en los tres
+  sistemas y export. _Fase 8.1 cerrada._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -406,9 +434,9 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
   componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Transferencia de calor**: conducción multicapa, aletas, correlaciones
-  de convección, radiación entre superficies, intercambiadores
-  por LMTD y ε-NTU.
+- **Transferencia de calor (Fase 8.2)**: radiación (cuerpo negro, factores de
+  forma, superficies grises en red), intercambiadores por LMTD y ε-NTU (con el
+  factor F de corrección); después, bancos de tubos y conducción transitoria.
 
 ---
 
@@ -446,6 +474,11 @@ apps/
 │   ├── psychrometrics_procedure.py  # su procedimiento «como en el pizarrón»
 │   ├── interpolation.py
 │   ├── isentropic.py
+│   ├── heat_transfer/
+│   │   ├── conduction.py  # red de resistencias: capas, contacto, paralelo, radio crítico
+│   │   ├── fins.py        # aletas recta, de aguja y anular (Bessel); arreglos
+│   │   ├── convection.py  # correlaciones de Nusselt: externa, en un tubo y natural
+│   │   └── *_procedure.py # sus procedimientos «como en el pizarrón»
 │   ├── exergy/
 │   │   ├── physical.py    # exergía física: estado muerto, ψ, φ, calor, fuente finita
 │   │   ├── chemical.py    # exergía química: Szargut y Ahrendts, mezclas, combustibles
@@ -483,8 +516,8 @@ apps/
 │   └── plots.py
 ├── ui/                    # Helpers de UI (Streamlit): unidades, diagramas, gráficos
 │                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica,
-│                          # gráficos de la combustión, del poder calorífico y de la
-│                          # exergía (Grassmann), créditos
+│                          # gráficos de la combustión, del poder calorífico, de la
+│                          # exergía (Grassmann) y de la transferencia de calor, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── data/                  # tablas: ISO 6976, polinomios NASA-9, biomasas (Ghugare),
 │                          # carbones de Argonne con el PCS medido y exergías
@@ -504,7 +537,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.23.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.24.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 ---
@@ -847,6 +880,202 @@ componente (combustible, producto, destrucción y pérdida):
   edition   = {8},
   publisher = {Wiley},
   year      = {2014}
+}
+```
+
+**Transferencia de calor** — la red de resistencias, las aletas y las
+correlaciones de convección (cada función de `core/heat_transfer/convection.py`
+lleva su cita y su rango):
+
+```bibtex
+@book{cengel2015heat,
+  author    = {{\c{C}}engel, Yunus A. and Ghajar, Afshin J.},
+  title     = {Heat and Mass Transfer: Fundamentals and Applications},
+  edition   = {5},
+  publisher = {McGraw-Hill Education},
+  year      = {2015}
+}
+
+@book{incropera2007fundamentals,
+  author    = {Incropera, Frank P. and DeWitt, David P. and Bergman, Theodore L.
+               and Lavine, Adrienne S.},
+  title     = {Fundamentals of Heat and Mass Transfer},
+  edition   = {6},
+  publisher = {Wiley},
+  year      = {2007}
+}
+
+@article{churchill1977cylinder,
+  author  = {Churchill, Stuart W. and Bernstein, M.},
+  title   = {A Correlating Equation for Forced Convection From Gases and Liquids
+             to a Circular Cylinder in Crossflow},
+  journal = {Journal of Heat Transfer},
+  volume  = {99},
+  number  = {2},
+  pages   = {300--306},
+  year    = {1977},
+  doi     = {10.1115/1.3450685}
+}
+
+@article{churchill1975vertical,
+  author  = {Churchill, Stuart W. and Chu, Humbert H. S.},
+  title   = {Correlating equations for laminar and turbulent free convection from
+             a vertical plate},
+  journal = {International Journal of Heat and Mass Transfer},
+  volume  = {18},
+  number  = {11},
+  pages   = {1323--1329},
+  year    = {1975},
+  doi     = {10.1016/0017-9310(75)90243-4}
+}
+
+@article{churchill1975cylinder,
+  author  = {Churchill, Stuart W. and Chu, Humbert H. S.},
+  title   = {Correlating equations for laminar and turbulent free convection from
+             a horizontal cylinder},
+  journal = {International Journal of Heat and Mass Transfer},
+  volume  = {18},
+  number  = {9},
+  pages   = {1049--1053},
+  year    = {1975},
+  doi     = {10.1016/0017-9310(75)90222-7}
+}
+
+@incollection{churchill1983spheres,
+  author    = {Churchill, Stuart W.},
+  title     = {Free convection around immersed bodies},
+  booktitle = {Heat Exchanger Design Handbook},
+  editor    = {Schl{\"u}nder, Ernst U.},
+  note      = {Secci{\'o}n 2.5.7},
+  publisher = {Hemisphere},
+  year      = {1983}
+}
+
+@article{whitaker1972forced,
+  author  = {Whitaker, Stephen},
+  title   = {Forced convection heat transfer correlations for flow in pipes, past
+             flat plates, single cylinders, single spheres, and for flow in packed
+             beds and tube bundles},
+  journal = {AIChE Journal},
+  volume  = {18},
+  number  = {2},
+  pages   = {361--371},
+  year    = {1972}
+}
+
+@article{ranz1952evaporation,
+  author  = {Ranz, W. E. and Marshall, W. R.},
+  title   = {Evaporation from drops, Part I},
+  journal = {Chemical Engineering Progress},
+  volume  = {48},
+  number  = {3},
+  pages   = {141--146},
+  year    = {1952}
+}
+
+@article{hilpert1933,
+  author  = {Hilpert, R.},
+  title   = {W{\"a}rmeabgabe von geheizten Dr{\"a}hten und Rohren im Luftstrom},
+  journal = {Forschung auf dem Gebiete des Ingenieurwesens},
+  volume  = {4},
+  pages   = {215--224},
+  year    = {1933}
+}
+
+@article{gnielinski1976,
+  author  = {Gnielinski, Volker},
+  title   = {New equations for heat and mass transfer in turbulent pipe and
+             channel flow},
+  journal = {International Chemical Engineering},
+  volume  = {16},
+  number  = {2},
+  pages   = {359--368},
+  year    = {1976}
+}
+
+@incollection{petukhov1970,
+  author    = {Petukhov, B. S.},
+  title     = {Heat transfer and friction in turbulent pipe flow with variable
+               physical properties},
+  booktitle = {Advances in Heat Transfer},
+  volume    = {6},
+  pages     = {503--564},
+  publisher = {Academic Press},
+  year      = {1970}
+}
+
+@article{dittus1930,
+  author  = {Dittus, F. W. and Boelter, L. M. K.},
+  title   = {Heat transfer in automobile radiators of the tubular type},
+  journal = {University of California Publications in Engineering},
+  volume  = {2},
+  number  = {13},
+  pages   = {443--461},
+  year    = {1930},
+  note    = {Reimpreso en Int. Commun. Heat Mass Transfer 12 (1985) 3--22,
+             doi:10.1016/0735-1933(85)90003-X}
+}
+
+@article{sieder1936,
+  author  = {Sieder, E. N. and Tate, G. E.},
+  title   = {Heat transfer and pressure drop of liquids in tubes},
+  journal = {Industrial \& Engineering Chemistry},
+  volume  = {28},
+  number  = {12},
+  pages   = {1429--1435},
+  year    = {1936}
+}
+
+@article{hausen1943,
+  author  = {Hausen, H.},
+  title   = {Darstellung des W{\"a}rme{\"u}berganges in Rohren durch
+             verallgemeinerte Potenzbeziehungen},
+  journal = {Zeitschrift des VDI, Beiheft Verfahrenstechnik},
+  volume  = {4},
+  pages   = {91--98},
+  year    = {1943}
+}
+
+@article{lloyd1974horizontal,
+  author  = {Lloyd, J. R. and Moran, W. R.},
+  title   = {Natural Convection Adjacent to Horizontal Surface of Various
+             Planforms},
+  journal = {Journal of Heat Transfer},
+  volume  = {96},
+  number  = {4},
+  pages   = {443--447},
+  year    = {1974},
+  doi     = {10.1115/1.3450224}
+}
+
+@article{goldstein1973horizontal,
+  author  = {Goldstein, R. J. and Sparrow, E. M. and Jones, D. C.},
+  title   = {Natural convection mass transfer adjacent to horizontal plates},
+  journal = {International Journal of Heat and Mass Transfer},
+  volume  = {16},
+  number  = {5},
+  pages   = {1025--1035},
+  year    = {1973},
+  doi     = {10.1016/0017-9310(73)90041-0}
+}
+
+@incollection{morgan1975cylinders,
+  author    = {Morgan, Vincent T.},
+  title     = {The overall convective heat transfer from smooth circular
+               cylinders},
+  booktitle = {Advances in Heat Transfer},
+  volume    = {11},
+  pages     = {199--264},
+  publisher = {Academic Press},
+  year      = {1975}
+}
+
+@book{mcadams1954,
+  author    = {McAdams, William H.},
+  title     = {Heat Transmission},
+  edition   = {3},
+  publisher = {McGraw-Hill},
+  year      = {1954}
 }
 ```
 

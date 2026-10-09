@@ -925,6 +925,11 @@ def _el(fluid: str) -> str:
     return _FLUID_WITH_ARTICLE.get(fluid, f"el fluido {fluid}")
 
 
+def fluid_with_article(fluid: str) -> str:
+    """``"el agua"``, ``"el R-134a"``, ... (público: lo usan los mensajes de otros módulos)."""
+    return _el(fluid)
+
+
 def _del(fluid: str) -> str:
     """``"del agua"``, ``"del R-134a"``, ... (contracción de + el)."""
     return "del " + _el(fluid)[3:]
