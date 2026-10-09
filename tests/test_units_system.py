@@ -44,6 +44,13 @@ _KINDS = (
     "mass",
     "energy",
     "length",
+    "heat_transfer_coefficient",
+    "heat_flux",
+    "thermal_resistance",
+    "area",
+    "small_length",
+    "heat_rate",
+    "linear_heat_rate",
 )
 
 
@@ -117,6 +124,18 @@ class TestUnitLabels:
             ("energy", "Inglés", "Btu"),
             ("length", "Técnico", "m"),
             ("length", "Inglés", "ft"),
+            ("heat_transfer_coefficient", "Técnico", "W/(m²·K)"),
+            ("heat_transfer_coefficient", "Inglés", "Btu/(h·ft²·°F)"),
+            ("heat_flux", "Inglés", "Btu/(h·ft²)"),
+            ("thermal_resistance", "SI", "K/W"),
+            ("thermal_resistance", "Inglés", "h·°F/Btu"),
+            ("area", "Inglés", "ft²"),
+            ("small_length", "SI", "m"),
+            ("small_length", "Técnico", "mm"),
+            ("small_length", "Inglés", "in"),
+            ("heat_rate", "Técnico", "W"),
+            ("heat_rate", "Inglés", "Btu/h"),
+            ("linear_heat_rate", "Inglés", "Btu/(h·ft)"),
         ],
     )
     def test_label(self, kind: str, system: str, expected: str) -> None:
@@ -148,6 +167,13 @@ class TestRoundTrip:
         "mass": (0.0, 1.0, 2323.0, 1.0e6),
         "energy": (0.0, 1.0, 2.81e8, 1.0e12),
         "length": (0.0, 1.0, 100.0, 3000.0),
+        "heat_transfer_coefficient": (0.0, 5.0, 40.0, 1.0e4),
+        "heat_flux": (0.0, 1.0, 1.0e3, 1.0e6),
+        "thermal_resistance": (0.0, 1.0e-4, 0.94, 50.0),
+        "area": (0.0, 1.0e-4, 1.2, 1.0e3),
+        "small_length": (0.0, 1.0e-3, 0.025, 0.3),
+        "heat_rate": (0.0, 1.0, 630.0, 1.0e6),
+        "linear_heat_rate": (0.0, 1.0, 121.0, 1.0e4),
     }
 
     @pytest.mark.parametrize("kind", _KINDS)
@@ -407,3 +433,32 @@ def test_mass_and_energy_are_coherent_with_specific_energy() -> None:
         )
         assert product == pytest.approx(convert_from_si(m * e, "energy", system), rel=1e-12)
     assert convert_from_si(0.3048, "length", "Inglés") == pytest.approx(1.0)
+
+
+def test_heat_transfer_units_are_coherent() -> None:
+    """h·A·ΔT = Q̇, q''·A = Q̇ y ΔT/R = Q̇ en cada sistema, sin factores (Fase 8)."""
+    h, area, dT, R = 25.0, 3.0, 40.0, 0.12
+    for system in SUPPORTED_SYSTEMS:
+        Q = convert_from_si(h * area * dT, "heat_rate", system)
+        product = (
+            convert_from_si(h, "heat_transfer_coefficient", system)
+            * convert_from_si(area, "area", system)
+            * convert_from_si(dT, "temperature_difference", system)
+        )
+        assert product == pytest.approx(Q, rel=1e-12)
+        flux = convert_from_si(h * dT, "heat_flux", system) * convert_from_si(area, "area", system)
+        assert flux == pytest.approx(Q, rel=1e-12)
+        ratio = convert_from_si(dT, "temperature_difference", system) / convert_from_si(
+            R, "thermal_resistance", system
+        )
+        assert ratio == pytest.approx(convert_from_si(dT / R, "heat_rate", system), rel=1e-12)
+        per_length = convert_from_si(h * dT * 0.5, "linear_heat_rate", system) * convert_from_si(
+            2.0, "length", system
+        )
+        assert per_length == pytest.approx(convert_from_si(h * dT, "heat_rate", system), rel=1e-12)
+    # 1 Btu/(h·ft²·°F) = 5,678263 W/(m²·K) (Incropera, tabla de conversiones)
+    assert 1.0 / convert_from_si(1.0, "heat_transfer_coefficient", "Inglés") == pytest.approx(
+        5.678263, rel=1e-6
+    )
+    assert convert_from_si(0.0254, "small_length", "Inglés") == pytest.approx(1.0)
+    assert convert_from_si(0.004, "small_length", "Técnico") == pytest.approx(4.0)
