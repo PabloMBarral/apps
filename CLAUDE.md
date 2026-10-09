@@ -111,6 +111,15 @@ apps/
 │   │                          # aletas (recta, aguja, anular; arreglos) y
 │   │                          # convección (19 correlaciones de Nusselt:
 │   │                          # externa, en un tubo y natural).
+│   ├── 15_Radiacion.py        # ✅ Fase 8.2 — Cuerpo negro (Planck, Wien, S–B,
+│   │                          # bandas; ε(λ) y α para el sol), factores de forma
+│   │                          # (8 geometrías), dos superficies con pantallas,
+│   │                          # recintos por radiosidades y radiación con
+│   │                          # convección (y la termocupla).
+│   ├── 16_Intercambiadores.py # ✅ Fase 8.2 — Verificación (ε-NTU),
+│   │                          # dimensionamiento (ε-NTU y LMTD con F), ensayo con
+│   │                          # las cuatro temperaturas y U global con
+│   │                          # ensuciamiento; comparación de tipos y exergía.
 │   └── 99_Acerca.py           # Créditos, licencias, citas
 ├── core/                      # Lógica pura, sin dependencia de Streamlit
 │   ├── __init__.py
@@ -132,6 +141,10 @@ apps/
 │   │                          # inverse_length (m de una aleta),
 │   │                          # expansion_coefficient (β), acceleration (g) y
 │   │                          # pressure_drop (Pa | Pa | lbf/ft²).
+│   │                          # Fase 8.2: + absolute_temperature (K | K | °R),
+│   │                          # wavelength (μm), wavelength_temperature (λT),
+│   │                          # spectral_emissive_power (E_bλ por μm),
+│   │                          # fouling_resistance (R″_f) y entropy_rate (W/K).
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
@@ -197,11 +210,35 @@ apps/
 │   │   │                      # solve_natural, solve_internal (T_m iterada),
 │   │   │                      # dimensionless_groups, nu_curve, tube_profile,
 │   │   │                      # convection_fluids, notas, ejemplos y export.
+│   │   ├── radiation.py       # ✅ Fase 8.2 — planck, blackbody_fraction (Chang y
+│   │   │                      # Rhee) e inversa, bandas (ε y α), VIEW_FACTORS (8
+│   │   │                      # geometrías) y view_factor_curve, solve_two_surface
+│   │   │                      # (pantallas), solve_enclosure (radiosidades),
+│   │   │                      # ENCLOSURE_LAYOUTS, enclosure_from_layout y
+│   │   │                      # EnclosureCase, solve_surface_balance (h_rad, sol,
+│   │   │                      # T de equilibrio) y su curva, la termocupla,
+│   │   │                      # notas, ejemplos y export.
+│   │   ├── exchangers.py      # ✅ Fase 8.2 — ε(NTU, C_r) y NTU(ε, C_r) de cada
+│   │   │                      # tipo (flujo cruzado sin mezclar: serie de Mason),
+│   │   │                      # correction_factor (F = NTU_cc/NTU), lmtd, Stream
+│   │   │                      # (c_p dado o de CoolProp, cambio de fase),
+│   │   │                      # solve_rating, solve_sizing,
+│   │   │                      # solve_four_temperatures, ExergyBalance,
+│   │   │                      # type_comparison, curvas ε–NTU y F–P, perfil del
+│   │   │                      # doble tubo, overall_u (FOULING_FACTORS de TEMA),
+│   │   │                      # notas, ejemplos y export.
 │   │   ├── procedure_common.py # q, n, frac, sub, times, sum_rows, numbered.
 │   │   ├── conduction_procedure.py # conduction_steps (símbolos de la red).
 │   │   ├── fins_procedure.py  # fin_steps (con γ y Bessel en la anular).
-│   │   └── convection_procedure.py # convection_steps, internal_steps,
-│   │                          # correlation_latex y big (adimensionales).
+│   │   ├── convection_procedure.py # convection_steps, internal_steps,
+│   │   │                      # correlation_latex y big (adimensionales).
+│   │   ├── radiation_procedure.py # ✅ Fase 8.2 — constants_latex y los pasos del
+│   │   │                      # cuerpo negro, el factor de forma, las dos
+│   │   │                      # superficies, el recinto, la superficie y la
+│   │   │                      # termocupla.
+│   │   └── exchangers_procedure.py # ✅ Fase 8.2 — exchanger_steps (los tres
+│   │                          # problemas, con la exergía), overall_u_steps,
+│   │                          # EPS_FORMULAS y NTU_FORMULAS (renglones).
 │   ├── exergy/                # ✅ Fase 7 (reemplaza al placeholder exergy.py)
 │   │   ├── physical.py        # Ambient (T₀, p₀), PhysicalExergy /
 │   │   │                      # physical_exergy (ψ, φ, térmica y mecánica, V²/2,
@@ -378,6 +415,12 @@ apps/
 │                              # insulation_figure, fin_profile_figure,
 │                              # fin_efficiency_figure, nu_curve_figure,
 │                              # correlation_figure y tube_figure.
+│   └── radiation_charts.py    # ✅ Fase 8.2 — planck_figure, spectral_match_figure,
+│                              # view_factor_figure, network_figure,
+│                              # enclosure_figure y surface_curve_figure.
+│   └── exchanger_charts.py    # ✅ Fase 8.2 — effectiveness_figure (ε–NTU),
+│                              # f_factor_figure (F–P), profile_figure,
+│                              # type_comparison_figure y u_resistance_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
@@ -1190,6 +1233,65 @@ Notas de la Fase 8.1 (transferencia de calor: conducción, aletas y convección)
   sombreadas y numeradas (los nombres no entraban a 390 px), los fluidos
   naranjas con la película punteada; la comparación de correlaciones es un
   gráfico de puntos (hueco si está fuera de rango).
+
+Notas de la Fase 8.2 (radiación e intercambiadores):
+
+- Dos páginas nuevas en vez de más modos en /Transferencia_de_Calor (habría
+  pasado de 2500 renglones): /Radiacion (☀️, keys `rd_mode`, `rb_…`, `rv_…`,
+  `rt_…`, `re_…`, `rc_…` y `rk_…`) e /Intercambiadores (🔄, `hx_mode`, `xv_…`,
+  `xd_…`, `xe_…` y `xu_…`). Las dos recalculan solas (`st.cache_data` con los
+  dataclasses). El vademecum no tiene radiación ni intercambiadores, pero la
+  exergía del intercambiador sigue a §11.10 (η_ex) y §13.2 (Δs = c·ln(T₂/T₁)).
+- Unidades: la radiación usa la temperatura absoluta (`absolute_temperature`:
+  K, K, °R) y λ en μm en los tres sistemas; E_bλ va por μm y σ en el Inglés es
+  0,1712·10⁻⁸ Btu/(h·ft²·°R⁴). Los modos de cuerpo negro, factor de forma, dos
+  superficies y recinto piden T absoluta; la superficie con convección y la
+  termocupla piden la T del sistema y el procedimiento suma 273,15 o 459,67.
+  En los intercambiadores, Q̇ = ṁ·h_fg y ṁ = Q̇/(c_p·ΔT) llevan el factor de
+  unidades a la vista (1000 en el Técnico, 3600 en el Inglés).
+- ε-NTU: el flujo cruzado con los dos fluidos sin mezclar va con la serie
+  exacta (Mason, 1955; `gammainc`): la fórmula aproximada de las tablas se
+  aparta hasta 3,8 % en ε y mueve mucho a F (11-6: 0,933 contra 0,970, el libro
+  lee 0,97). El procedimiento muestra las dos. F = NTU_cc/NTU para cualquier
+  tipo (igual a la fórmula cerrada de Bowman con un casco); P y R como Cengel y
+  Ghajar con t el fluido de los tubos (el radio `tubes` solo cambia los
+  rótulos: F(P, R) = F(P·R, 1/R)). Con C_r = 0 todos los tipos dan lo mismo.
+- 11-5 con un solo paso de casco no se puede: P = 0,667 con R = 0,75 es justo
+  el ε máximo (área infinita); es un error que sugiere más pasos de casco, y el
+  ejemplo usa dos con caudales que reproducen las temperaturas del libro.
+- c_p de CoolProp a la temperatura media de cada corriente (se itera, porque la
+  salida depende de c_p), con la corriente en una sola fase («Subí la presión»
+  o «Bajá la presión, o marcá que cambia de fase»). Una corriente que cambia de
+  fase entra a T_sat (C → ∞) y su caudal sale de Q̇/h_fg; los pseudo-puros se
+  rechazan (deslizamiento). En el ensayo, una corriente que cambia de fase pide
+  su caudal solo si es el caudal conocido.
+- Radiación: f(λT) con la serie de Chang y Rhee (contra `quad`, 5·10⁻⁹), los
+  factores de forma contra Monte Carlo (3D), las cuerdas cruzadas (2D) y una
+  caja cerrada (perpendiculares). Los recintos se arman desde la geometría
+  (`ENCLOSURE_LAYOUTS`, `layout_geometry`: F de la regla de la suma y la
+  reciprocidad) y cada ejemplo guarda su configuración
+  (`RadiationExample.case`): la página cambia la condición de cada superficie
+  (T dada, Q̇ dado o rerradiante). La boca de una cavidad y los costados entre
+  dos placas son una superficie negra a la T de los alrededores (se valida). El
+  ducto se calcula por metro de largo (las áreas son el ancho por 1 m).
+- Gráficos: ε–NTU y F–P como los de los libros, con la familia en una rampa
+  azul ordinal (validada) y la curva de los datos en naranja rayada; F–P solo
+  en casco y tubos y flujo cruzado. Los espectros de la superficie y de la
+  fuente van divididos por su máximo junto a ε(λ): todo adimensional en un
+  solo eje (no es un eje doble). En los ejes logarítmicos plotly rotula 0,2
+  como «2»: van marcas 1-2-5 explícitas (`_log_ticks`).
+- LaTeX: 3094 expresiones distintas (procedimientos con los ejemplos y sus
+  variantes, y la teoría), KaTeX estricto, máx. 321 px. Lo que hizo falta: un
+  lado izquierdo largo sin alinear (`_flush_chain`, o solo en el primer
+  renglón: las ecuaciones de las radiosidades, un término por renglón); el
+  calor de cada superficie con J_i − J_j ya restado si las J llevan ×10ⁿ y el
+  área en su propio renglón; las fórmulas con una variable auxiliar en dos
+  renglones (`EPS_FORMULAS` y `NTU_FORMULAS` son tuplas de renglones); P y R
+  por separado; el ln de adentro calculado antes (NTU del flujo cruzado
+  mezclado), y en las fórmulas de los factores de forma, los términos con
+  nombre (t₁…t₄; u, v, a, b, c).
+- CITATION.cff: un número de artículo con cero adelante (025010) va entre
+  comillas: sin ellas YAML lo lee en octal (10760).
 
 ### Citas y licencias
 

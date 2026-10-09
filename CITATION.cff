@@ -19,7 +19,8 @@ abstract: >-
   propiedades termofísicas, interpolación lineal y doble, rendimientos
   isoentrópicos, ciclos termodinámicos, estequiometría y combustión,
   poder calorífico por composición última/próxima y por ISO 6976,
-  exergía, psicrometría y diagramas de fluidos.
+  exergía, psicrometría, transferencia de calor (conducción, aletas,
+  convección, radiación e intercambiadores) y diagramas de fluidos.
 keywords:
   - thermal-engineering
   - thermodynamics
@@ -40,8 +41,11 @@ keywords:
   - heating-value
   - chemical-exergy
   - grassmann-diagram
+  - heat-transfer
+  - thermal-radiation
+  - heat-exchangers
 license: MIT
-version: "0.24.0"
+version: "0.25.0"
 date-released: "2026-10-09"
 references:
   - type: article
@@ -488,7 +492,9 @@ references:
       name: "Wiley"
     year: 2014
   - type: book
-    scope: "Transferencia de calor: conducción, aletas y convección (caps. 3, 7, 8 y 9)"
+    scope: >-
+      Transferencia de calor: conducción, aletas y convección (caps. 3, 7, 8 y 9),
+      intercambiadores (cap. 11) y radiación (caps. 12 y 13)
     authors:
       - family-names: "Çengel"
         given-names: "Yunus A."
@@ -500,7 +506,10 @@ references:
       name: "McGraw-Hill Education"
     year: 2015
   - type: book
-    scope: "Transferencia de calor: aletas (tabla 3.4, §3.6.4) y correlaciones de convección"
+    scope: >-
+      Transferencia de calor: aletas (tabla 3.4, §3.6.4), correlaciones de convección,
+      ε-NTU (tablas 11.3 y 11.4), ensuciamiento (tabla 11.1) y factores de forma
+      (tablas 13.1 y 13.2)
     authors:
       - family-names: "Incropera"
         given-names: "Frank P."
@@ -724,6 +733,109 @@ references:
     publisher:
       name: "McGraw-Hill"
     year: 1954
+  - type: article
+    scope: "Radiación: σ, C₁, C₂ y C₃ (CODATA 2018)"
+    authors:
+      - family-names: "Tiesinga"
+        given-names: "Eite"
+      - family-names: "Mohr"
+        given-names: "Peter J."
+      - family-names: "Newell"
+        given-names: "David B."
+      - family-names: "Taylor"
+        given-names: "Barry N."
+    title: "CODATA recommended values of the fundamental physical constants: 2018"
+    journal: "Reviews of Modern Physics"
+    year: 2021
+    volume: 93
+    issue: 2
+    start: "025010"
+    doi: "10.1103/RevModPhys.93.025010"
+  - type: article
+    scope: "Radiación: la fracción de la emisión del cuerpo negro f(λT), en serie"
+    authors:
+      - family-names: "Chang"
+        given-names: "S. L."
+      - family-names: "Rhee"
+        given-names: "K. T."
+    title: "Blackbody radiation functions"
+    journal: "International Communications in Heat and Mass Transfer"
+    year: 1984
+    volume: 11
+    issue: 5
+    start: 451
+    end: 455
+  - type: book
+    scope: "Radiación: el método de las cuerdas cruzadas (recintos largos)"
+    authors:
+      - family-names: "Hottel"
+        given-names: "Hoyt C."
+      - family-names: "Sarofim"
+        given-names: "Adel F."
+    title: "Radiative Transfer"
+    publisher:
+      name: "McGraw-Hill"
+    year: 1967
+  - type: article
+    scope: "Intercambiadores: el factor de corrección F de la ΔT media logarítmica"
+    authors:
+      - family-names: "Bowman"
+        given-names: "R. A."
+      - family-names: "Mueller"
+        given-names: "A. C."
+      - family-names: "Nagle"
+        given-names: "W. M."
+    title: "Mean temperature difference in design"
+    journal: "Transactions of the ASME"
+    year: 1940
+    volume: 62
+    start: 283
+    end: 294
+  - type: conference-paper
+    scope: "Intercambiadores: ε del flujo cruzado con los dos fluidos sin mezclar (serie exacta)"
+    authors:
+      - family-names: "Mason"
+        given-names: "J. L."
+    title: "Heat transfer in cross-flow"
+    collection-title: "Proceedings of the Second U.S. National Congress of Applied Mechanics"
+    publisher:
+      name: "ASME"
+    year: 1955
+    start: 801
+    end: 803
+  - type: book
+    scope: "Intercambiadores: relaciones ε-NTU (y la tabla del flujo cruzado sin mezclar)"
+    authors:
+      - family-names: "Kays"
+        given-names: "W. M."
+      - family-names: "London"
+        given-names: "A. L."
+    title: "Compact Heat Exchangers"
+    edition: "3"
+    publisher:
+      name: "McGraw-Hill"
+    year: 1984
+  - type: book
+    scope: "Intercambiadores: ε-NTU, el factor F y la serie del flujo cruzado"
+    authors:
+      - family-names: "Shah"
+        given-names: "Ramesh K."
+      - family-names: "Sekulić"
+        given-names: "Dušan P."
+    title: "Fundamentals of Heat Exchanger Design"
+    publisher:
+      name: "John Wiley & Sons"
+    year: 2003
+    isbn: "978-0-471-32171-2"
+  - type: standard
+    scope: "Intercambiadores: factores de ensuciamiento representativos (según Incropera, tabla 11.1)"
+    authors:
+      - name: "Tubular Exchanger Manufacturers Association"
+    title: "Standards of the Tubular Exchanger Manufacturers Association"
+    edition: "6"
+    publisher:
+      name: "TEMA"
+    year: 1978
   - type: software
     scope: "Repositorio hermano: hoja de fórmulas teóricas"
     authors:
