@@ -14,7 +14,7 @@ Las cuatro condiciones de la punta de la tabla 3.4 de Incropera:
 - **temperatura dada** θ_L: q = M·(cosh mL − θ_L/θ_b)/senh mL;
 - **infinita**: q = M.
 
-Más la **longitud corregida** (Cengel y Ghajar, ec. 3-79): la punta
+Más la **longitud corregida** (Cengel y Ghajar, §3-6): la punta
 convectiva se aproxima con una adiabática de L_c = L + t/2 (recta) o
 L + D/4 (aguja).
 
@@ -23,8 +23,8 @@ es θ = C₁·I₀(mr) + C₂·K₀(mr) (Incropera, §3.6.4). Las funciones de B
 escaladas (``scipy.special.i0e``…) para no desbordar con m·r grande.
 
 Eficiencia η = q/(h·A_aleta·θ_b) y efectividad ε = q/(h·A_c·θ_b) (Incropera,
-ec. 3.86 y 3.81). En un arreglo, la eficiencia global
-η_o = 1 − (N·A_f/A_t)·(1 − η) (ec. 3.102).
+§3.6.3). En un arreglo, la eficiencia global
+η_o = 1 − (N·A_f/A_t)·(1 − η) (§3.6.5).
 """
 
 from __future__ import annotations
@@ -331,7 +331,6 @@ def fin_profile(result: FinResult, n: int = 81) -> tuple[list[float], list[float
     L = result.L_c_m
     xs = [L * j / (n - 1) for j in range(n)]
     if i.shape == "annular":
-        k, h, t = i.k_W_per_mK, i.h_W_per_m2K, i.thickness_m
         m = result.m_per_m
         r1 = i.r_base_m
         rE = r1 + L
@@ -339,7 +338,6 @@ def fin_profile(result: FinResult, n: int = 81) -> tuple[list[float], list[float
             coeffs: Any = (0.0, i.theta_b / k0e(m * r1))
         else:
             coeffs = _annular_coeffs(i, m, r1, rE, i.tip)
-        del k, h, t
         Ts = [i.T_inf_K + _annular_theta(i, m, r1, rE, coeffs, r1 + x) for x in xs]
     else:
         tip: TipCondition = "adiabatic" if i.tip == "corrected" else i.tip
@@ -415,7 +413,7 @@ class FinArrayResult:
 
     @property
     def overall_efficiency(self) -> float:
-        """η_o = Q̇_total/(h·A_t·θ_b) = 1 − (N·A_f/A_t)·(1 − η) (Incropera, ec. 3.102)."""
+        """η_o = Q̇_total/(h·A_t·θ_b) = 1 − (N·A_f/A_t)·(1 − η) (Incropera, §3.6.5)."""
         i = self.inputs.fin
         return self.Q_total_W / (i.h_W_per_m2K * self.A_total_m2 * i.theta_b)
 

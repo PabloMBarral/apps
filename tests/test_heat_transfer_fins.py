@@ -166,7 +166,7 @@ def test_steam_pipe_with_annular_fins() -> None:
     arr = solve_fin_array(FinArrayInputs(ex.fin, ex.n_fins, ex.base_area_m2))  # type: ignore[arg-type]
     assert arr.Q_no_fins_W == pytest.approx(974.0, abs=0.5)
     assert arr.Q_total_W == pytest.approx(3689.0, abs=1.0)
-    # η_o = 1 − (N·A_f/A_t)·(1 − η) (Incropera, ec. 3.102)
+    # η_o = 1 − (N·A_f/A_t)·(1 − η) (Incropera, §3.6.5)
     frac = ex.n_fins * fin.A_fin_m2 / arr.A_total_m2  # type: ignore[operator]
     assert arr.overall_efficiency == pytest.approx(1 - frac * (1 - fin.efficiency), rel=1e-12)
 

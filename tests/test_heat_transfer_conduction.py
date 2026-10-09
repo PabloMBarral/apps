@@ -101,7 +101,7 @@ def test_insulated_wire_and_critical_radius() -> None:
 
 
 def test_heat_loss_peaks_at_the_critical_radius() -> None:
-    """Con las temperaturas dadas, Q̇ tiene un máximo en r_cr (Cengel y Ghajar, §3-7)."""
+    """Con las temperaturas dadas, Q̇ tiene un máximo en r_cr (Cengel y Ghajar, §3-5)."""
     inputs = ConductionInputs(
         geometry="cylinder",
         layers=(Layer("plástico", 0.002, 0.15),),
@@ -168,7 +168,7 @@ def test_every_example_is_a_consistent_network(name: str) -> None:
 
 
 def _analytic_T(geometry: str, r_: float, T1: float, T2: float, x1: float, x2: float) -> float:
-    """La solución analítica dentro de una capa (Incropera, ec. 3.3, 3.26 y 3.36)."""
+    """La solución analítica dentro de una capa (Incropera, §3.1 y §3.3)."""
     if geometry == "plane":
         return T1 + (T2 - T1) * (r_ - x1) / (x2 - x1)
     if geometry == "cylinder":

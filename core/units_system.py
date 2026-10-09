@@ -31,6 +31,11 @@ area                   m²          m²             ft²
 small_length           m           mm             in
 heat_rate              W           W              Btu/h
 linear_heat_rate       W/m         W/m            Btu/(h·ft)
+heat_capacity_rate     W/K         W/K            Btu/(h·°F)
+inverse_length         1/m         1/m            1/ft
+expansion_coefficient  1/K         1/K            1/°R
+acceleration           m/s²        m/s²           ft/s²
+pressure_drop          Pa          Pa             lbf/ft²
 ====================== =========== ============== ============================
 
 ``specific_enthalpy`` también se usa para energía interna, calor latente
@@ -91,6 +96,11 @@ QuantityKind = Literal[
     "small_length",
     "heat_rate",
     "linear_heat_rate",
+    "heat_capacity_rate",
+    "inverse_length",
+    "expansion_coefficient",
+    "acceleration",
+    "pressure_drop",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -278,6 +288,34 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "W/m"),
         "Técnico": (1.0, 0.0, "W/m"),
         "Inglés": (_FT_PER_M / _BTU_PER_H_W, 0.0, "Btu/(h·ft)"),
+    },
+    # Para que las sustituciones de los procedimientos cierren sin factores:
+    # ṁ·c_p y h·A en W/K o Btu/(h·°F) (NTU = h·A/(ṁ·c_p)); m de una aleta en 1/m o
+    # 1/ft; β y g de Grashof; Δp de un tubo (en el Inglés, ρ·V²/(2·g_c) da lbf/ft²).
+    "heat_capacity_rate": {
+        "SI": (1.0, 0.0, "W/K"),
+        "Técnico": (1.0, 0.0, "W/K"),
+        "Inglés": (5.0 / 9.0 / _BTU_PER_H_W, 0.0, "Btu/(h·°F)"),
+    },
+    "inverse_length": {
+        "SI": (1.0, 0.0, "1/m"),
+        "Técnico": (1.0, 0.0, "1/m"),
+        "Inglés": (_FT_PER_M, 0.0, "1/ft"),
+    },
+    "expansion_coefficient": {
+        "SI": (1.0, 0.0, "1/K"),
+        "Técnico": (1.0, 0.0, "1/K"),
+        "Inglés": (5.0 / 9.0, 0.0, "1/°R"),
+    },
+    "acceleration": {
+        "SI": (1.0, 0.0, "m/s²"),
+        "Técnico": (1.0, 0.0, "m/s²"),
+        "Inglés": (1.0 / _FT_PER_M, 0.0, "ft/s²"),
+    },
+    "pressure_drop": {
+        "SI": (1.0, 0.0, "Pa"),
+        "Técnico": (1.0, 0.0, "Pa"),
+        "Inglés": (144.0 / _PSI_PER_PA, 0.0, "lbf/ft²"),
     },
 }
 

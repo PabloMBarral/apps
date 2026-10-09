@@ -12,11 +12,11 @@ Cada elemento entre dos temperaturas es una resistencia térmica, R = ΔT/Q̇:
 
 En serie se suman y Q̇ = (T₁ − T₂)/ΣR. Las partes de una capa plana compuesta
 (el ladrillo y el revoque de una hilada) van en paralelo con las caras
-isotérmicas, la aproximación de Cengel y Ghajar (§3-5): 1/R = Σ 1/R_i.
+isotérmicas, la aproximación de Cengel y Ghajar (§3-3): 1/R = Σ 1/R_i.
 
 Un borde puede ser un fluido (T∞ y h; el h puede incluir la radiación), una
 superficie a temperatura dada o un calor dado (el de un alambre que se
-calienta por efecto Joule). El radio crítico de aislación (§3-7) es
+calienta por efecto Joule). El radio crítico de aislación (§3-5) es
 r_cr = k/h en un cilindro y 2k/h en una esfera.
 
 Todo en SI. Lado 1 es la izquierda de una pared o el interior de un caño o de
@@ -231,7 +231,7 @@ class ConductionResult:
 
     @property
     def U_inner_W_per_m2K(self) -> float:
-        """U referido a la cara 1: Q̇ = U·A₁·(T₁ − T₂) (Cengel y Ghajar, §3-3)."""
+        """U referido a la cara 1: Q̇ = U·A₁·(T₁ − T₂) (Cengel y Ghajar, §3-1)."""
         return 1.0 / (self.R_total_K_per_W * self.A_inner_m2)
 
     @property
@@ -261,7 +261,7 @@ class ConductionResult:
 
     @property
     def critical_radius_m(self) -> float | None:
-        """r_cr = k/h (cilindro) o 2k/h (esfera) de la capa exterior (Cengel y Ghajar, §3-7)."""
+        """r_cr = k/h (cilindro) o 2k/h (esfera) de la capa exterior (Cengel y Ghajar, §3-5)."""
         outer = self.inputs.outer
         if self.inputs.geometry == "plane" or outer.kind != "fluid":
             return None
@@ -298,7 +298,7 @@ def _faces(inputs: ConductionInputs) -> list[float]:
 
 
 def _layer_R(inputs: ConductionInputs, layer: Layer, x1: float, x2: float) -> float:
-    """R de conducción de una capa (Cengel y Ghajar, ec. 3-5, 3-43 y 3-44)."""
+    """R de conducción de una capa (Cengel y Ghajar, §3-1 y §3-4)."""
     if inputs.geometry == "plane":
         return layer.thickness_m / (layer.k_effective * inputs.area_m2)
     k = layer.k_W_per_mK
@@ -373,7 +373,7 @@ def _validate(inputs: ConductionInputs) -> None:
 
 
 def solve_conduction(inputs: ConductionInputs) -> ConductionResult:
-    """Resuelve la red de resistencias en serie (Cengel y Ghajar, §3-3 a §3-6).
+    """Resuelve la red de resistencias en serie (Cengel y Ghajar, §3-1 a §3-4).
 
     Raises
     ------
@@ -459,7 +459,7 @@ def solve_conduction(inputs: ConductionInputs) -> ConductionResult:
 def temperature_profile(result: ConductionResult, n: int = 41) -> list[ProfileSegment]:
     """El perfil dentro de cada capa: recto en la pared, ln r en el cilindro, 1/r en la esfera.
 
-    Incropera et al. (2007), ec. 3.3, 3.26 y 3.36.
+    Incropera et al. (2007), §3.1 y §3.3.
     """
     geo = result.inputs.geometry
     segments: list[ProfileSegment] = []
@@ -498,7 +498,7 @@ def insulation_sweep(inputs: ConductionInputs, radii_m: list[float]) -> list[Swe
 
     Con la temperatura dada en los dos lados, Q̇ tiene un máximo en r_cr; con
     el calor dado (un alambre), la T del lado 1 tiene un mínimo ahí (Cengel y
-    Ghajar, §3-7).
+    Ghajar, §3-5).
     """
     if inputs.geometry == "plane":
         raise ValueError("El radio crítico es de un cilindro o de una esfera.")
@@ -564,7 +564,7 @@ def conduction_notes(result: ConductionResult) -> list[str]:
         if layer.parts:
             notes.append(
                 f"La capa {i + 1} se resuelve con sus partes en paralelo y las caras isotérmicas "
-                "(Cengel y Ghajar, §3-5): es una aproximación unidimensional; el calor que pasa "
+                "(Cengel y Ghajar, §3-3): es una aproximación unidimensional; el calor que pasa "
                 "por cada parte está en la tabla."
             )
     r_cr = result.critical_radius_m
@@ -579,7 +579,7 @@ def conduction_notes(result: ConductionResult) -> list[str]:
                 f"El radio exterior ({_len(r_out)}) es **menor que el radio crítico** "
                 f"r_cr = {_len(r_cr)}: agregar más de la capa exterior {effect} hasta "
                 "r_cr, porque gana más superficie de convección que resistencia de conducción. "
-                "Por eso se aíslan los cables eléctricos finos (Cengel y Ghajar, §3-7)."
+                "Por eso se aíslan los cables eléctricos finos (Cengel y Ghajar, §3-5)."
             )
         else:
             effect = "sube la temperatura del lado 1" if heat_given else "baja Q̇"

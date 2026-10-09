@@ -462,3 +462,45 @@ def test_heat_transfer_units_are_coherent() -> None:
     )
     assert convert_from_si(0.0254, "small_length", "Inglés") == pytest.approx(1.0)
     assert convert_from_si(0.004, "small_length", "Técnico") == pytest.approx(4.0)
+
+
+def test_heat_transfer_procedure_units_are_coherent() -> None:
+    """Las sustituciones de los procedimientos de la Fase 8 cierran sin factores."""
+    h, A, k, P, A_c = 40.0, 0.3, 180.0, 0.016, 2.0e-5
+    g, beta, dT, L, nu = 9.80665, 3.1e-3, 50.0, 0.08, 1.75e-5
+    f, D, rho, V = 0.03, 0.03, 992.0, 0.24
+    for system in SUPPORTED_SYSTEMS:
+
+        def c(x: float, kind: str, system: str = system) -> float:
+            return convert_from_si(x, kind, system)  # type: ignore[arg-type]
+
+        # NTU = h·A/(ṁ·c_p): h·A es una capacidad (W/K o Btu/(h·°F))
+        assert c(h, "heat_transfer_coefficient") * c(A, "area") == pytest.approx(
+            c(h * A, "heat_capacity_rate"), rel=1e-12
+        )
+        assert c(h * A, "heat_capacity_rate") * c(dT, "temperature_difference") == pytest.approx(
+            c(h * A * dT, "heat_rate"), rel=1e-12
+        )
+        # m = √(h·P/(k·A_c)) de una aleta
+        m = math.sqrt(h * P / (k * A_c))
+        m_sys = math.sqrt(
+            c(h, "heat_transfer_coefficient")
+            * c(P, "length")
+            / (c(k, "thermal_conductivity") * c(A_c, "area"))
+        )
+        assert m_sys == pytest.approx(c(m, "inverse_length"), rel=1e-12)
+        # Gr = g·β·ΔT·L³/ν² es el mismo número en los tres sistemas
+        Gr = g * beta * dT * L**3 / nu**2
+        Gr_sys = (
+            c(g, "acceleration")
+            * c(beta, "expansion_coefficient")
+            * c(dT, "temperature_difference")
+            * c(L, "length") ** 3
+            / c(nu, "diffusivity") ** 2
+        )
+        assert Gr_sys == pytest.approx(Gr, rel=1e-12)
+        # Δp = f·(L/D)·ρ·V²/2 (en el Inglés, dividido por g_c = 32,174 lbm·ft/(lbf·s²))
+        dp = f * (5.0 / D) * rho * V**2 / 2.0
+        g_c = 32.17404855643 if system == "Inglés" else 1.0
+        dp_sys = f * (5.0 / D) * c(rho, "density") * c(V, "speed") ** 2 / (2.0 * g_c)
+        assert dp_sys == pytest.approx(c(dp, "pressure_drop"), rel=1e-9)

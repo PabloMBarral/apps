@@ -71,6 +71,7 @@ __all__ = [
     "Properties",
     "convection_notes",
     "convection_to_dict",
+    "dimensionless_groups",
     "fluid_properties",
     "friction_petukhov",
     "internal_notes",
@@ -1164,6 +1165,26 @@ def _check_no_phase_change(i: InternalFlowInputs, T_out: float, T_sat: float | N
 # ---------------------------------------------------------------------
 
 
+def dimensionless_groups(result: ConvectionResult | InternalFlowResult) -> dict[str, float]:
+    """Los números con los que se evalúan las correlaciones (Re o Ra, Pr, μ/μ_s…)."""
+    mu_ratio = result.props.mu_Pa_s / (result.mu_s_Pa_s or result.props.mu_Pa_s)
+    if isinstance(result, InternalFlowResult):
+        return {
+            "Re": result.Re,
+            "Pr": result.props.Pr,
+            "D_over_L": result.inputs.D_m / result.inputs.L_m,
+            "mu_ratio": mu_ratio,
+            "heating": 1.0 if result.heating else 0.0,
+            "constant_T": 1.0 if result.inputs.condition == "constant_T" else 0.0,
+        }
+    d = {"Pr": result.Pr, "mu_ratio": mu_ratio}
+    if result.Ra is not None:
+        d["Ra"] = result.Ra
+    if result.Re is not None:
+        d["Re"] = result.Re
+    return d
+
+
 def nu_curve(
     result: ConvectionResult | InternalFlowResult, n: int = 80
 ) -> tuple[str, list[float], list[float]]:
@@ -1174,14 +1195,8 @@ def nu_curve(
     con el punto de los datos adentro (es uno de los valores).
     """
     c = CORRELATIONS[result.correlation]
+    base = dimensionless_groups(result)
     if isinstance(result, InternalFlowResult):
-        base: dict[str, float] = {
-            "Pr": result.props.Pr,
-            "D_over_L": result.inputs.D_m / result.inputs.L_m,
-            "mu_ratio": result.props.mu_Pa_s / (result.mu_s_Pa_s or result.props.mu_Pa_s),
-            "heating": 1.0 if result.heating else 0.0,
-            "constant_T": 1.0 if result.inputs.condition == "constant_T" else 0.0,
-        }
         var, x0, span = "Re", result.Re, 30.0
         if result.correlation in ("hausen", "tube_laminar"):
             lo, hi = 10.0, RE_LAMINAR_TUBE
@@ -1189,21 +1204,16 @@ def nu_curve(
             lo, hi = 3000.0, max(x0 * span, 1e5)
         else:
             lo, hi = 1e4, max(x0 * span, 1e5)
+    elif result.Ra is not None:
+        var, x0 = "Ra", result.Ra
+        lo, hi = x0 / 1e3, x0 * 1e3
     else:
-        base = {
-            "Pr": result.Pr,
-            "mu_ratio": result.props.mu_Pa_s / (result.mu_s_Pa_s or result.props.mu_Pa_s),
-        }
-        if result.Ra is not None:
-            var, x0 = "Ra", result.Ra
-            lo, hi = x0 / 1e3, x0 * 1e3
-        else:
-            var, x0 = "Re", result.Re or 1.0
-            lo, hi = x0 / 30.0, x0 * 30.0
-            if result.correlation == "plate_laminar":
-                hi = min(hi, RE_CRITICAL_PLATE)
-            if result.correlation in ("plate_mixed", "plate_turbulent"):
-                lo = max(lo, RE_CRITICAL_PLATE)
+        var, x0 = "Re", result.Re or 1.0
+        lo, hi = x0 / 30.0, x0 * 30.0
+        if result.correlation == "plate_laminar":
+            hi = min(hi, RE_CRITICAL_PLATE)
+        if result.correlation in ("plate_mixed", "plate_turbulent"):
+            lo = max(lo, RE_CRITICAL_PLATE)
     lo, hi = min(lo, x0 / 2.0), max(hi, 2.0 * x0)
     xs = sorted({lo * (hi / lo) ** (j / (n - 1)) for j in range(n)} | {x0})
     nus = [c.func({**base, var: x}) for x in xs]
