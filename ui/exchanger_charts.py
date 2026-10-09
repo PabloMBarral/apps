@@ -159,7 +159,8 @@ def effectiveness_figure(result: ExchangerResult) -> go.Figure:
             y=eps_max,
             line={"color": _GRAY, "width": 1.2, "dash": "dot"},
             annotation_text=f"ε máx. con C_r = {_comma(cr, '.3g')}",
-            annotation_position="bottom right",
+            # arriba: abajo de la línea se acerca la curva de los datos
+            annotation_position="top right",
         )
     _layout(
         fig,

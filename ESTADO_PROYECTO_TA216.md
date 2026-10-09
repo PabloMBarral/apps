@@ -1414,17 +1414,17 @@
   - LaTeX: 3094 expresiones distintas (los procedimientos con los ejemplos y
     sus variantes, y la teoría) validan con KaTeX estricto y entran en 321 px
     como máximo en los tres sistemas.
-  - Smoke test en Chromium a 1280 px: 25 casos (14 de radiación y 11 de
+  - Smoke test en Chromium a 1280 y 390 px: 25 casos (14 de radiación y 11 de
     intercambiadores, en los tres sistemas) con la teoría y el procedimiento
     abiertos, sin errores, sin desborde y sin ecuaciones que se pasen de su
-    expansor. Las capturas y los gráficos sueltos a 390 px encontraron cuatro
-    detalles que se corrigieron: los ejes logarítmicos rotulaban 0,2 como «2»
-    (ahora van marcas 1-2-5), las barras del recinto decían «3,698e+04» y el
-    rótulo de la negativa se pisaba con el nombre (ahora van adentro y sin
-    exponente), la leyenda de las barras pisaba el título del eje (ahora va al
-    pie) y los nombres largos de los tipos de intercambiador aplastaban el eje
-    de la comparación (ahora van nombres cortos; la tabla conserva los
-    completos).
+    expansor. Las capturas encontraron cinco detalles que se corrigieron: los
+    ejes logarítmicos rotulaban 0,2 como «2» (ahora van marcas 1-2-5), las
+    barras del recinto decían «3,698e+04» y el rótulo de la negativa se pisaba
+    con el nombre (ahora van adentro y sin exponente), la leyenda de las barras
+    pisaba el título del eje (ahora va al pie), los nombres largos de los tipos
+    de intercambiador aplastaban el eje de la comparación (ahora van nombres
+    cortos; la tabla conserva los completos) y el rótulo del ε máximo quedaba
+    encima de la curva de los datos (ahora va arriba de la línea).
 - **Dependencias**: ninguna nueva (`gammainc` y `brentq` son de SciPy).
 - **Red**: doi.org, Crossref y las editoriales siguen bloqueados; el DOI de
   CODATA 2018 se confirmó en NIST, los de Chang y Rhee y de Shah y Sekulić no, y
