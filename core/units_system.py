@@ -36,6 +36,12 @@ inverse_length         1/m         1/m            1/ft
 expansion_coefficient  1/K         1/K            1/°R
 acceleration           m/s²        m/s²           ft/s²
 pressure_drop          Pa          Pa             lbf/ft²
+absolute_temperature   K           K              °R
+wavelength             μm          μm             μm
+wavelength_temperature μm·K        μm·K           μm·°R
+spectral_emissive_pow. W/(m²·μm)   W/(m²·μm)      Btu/(h·ft²·μm)
+fouling_resistance     m²·K/W      m²·K/W         h·ft²·°F/Btu
+entropy_rate           W/K         W/K            Btu/(h·°R)
 ====================== =========== ============== ============================
 
 ``specific_enthalpy`` también se usa para energía interna, calor latente
@@ -101,6 +107,12 @@ QuantityKind = Literal[
     "expansion_coefficient",
     "acceleration",
     "pressure_drop",
+    "absolute_temperature",
+    "wavelength",
+    "wavelength_temperature",
+    "spectral_emissive_power",
+    "fouling_resistance",
+    "entropy_rate",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -316,6 +328,41 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "Pa"),
         "Técnico": (1.0, 0.0, "Pa"),
         "Inglés": (144.0 / _PSI_PER_PA, 0.0, "lbf/ft²"),
+    },
+    # Fase 8.2 (radiación e intercambiadores). La radiación usa la temperatura
+    # absoluta (σ·T⁴, λ·T) y la exergía ln(T₂/T₁): K, o °R en el Inglés, donde
+    # σ = 0,1714·10⁻⁸ Btu/(h·ft²·°R⁴). λ va en μm en los tres sistemas (como las
+    # tablas de los libros); λ·T en μm·K o μm·°R. El factor de ensuciamiento R''_f
+    # es el inverso de un h; S_gen, una capacidad calorífica con °R.
+    "absolute_temperature": {
+        "SI": (1.0, 0.0, "K"),
+        "Técnico": (1.0, 0.0, "K"),
+        "Inglés": (9.0 / 5.0, 0.0, "°R"),
+    },
+    "wavelength": {
+        "SI": (1.0e6, 0.0, "μm"),
+        "Técnico": (1.0e6, 0.0, "μm"),
+        "Inglés": (1.0e6, 0.0, "μm"),
+    },
+    "wavelength_temperature": {
+        "SI": (1.0e6, 0.0, "μm·K"),
+        "Técnico": (1.0e6, 0.0, "μm·K"),
+        "Inglés": (1.0e6 * 9.0 / 5.0, 0.0, "μm·°R"),
+    },
+    "spectral_emissive_power": {
+        "SI": (1.0e-6, 0.0, "W/(m²·μm)"),
+        "Técnico": (1.0e-6, 0.0, "W/(m²·μm)"),
+        "Inglés": (1.0e-6 * _FT_PER_M**2 / _BTU_PER_H_W, 0.0, "Btu/(h·ft²·μm)"),
+    },
+    "fouling_resistance": {
+        "SI": (1.0, 0.0, "m²·K/W"),
+        "Técnico": (1.0, 0.0, "m²·K/W"),
+        "Inglés": (9.0 / 5.0 * _BTU_PER_H_W / _FT_PER_M**2, 0.0, "h·ft²·°F/Btu"),
+    },
+    "entropy_rate": {
+        "SI": (1.0, 0.0, "W/K"),
+        "Técnico": (1.0, 0.0, "W/K"),
+        "Inglés": (5.0 / 9.0 / _BTU_PER_H_W, 0.0, "Btu/(h·°R)"),
     },
 }
 

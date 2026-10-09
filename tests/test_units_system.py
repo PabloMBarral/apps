@@ -51,6 +51,12 @@ _KINDS = (
     "small_length",
     "heat_rate",
     "linear_heat_rate",
+    "absolute_temperature",
+    "wavelength",
+    "wavelength_temperature",
+    "spectral_emissive_power",
+    "fouling_resistance",
+    "entropy_rate",
 )
 
 
@@ -136,6 +142,17 @@ class TestUnitLabels:
             ("heat_rate", "Técnico", "W"),
             ("heat_rate", "Inglés", "Btu/h"),
             ("linear_heat_rate", "Inglés", "Btu/(h·ft)"),
+            ("absolute_temperature", "Técnico", "K"),
+            ("absolute_temperature", "Inglés", "°R"),
+            ("wavelength", "Inglés", "μm"),
+            ("wavelength_temperature", "SI", "μm·K"),
+            ("wavelength_temperature", "Inglés", "μm·°R"),
+            ("spectral_emissive_power", "Técnico", "W/(m²·μm)"),
+            ("spectral_emissive_power", "Inglés", "Btu/(h·ft²·μm)"),
+            ("fouling_resistance", "SI", "m²·K/W"),
+            ("fouling_resistance", "Inglés", "h·ft²·°F/Btu"),
+            ("entropy_rate", "Técnico", "W/K"),
+            ("entropy_rate", "Inglés", "Btu/(h·°R)"),
         ],
     )
     def test_label(self, kind: str, system: str, expected: str) -> None:
@@ -174,6 +191,12 @@ class TestRoundTrip:
         "small_length": (0.0, 1.0e-3, 0.025, 0.3),
         "heat_rate": (0.0, 1.0, 630.0, 1.0e6),
         "linear_heat_rate": (0.0, 1.0, 121.0, 1.0e4),
+        "absolute_temperature": (0.0, 77.0, 298.15, 5800.0),
+        "wavelength": (0.0, 1.0e-7, 2.9e-6, 1.0e-3),
+        "wavelength_temperature": (0.0, 1.0e-3, 2.897771955e-3, 0.05),
+        "spectral_emissive_power": (0.0, 1.0, 3.846e9, 8.3e13),
+        "fouling_resistance": (0.0, 1.0e-4, 9.0e-4, 0.01),
+        "entropy_rate": (0.0, 0.5, 120.0, 1.0e5),
     }
 
     @pytest.mark.parametrize("kind", _KINDS)
@@ -504,3 +527,50 @@ def test_heat_transfer_procedure_units_are_coherent() -> None:
         g_c = 32.17404855643 if system == "Inglés" else 1.0
         dp_sys = f * (5.0 / D) * c(rho, "density") * c(V, "speed") ** 2 / (2.0 * g_c)
         assert dp_sys == pytest.approx(c(dp, "pressure_drop"), rel=1e-9)
+
+
+def test_radiation_and_exchanger_units_are_coherent() -> None:
+    """Fase 8.2: σ·T⁴, E_bλ·Δλ, λ·T, R''_f = 1/h y T·Ṡ cierran sin factores."""
+    sigma = 5.670374419e-8
+    T, lam, R_f, h, S, dT = 800.0, 3.0e-6, 2.0e-4, 1200.0, 35.0, 12.0
+    for system in SUPPORTED_SYSTEMS:
+
+        def c(x: float, kind: str, system: str = system) -> float:
+            return convert_from_si(x, kind, system)  # type: ignore[arg-type]
+
+        # σ en el sistema: q'' = σ_sys·T_sys⁴
+        sigma_sys = c(sigma, "heat_flux") / c(1.0, "absolute_temperature") ** 4
+        assert sigma_sys * c(T, "absolute_temperature") ** 4 == pytest.approx(
+            c(sigma * T**4, "heat_flux"), rel=1e-12
+        )
+        # E_bλ [por μm] · Δλ [μm] = q''
+        assert c(5.0e9, "spectral_emissive_power") * c(lam, "wavelength") == pytest.approx(
+            c(5.0e9 * lam, "heat_flux"), rel=1e-12
+        )
+        # λ·T con λ en μm y T absoluta
+        assert c(lam, "wavelength") * c(T, "absolute_temperature") == pytest.approx(
+            c(lam * T, "wavelength_temperature"), rel=1e-12
+        )
+        # R''_f se suma con 1/h sin factores (U = 1/(1/h + R''_f))
+        assert c(1.0 / h, "fouling_resistance") * c(h, "heat_transfer_coefficient") == (
+            pytest.approx(1.0, rel=1e-12)
+        )
+        U_sys = 1.0 / (1.0 / c(h, "heat_transfer_coefficient") + c(R_f, "fouling_resistance"))
+        assert U_sys == pytest.approx(
+            c(1.0 / (1.0 / h + R_f), "heat_transfer_coefficient"), rel=1e-12
+        )
+        # T₀·Ṡ_gen = Ẋ_dest (W o Btu/h)
+        assert c(T, "absolute_temperature") * c(S, "entropy_rate") == pytest.approx(
+            c(T * S, "heat_rate"), rel=1e-12
+        )
+        # ΔT con °R o °F es lo mismo: Ṡ·ΔT = Q̇
+        assert c(S, "entropy_rate") * c(dT, "temperature_difference") == pytest.approx(
+            c(S * dT, "heat_rate"), rel=1e-12
+        )
+    # σ = 0,1714·10⁻⁸ Btu/(h·ft²·°R⁴) (Cengel y Ghajar, tabla 1-1)
+    sigma_e = convert_from_si(sigma, "heat_flux", "Inglés") / 1.8**4
+    assert sigma_e == pytest.approx(0.1714e-8, rel=2e-3)
+    # λ·T del máximo (Wien): 2897,8 μm·K = 5216,0 μm·°R
+    assert convert_from_si(2.897771955e-3, "wavelength_temperature", "Inglés") == pytest.approx(
+        5216.0, abs=0.1
+    )
