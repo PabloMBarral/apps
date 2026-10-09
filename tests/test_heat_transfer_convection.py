@@ -545,3 +545,31 @@ def test_every_example(name: str) -> None:
         assert dict_to_csv(data)
         assert data["Nu"] == r.Nu
     assert pickle.loads(pickle.dumps(r)) == r
+
+
+# ---------------------------------------------------------------------
+# Para la página: los fluidos y el perfil del tubo
+# ---------------------------------------------------------------------
+
+
+def test_convection_fluids_have_transport_properties() -> None:
+    fluids = cv.convection_fluids()
+    assert "Water" in fluids and "Air" in fluids
+    assert "R1233zd(E)" not in fluids  # CoolProp no tiene su viscosidad
+    for fluid in fluids:
+        fluid_properties(fluid, 350.0, 2.0e5)
+
+
+@pytest.mark.parametrize("name", list(INTERNAL_EXAMPLES))
+def test_tube_profile(name: str) -> None:
+    r = solve_internal(INTERNAL_EXAMPLES[name].inputs)
+    xs, Tm, Ts = cv.tube_profile(r)
+    assert xs[0] == 0.0 and xs[-1] == pytest.approx(r.inputs.L_m)
+    assert Tm[0] == pytest.approx(r.inputs.T_in_K)
+    assert Tm[-1] == pytest.approx(r.T_out_K, abs=1e-9)
+    if r.inputs.condition == "constant_T":
+        assert Ts == [r.inputs.T_s_K] * len(xs)
+    else:
+        q = r.inputs.q_W_per_m2
+        assert all(s - m == pytest.approx(q / r.h_W_per_m2K) for s, m in zip(Ts, Tm, strict=True))
+        assert Ts[-1] == pytest.approx(r.T_s_out_K)

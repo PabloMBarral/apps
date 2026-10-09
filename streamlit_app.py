@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.23.0"
+PAGE_VERSION = "0.24.0"
 
 
 def _home_page() -> None:
@@ -156,6 +156,14 @@ def _home_page() -> None:
           combinado): cuánto gasta, produce, destruye y pierde cada uno,
           con el **diagrama de Grassmann** (ejemplos de Cengel cap. 8 y
           10-8).
+        - 🧱 **Transferencia de calor** — la **conducción** a través de
+          paredes, caños y esferas de varias capas (la red de resistencias,
+          el contacto, las partes en paralelo y el radio crítico de
+          aislación), las **aletas** (recta, de aguja o anular, con cada
+          condición de la punta, la eficiencia, la efectividad y un arreglo)
+          y el coeficiente de **convección** h de las correlaciones de
+          Nusselt: forzada externa, en un tubo y natural, comparadas entre sí
+          (ejemplos de Cengel y Ghajar e Incropera).
         - 📈 **Diagramas** — Propiedades, Isoentrópicos, Rankine,
           Refrigeración y Ciclo combinado incluyen
           gráficos interactivos con isolíneas (log p–h, T–s, h–s,
@@ -169,8 +177,9 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Exergoeconomía (el costo de la exergía en cada componente) y
-        transferencia de calor. Ver el
+        Exergoeconomía (el costo de la exergía en cada componente) y la
+        segunda entrega de transferencia de calor (radiación e
+        intercambiadores). Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -184,8 +193,8 @@ def _home_page() -> None:
         — default, alineado con Cengel — o **Inglés** (°F, psia, Btu/lb,
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
-        Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado y
-        Exergía.
+        Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado,
+        Exergía y Transferencia de calor.
         Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
@@ -210,6 +219,7 @@ pages = [
     st.Page("app_pages/10_HRSG.py", title="HRSG", icon="🏭"),
     st.Page("app_pages/12_Ciclo_Combinado.py", title="Ciclo combinado", icon="⚡"),
     st.Page("app_pages/11_Exergia.py", title="Exergía", icon="🔋"),
+    st.Page("app_pages/14_Transferencia_de_Calor.py", title="Transferencia de calor", icon="🧱"),
 ]
 pg = st.navigation(pages)
 pg.run()

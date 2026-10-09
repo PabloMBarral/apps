@@ -30,12 +30,14 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Literal
 
 from CoolProp.CoolProp import PropsSI
 
 from core.fluids import (
     FLUID_NAMES_ES,
+    SUPPORTED_FLUIDS,
     fluid_state_from_pair,
     fluid_with_article,
     saturation_at_pressure,
@@ -70,6 +72,7 @@ __all__ = [
     "NaturalGeometry",
     "Properties",
     "convection_notes",
+    "convection_fluids",
     "convection_to_dict",
     "dimensionless_groups",
     "fluid_properties",
@@ -99,6 +102,7 @@ __all__ = [
     "solve_external",
     "solve_internal",
     "solve_natural",
+    "tube_profile",
 ]
 
 #: Aceleración de la gravedad estándar (m/s²).
@@ -216,6 +220,20 @@ def fluid_properties(fluid: str, T_K: float, p_Pa: float) -> Properties:
     beta = float(PropsSI("isobaric_expansion_coefficient", "T", T_K, "P", p_Pa, fluid))
     liquid = state.region in ("compressed_liquid", "saturated_liquid")
     return Properties(fluid, T_K, p_Pa, state.rho_kg_per_m3, mu, k, cp, beta, liquid)
+
+
+@lru_cache(maxsize=1)
+def convection_fluids() -> tuple[str, ...]:
+    """Los fluidos del proyecto con viscosidad y conductividad en CoolProp."""
+    out = []
+    for fluid in SUPPORTED_FLUIDS:
+        try:
+            PropsSI("V", "T", 300.0, "P", 101_325.0, fluid)
+            PropsSI("L", "T", 300.0, "P", 101_325.0, fluid)
+        except ValueError:
+            continue
+        out.append(fluid)
+    return tuple(out)
 
 
 def _check_wall_phase(fluid: str, T_s: float, T_bulk: float, p: float) -> str | None:
@@ -495,8 +513,9 @@ CORRELATIONS: dict[str, Correlation] = {
         Correlation(
             "churchill_bernstein",
             "Churchill y Bernstein (1977)",
-            r"Nu = 0.3 + \frac{0.62\,Re^{1/2}Pr^{1/3}}{\left[1 + (0.4/Pr)^{2/3}\right]^{1/4}}"
-            r"\left[1 + \left(\frac{Re}{282\,000}\right)^{5/8}\right]^{4/5}",
+            r"\begin{aligned}Nu &= 0.3 + \frac{0.62\,Re^{1/2}Pr^{1/3}}"
+            r"{\left[1 + (0.4/Pr)^{2/3}\right]^{1/4}} \\ &\quad \cdot "
+            r"\left[1 + \left(\frac{Re}{282\,000}\right)^{5/8}\right]^{4/5}\end{aligned}",
             "Re·Pr > 0,2",
             lambda d: nu_churchill_bernstein(d["Re"], d["Pr"]),
             lambda d: d["Re"] * d["Pr"] > 0.2,
@@ -512,8 +531,8 @@ CORRELATIONS: dict[str, Correlation] = {
         Correlation(
             "whitaker",
             "Whitaker (1972)",
-            r"Nu = 2 + \left(0.4\,Re^{1/2} + 0.06\,Re^{2/3}\right) Pr^{0.4}"
-            r"\left(\frac{\mu_\infty}{\mu_s}\right)^{1/4}",
+            r"\begin{aligned}Nu &= 2 + \left(0.4\,Re^{1/2} + 0.06\,Re^{2/3}\right) \\ &\quad "
+            r"\cdot Pr^{0.4}\left(\frac{\mu_\infty}{\mu_s}\right)^{1/4}\end{aligned}",
             "3,5 ≤ Re ≤ 7,6·10⁴; 0,71 ≤ Pr ≤ 380",
             lambda d: nu_whitaker(d["Re"], d["Pr"], d["mu_ratio"]),
             lambda d: _between(d["Re"], 3.5, 7.6e4) and _between(d["Pr"], 0.71, 380),
@@ -529,7 +548,8 @@ CORRELATIONS: dict[str, Correlation] = {
         Correlation(
             "tube_laminar",
             "Laminar desarrollada",
-            r"Nu = 3.66 \;\;(T_s\ \text{cte.}) \qquad Nu = 4.36 \;\;(q''\ \text{cte.})",
+            r"\begin{aligned}Nu &= 3.66 \;\;(T_s\ \text{cte.}) \\ "
+            r"Nu &= 4.36 \;\;(q''_s\ \text{cte.})\end{aligned}",
             "Re < 2300; lejos de la entrada",
             lambda d: nu_tube_laminar(d["constant_T"] > 0.5),
             lambda d: d["Re"] < RE_LAMINAR_TUBE,
@@ -569,8 +589,8 @@ CORRELATIONS: dict[str, Correlation] = {
         Correlation(
             "vertical_churchill_chu",
             "Churchill y Chu (1975)",
-            r"Nu = \left\{0.825 + \frac{0.387\,Ra^{1/6}}"
-            r"{\left[1 + (0.492/Pr)^{9/16}\right]^{8/27}}\right\}^{2}",
+            r"\begin{aligned}Nu &= \left(0.825 + \frac{0.387\,Ra^{1/6}}{\psi}\right)^{2} \\ "
+            r"\psi &= \left[1 + (0.492/Pr)^{9/16}\right]^{8/27}\end{aligned}",
             "todo Ra",
             lambda d: nu_vertical_churchill_chu(d["Ra"], d["Pr"]),
             lambda d: d["Ra"] <= 1e13,
@@ -602,8 +622,8 @@ CORRELATIONS: dict[str, Correlation] = {
         Correlation(
             "horizontal_cylinder_churchill_chu",
             "Churchill y Chu (1975)",
-            r"Nu = \left\{0.60 + \frac{0.387\,Ra^{1/6}}"
-            r"{\left[1 + (0.559/Pr)^{9/16}\right]^{8/27}}\right\}^{2}",
+            r"\begin{aligned}Nu &= \left(0.60 + \frac{0.387\,Ra^{1/6}}{\psi}\right)^{2} \\ "
+            r"\psi &= \left[1 + (0.559/Pr)^{9/16}\right]^{8/27}\end{aligned}",
             "Ra ≤ 10¹²",
             lambda d: nu_horizontal_cylinder_churchill_chu(d["Ra"], d["Pr"]),
             lambda d: d["Ra"] <= 1e12,
@@ -1004,6 +1024,27 @@ class InternalFlowResult:
         if self.Re < RE_LAMINAR_TUBE:
             return 0.05 * self.Re * D, 0.05 * self.Re * self.props.Pr * D
         return 10.0 * D, 10.0 * D
+
+
+def tube_profile(
+    result: InternalFlowResult, n: int = 61
+) -> tuple[list[float], list[float], list[float]]:
+    """(x en m, T_m(x), T_s(x)) a lo largo del tubo, con el h promedio (Incropera, §8.3).
+
+    Con T de pared constante, T_s − T_m cae exponencialmente; con flujo
+    constante, T_m sube lineal y la pared queda q''/h por encima.
+    """
+    i = result.inputs
+    C = i.m_dot_kg_s * result.props.cp_J_per_kgK
+    P = math.pi * i.D_m
+    xs = [i.L_m * j / (n - 1) for j in range(n)]
+    if i.condition == "constant_T":
+        Ts = i.T_s_K or 0.0
+        Tm = [Ts - (Ts - i.T_in_K) * math.exp(-result.h_W_per_m2K * P * x / C) for x in xs]
+        return xs, Tm, [Ts] * n
+    q = i.q_W_per_m2 or 0.0
+    Tm = [i.T_in_K + q * P * x / C for x in xs]
+    return xs, Tm, [T + q / result.h_W_per_m2K for T in Tm]
 
 
 def _saturation_T(fluid: str, p: float) -> float | None:
