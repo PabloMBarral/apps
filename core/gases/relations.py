@@ -954,14 +954,15 @@ RELATIONS_EXAMPLES: dict[str, RelationsExample] = {
     "Agua líquida a 100 bar y 20 °C": RelationsExample(
         RelationsInputs("Water", 100e5, 20.0 + C, 1.0, 10e5),
         "Un líquido: c_p − c_v es menos del 1 % de c_p. A volumen constante la presión sube "
-        "4,5 bar por kelvin: por eso ΔT = 1 °C.",
+        "4,9 bar por kelvin: por eso ΔT = 1 °C.",
     ),
 }
 
 CLAPEYRON_EXAMPLES: dict[str, ClapeyronExample] = {
-    "R-134a a −10 °C (Çengel §12-3)": ClapeyronExample(
-        ClapeyronInputs("R134a", -10.0 + C, 2.0, -20.0 + C),
-        "Çengel estima h_fg con las tablas a −8 y −12 °C: 205,9 kJ/kg (tabla: 205,96).",
+    "R-134a a 20 °C (Çengel §12-3)": ClapeyronExample(
+        ClapeyronInputs("R134a", 20.0 + C, 4.0, 40.0 + C),
+        "Çengel estima la pendiente con las tablas a 16 y 24 °C: h_fg = 182,40 kJ/kg (tabla: "
+        "182,27).",
     ),
     "Agua a 100 °C": ClapeyronExample(
         ClapeyronInputs("Water", 100.0 + C, 5.0, 120.0 + C),
@@ -977,7 +978,7 @@ CLAPEYRON_EXAMPLES: dict[str, ClapeyronExample] = {
 JT_EXAMPLES: dict[str, JouleThomsonExample] = {
     "Nitrógeno a 300 K y 50 bar (se enfría)": JouleThomsonExample(
         JouleThomsonInputs("Nitrogen", 50e5, 300.0, 5e5),
-        "Por debajo de su máxima temperatura de inversión (≈ 620 K): se enfría.",
+        "Por debajo de su máxima temperatura de inversión (≈ 608 K): se enfría.",
     ),
     "Hidrógeno a 300 K y 50 bar (se calienta)": JouleThomsonExample(
         JouleThomsonInputs("Hydrogen", 50e5, 300.0, 5e5),

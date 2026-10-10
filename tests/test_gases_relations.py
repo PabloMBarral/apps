@@ -165,9 +165,10 @@ def test_density_maximum_of_water() -> None:
 
 
 def test_inversion_curve_of_nitrogen() -> None:
-    """La máxima temperatura de inversión del N₂ ronda 620 K y la presión máxima, 380 bar."""
+    """La máxima temperatura de inversión del N₂ (con la ecuación de estado de CoolProp)
+    ronda 608 K y la presión máxima, 380 bar."""
     out = rl.inversion_curve("Nitrogen")
-    assert max(out["T"]) == pytest.approx(610.0, abs=15.0)
+    assert max(out["T"]) == pytest.approx(608.0, abs=2.0)
     assert max(out["p"]) / 1e5 == pytest.approx(380.0, abs=15.0)
     state = CoolProp.AbstractState("HEOS", "Nitrogen")
     for p, T in list(zip(out["p"], out["T"], strict=True))[::7]:
@@ -195,12 +196,13 @@ def test_isenthalps() -> None:
 
 
 def test_clapeyron_r134a_like_cengel() -> None:
-    """Çengel §12-3: h_fg del R-134a a −10 °C con p_sat a −8 y −12 °C da 206,0 kJ/kg (la
-    tabla, 205,96)."""
-    r = rl.clapeyron(rl.CLAPEYRON_EXAMPLES["R-134a a −10 °C (Çengel §12-3)"].inputs)
-    assert r.dpdT_finite / 1e3 == pytest.approx(7.9275, abs=0.01)
-    assert r.h_fg_clapeyron / 1e3 == pytest.approx(206.0, abs=0.15)
-    assert r.h_fg / 1e3 == pytest.approx(205.96, abs=0.05)
+    """Çengel §12-3: h_fg del R-134a a 20 °C con p_sat a 16 y 24 °C, 17,70 kPa/K y
+    182,40 kJ/kg (la tabla, 182,27)."""
+    r = rl.clapeyron(rl.CLAPEYRON_EXAMPLES["R-134a a 20 °C (Çengel §12-3)"].inputs)
+    assert (r.p_minus / 1e3, r.p_plus / 1e3) == pytest.approx((504.58, 646.18), abs=0.5)
+    assert r.dpdT_finite / 1e3 == pytest.approx(17.70, abs=0.02)
+    assert r.h_fg_clapeyron / 1e3 == pytest.approx(182.40, abs=0.1)
+    assert r.h_fg / 1e3 == pytest.approx(182.27, abs=0.05)
     assert r.dpdT_exact == pytest.approx(r.h_fg / (r.T * r.v_fg), rel=1e-6)  # Clapeyron exacta
     assert r.s_fg == pytest.approx(r.h_fg / r.T, rel=1e-9)
 
