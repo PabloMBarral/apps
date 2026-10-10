@@ -22,7 +22,14 @@ from core.gases.real import (
     lk_z_of_vr,
     pr_kappa,
 )
-from core.gases.relations import ClapeyronResult, Derivative, MaxwellRelation, RelationsResult
+from core.gases.relations import (
+    ClapeyronResult,
+    Derivative,
+    JouleThomsonResult,
+    MaxwellRelation,
+    PathState,
+    RelationsResult,
+)
 from core.heat_transfer.procedure_common import frac, n, numbered, q, sub, times
 from core.ideal_gas import R_U
 from core.latex import latex_chain, latex_number, latex_paren, latex_unit
@@ -33,6 +40,7 @@ __all__ = [
     "clapeyron_steps",
     "compressibility_steps",
     "cubic_steps",
+    "joule_thomson_steps",
     "relations_steps",
 ]
 
@@ -1138,49 +1146,118 @@ def relations_steps(r: RelationsResult, system: UnitSystem) -> list[ProcedureSte
             ),
         )
     )
-    lo, hi = r.isenthalpic
-    dvdT = r.relation("g").right.exact
-    Tdv = s.T * dvdT
-    jt_num = n(Tdv - s.v, _V, system)
     steps.append(
         ProcedureStep(
             "El coeficiente de Joule–Thomson",
-            "μ_JT = (∂T/∂p)_h = [T·(∂v/∂T)_p − v]/c_p (Çengel §12-5): positivo, el fluido se "
-            "enfría al estrangularlo; negativo, se calienta; en un gas ideal, 0. Por diferencias, "
-            "con los estados de h constante a p ± Δp." + _pv_text(system),
-            (
-                latex_chain(
-                    r"T\left(\frac{\partial v}{\partial T}\right)_p",
-                    times(n(s.T, _T, system), n(dvdT, "volume_per_temperature", system)),
-                    q(Tdv, _V, system),
-                ),
-                _stack_chain(
-                    r"T\left(\frac{\partial v}{\partial T}\right)_p - v",
-                    sub(n(Tdv, _V, system), n(s.v, _V, system)),
-                    q(Tdv - s.v, _V, system),
-                ),
-                latex_chain(
-                    r"\mu_{JT}",
-                    frac(r"T\left(\frac{\partial v}{\partial T}\right)_p - v", "c_p"),
-                    frac(
-                        _with_factor(f_tex, f"({jt_num})") if f_tex else jt_num,
-                        n(r.cp, "specific_heat", system),
-                    ),
-                    q(r.mu_JT_formula, "temperature_per_pressure", system),
-                ),
-                latex_chain(
-                    r"\mu_{JT}",
-                    frac(r"T_+ - T_-", r"2\,\Delta p"),
-                    frac(
-                        sub(n(hi.T, "temperature", system), n(lo.T, "temperature", system)),
-                        times("2", n(r.dp, _P, system)),
-                    ),
-                    q(r.mu_JT_finite, "temperature_per_pressure", system),
-                    relation=r"\approx",
-                ),
+            _JT_TEXT + _pv_text(system),
+            _jt_lines(
+                s,
+                r.relation("g").right.exact,
+                r.cp,
+                r.mu_JT_formula,
+                r.mu_JT_finite,
+                r.isenthalpic,
+                r.dp,
+                system,
             ),
         )
     )
+    return numbered(steps)
+
+
+_JT_TEXT = (
+    "μ_JT = (∂T/∂p)_h = [T·(∂v/∂T)_p − v]/c_p (Çengel §12-5): positivo, el fluido se "
+    "enfría al estrangularlo; negativo, se calienta; en un gas ideal, 0. Por diferencias, "
+    "con los estados de h constante a p ± Δp."
+)
+
+
+def _jt_lines(
+    s: PathState,
+    dvdT: float,
+    cp: float,
+    mu_formula: float,
+    mu_finite: float,
+    isenthalpic: tuple[PathState, PathState],
+    dp: float,
+    system: UnitSystem,
+) -> tuple[str, ...]:
+    """μ_JT con la fórmula y por diferencias a h constante."""
+    _, f_tex = _pv(system)
+    lo, hi = isenthalpic
+    Tdv = s.T * dvdT
+    jt_num = n(Tdv - s.v, _V, system)
+    return (
+        latex_chain(
+            r"T\left(\frac{\partial v}{\partial T}\right)_p",
+            times(n(s.T, _T, system), n(dvdT, "volume_per_temperature", system)),
+            q(Tdv, _V, system),
+        ),
+        _stack_chain(
+            r"T\left(\frac{\partial v}{\partial T}\right)_p - v",
+            sub(n(Tdv, _V, system), n(s.v, _V, system)),
+            q(Tdv - s.v, _V, system),
+        ),
+        latex_chain(
+            r"\mu_{JT}",
+            frac(r"T\left(\frac{\partial v}{\partial T}\right)_p - v", "c_p"),
+            frac(
+                _with_factor(f_tex, f"({jt_num})") if f_tex else jt_num,
+                n(cp, "specific_heat", system),
+            ),
+            q(mu_formula, "temperature_per_pressure", system),
+        ),
+        latex_chain(
+            r"\mu_{JT}",
+            frac(r"T_+ - T_-", r"2\,\Delta p"),
+            frac(
+                sub(n(hi.T, "temperature", system), n(lo.T, "temperature", system)),
+                times("2", n(dp, _P, system)),
+            ),
+            q(mu_finite, "temperature_per_pressure", system),
+            relation=r"\approx",
+        ),
+    )
+
+
+def joule_thomson_steps(r: JouleThomsonResult, system: UnitSystem) -> list[ProcedureStep]:
+    """Los pasos del coeficiente de Joule–Thomson en un estado (Çengel §12-5)."""
+    s = r.state
+    steps = [
+        ProcedureStep(
+            "El estado",
+            f"De la ecuación de estado del {r.fluid.noun} (CoolProp).",
+            (
+                _rows(
+                    ("T", q(s.T, _T, system)),
+                    ("p", q(s.p, _P, system)),
+                    ("v", q(s.v, _V, system)),
+                    ("c_p", q(r.cp, "specific_heat", system)),
+                ),
+                latex_chain(
+                    r"\left(\frac{\partial v}{\partial T}\right)_p",
+                    q(r.dv_dT, "volume_per_temperature", system),
+                ),
+            ),
+        ),
+        ProcedureStep(
+            "El coeficiente de Joule–Thomson",
+            _JT_TEXT + _pv_text(system),
+            _jt_lines(s, r.dv_dT, r.cp, r.mu_formula, r.mu_finite, r.isenthalpic, r.dp, system),
+        ),
+    ]
+    if r.T_inversion:
+        temps = " y ".join(_txt_q(T, "temperature", system) for T in r.T_inversion)
+        text = (
+            "La curva de inversión es donde μ_JT = 0, es decir T·(∂v/∂T)_p = v. A esta presión "
+            f"pasa por {temps}: entre esas temperaturas el fluido se enfría al estrangularlo."
+        )
+    else:
+        text = (
+            "La curva de inversión es donde μ_JT = 0, es decir T·(∂v/∂T)_p = v; a esta presión "
+            "no la corta (está por encima de su nariz)."
+        )
+    steps.append(ProcedureStep("La temperatura de inversión", text))
     return numbered(steps)
 
 

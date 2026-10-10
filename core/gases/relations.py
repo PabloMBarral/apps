@@ -35,6 +35,13 @@ from core.gases.real import RealFluid, real_fluid
 
 __all__ = [
     "CLAPEYRON_EXAMPLES",
+    "JT_EXAMPLES",
+    "JouleThomsonExample",
+    "JouleThomsonInputs",
+    "JouleThomsonResult",
+    "clausius_curve",
+    "joule_thomson",
+    "joule_thomson_to_dict",
     "MAXWELL_KEYS",
     "RELATIONS_EXAMPLES",
     "ClapeyronExample",
@@ -676,11 +683,47 @@ def _mu(state: CoolProp.AbstractState, p: float, T: float) -> float:
     return float(state.first_partial_deriv(CoolProp.iT, CoolProp.iP, CoolProp.iHmass))
 
 
-def inversion_curve(fluid_key: str, points: int = 50) -> dict[str, list[float]]:
-    """La curva de inversión de Joule–Thomson (μ_JT = 0) en el plano T–p.
+def _inversion_temperatures(
+    state: CoolProp.AbstractState, fl: RealFluid, p: float, Ts: np.ndarray
+) -> tuple[list[float], list[float]]:
+    """Las temperaturas de inversión a p: (rama baja, rama alta).
 
-    Para cada p busca los cambios de signo de μ_JT(T) en una sola fase (el salto de la
-    saturación no cuenta): la rama baja (μ pasa de − a + al subir T) y la alta (de + a −).
+    Busca los cambios de signo de μ_JT(T) en una sola fase (el salto de la saturación no
+    cuenta): en la rama baja μ pasa de − a + al subir T, en la alta de + a −.
+    """
+    T_sat = None
+    if p < fl.p_cr:
+        state.update(CoolProp.PQ_INPUTS, p, 0.0)
+        T_sat = float(state.T())
+    values = []
+    for T in Ts:
+        try:
+            values.append(_mu(state, p, float(T)))
+        except ValueError:
+            values.append(math.nan)
+    lower: list[float] = []
+    upper: list[float] = []
+    for i in range(len(Ts) - 1):
+        a, b = values[i], values[i + 1]
+        if not (math.isfinite(a) and math.isfinite(b)) or a * b > 0.0:
+            continue
+        if T_sat is not None and Ts[i] <= T_sat <= Ts[i + 1]:
+            continue  # el salto de líquido a vapor no es una inversión
+        try:
+            T_inv = float(brentq(lambda T: _mu(state, p, T), Ts[i], Ts[i + 1], xtol=1e-6))
+        except ValueError:
+            continue
+        (lower if a < 0.0 else upper).append(T_inv)
+    return lower, upper
+
+
+def _T_grid(fl: RealFluid) -> np.ndarray:
+    return np.geomspace(fl.T_min * 1.01, fl.T_max * 0.99, 240)
+
+
+def inversion_curve(fluid_key: str, points: int = 50) -> dict[str, list[float]]:
+    """La curva de inversión de Joule–Thomson (μ_JT = 0) en el plano T–p (Çengel §12-5).
+
     Devuelve ``{"p": [...], "T": [...]}`` en orden: la rama baja de p chica a la nariz y
     la alta de vuelta.
     """
@@ -688,30 +731,11 @@ def inversion_curve(fluid_key: str, points: int = 50) -> dict[str, list[float]]:
     state = CoolProp.AbstractState("HEOS", fl.key)
     lower: list[tuple[float, float]] = []
     upper: list[tuple[float, float]] = []
-    Ts = np.geomspace(fl.T_min * 1.01, fl.T_max * 0.99, 240)
+    Ts = _T_grid(fl)
     for p in np.geomspace(0.01 * fl.p_cr, min(30.0 * fl.p_cr, fl.p_max), points):
-        p = float(p)
-        T_sat = None
-        if p < fl.p_cr:
-            state.update(CoolProp.PQ_INPUTS, p, 0.0)
-            T_sat = float(state.T())
-        values = []
-        for T in Ts:
-            try:
-                values.append(_mu(state, p, float(T)))
-            except ValueError:
-                values.append(math.nan)
-        for i in range(len(Ts) - 1):
-            a, b = values[i], values[i + 1]
-            if not (math.isfinite(a) and math.isfinite(b)) or a * b > 0.0:
-                continue
-            if T_sat is not None and Ts[i] <= T_sat <= Ts[i + 1]:
-                continue  # el salto de líquido a vapor no es una inversión
-            try:
-                T_inv = float(brentq(lambda T, p=p: _mu(state, p, T), Ts[i], Ts[i + 1], xtol=1e-6))
-            except ValueError:
-                continue
-            (lower if a < 0.0 else upper).append((p, T_inv))
+        lo, hi = _inversion_temperatures(state, fl, float(p), Ts)
+        lower += [(float(p), T) for T in lo]
+        upper += [(float(p), T) for T in hi]
     curve = [*lower, *reversed(upper)]
     return {"p": [p for p, _ in curve], "T": [T for _, T in curve]}
 
@@ -740,9 +764,159 @@ def isenthalps(
     return out
 
 
+@dataclass(frozen=True)
+class JouleThomsonInputs:
+    """El fluido, el estado (p, T) y el paso Δp de la diferencia a h constante (SI)."""
+
+    fluid_key: str
+    p_Pa: float
+    T_K: float
+    dp_Pa: float | None = None  # None: 10 % de p
+
+
+@dataclass(frozen=True)
+class JouleThomsonResult:
+    inputs: JouleThomsonInputs
+    fluid: RealFluid
+    phase: Literal["liquid", "vapor", "supercritical"]
+    state: PathState
+    cp: float
+    dv_dT: float  # (∂v/∂T)_p
+    dp: float
+    mu: float  # exacto (CoolProp)
+    mu_formula: float  # [T·(∂v/∂T)_p − v]/c_p
+    mu_finite: float  # (T₊ − T₋)/(2Δp) a h constante
+    isenthalpic: tuple[PathState, PathState]
+    T_inversion: tuple[float, ...]  # las temperaturas de inversión a esta presión
+    notes: tuple[str, ...]
+
+
+def joule_thomson(inputs: JouleThomsonInputs) -> JouleThomsonResult:
+    """El coeficiente de Joule–Thomson μ_JT = (∂T/∂p)_h = [T·(∂v/∂T)_p − v]/c_p en (p, T)
+    (Çengel §12-5), exacto, con la fórmula y por diferencias a h constante, y las
+    temperaturas de inversión a esa presión.
+
+    Raises
+    ------
+    ValueError
+        Con datos no positivos, fuera del rango de la ecuación de estado o en la campana.
+    """
+    fl = real_fluid(inputs.fluid_key)
+    p, T = inputs.p_Pa, inputs.T_K
+    dp = inputs.dp_Pa if inputs.dp_Pa is not None else 0.1 * p
+    for msg, value in (
+        ("La presión (absoluta) tiene que ser positiva", p),
+        ("La temperatura (absoluta) tiene que ser positiva", T),
+        ("El paso Δp tiene que ser positivo", dp),
+    ):
+        if not (math.isfinite(value) and value > 0.0):
+            raise ValueError(f"{msg}.")
+    if dp >= p:
+        raise ValueError("El paso Δp tiene que ser menor que la presión (p − Δp > 0).")
+    if not (fl.T_min <= T <= fl.T_max):
+        raise ValueError(
+            f"La temperatura está fuera del rango de la ecuación de estado del {fl.noun}: de "
+            f"{_num(fl.T_min, '.4g')} K a {_num(fl.T_max, '.4g')} K."
+        )
+    if p + dp > fl.p_max:
+        raise ValueError(
+            f"p + Δp supera la presión máxima de la ecuación de estado del {fl.noun} "
+            f"({_num(fl.p_max / 1e6, '.4g')} MPa)."
+        )
+    state = CoolProp.AbstractState("HEOS", fl.key)
+    if T < fl.T_cr:
+        state.update(CoolProp.QT_INPUTS, 0.0, T)
+        if abs(p / state.p() - 1.0) < 1e-6:
+            raise ValueError(
+                "Esa presión es justo la de saturación a esa temperatura: μ_JT es de una sola "
+                "fase. Corré un poco la presión o la temperatura."
+            )
+    base = _update(state, "PT", p, T, "del dato")
+    phase = _phase(state, fl)
+    cp = float(state.cpmass())
+    mu = float(state.first_partial_deriv(CoolProp.iT, CoolProp.iP, CoolProp.iHmass))
+    dv_dT = _exact(state, "v", "T", "p")
+    lo = _update(state, "PH", p - dp, base.h, "a p − Δp de la isoentálpica")
+    hi = _update(state, "PH", p + dp, base.h, "a p + Δp de la isoentálpica")
+    low, up = _inversion_temperatures(state, fl, p, _T_grid(fl))
+    result = JouleThomsonResult(
+        inputs=inputs,
+        fluid=fl,
+        phase=phase,
+        state=base,
+        cp=cp,
+        dv_dT=dv_dT,
+        dp=dp,
+        mu=mu,
+        mu_formula=(T * dv_dT - base.v) / cp,
+        mu_finite=(hi.T - lo.T) / (2.0 * dp),
+        isenthalpic=(lo, hi),
+        T_inversion=tuple(sorted(low + up)),
+        notes=(),
+    )
+    return replace(result, notes=_jt_notes(result))
+
+
+def _jt_notes(r: JouleThomsonResult) -> tuple[str, ...]:
+    notes: list[str] = []
+    fl = r.fluid
+    K_bar = r.mu * 1e5
+    if r.mu > 0:
+        notes.append(
+            f"μ_JT > 0: al estrangularlo (la presión baja a h constante) el {fl.noun} se enfría, "
+            f"unos {_num(abs(K_bar), '.2g')} K por bar. Así se licúan los gases (Linde)."
+        )
+    else:
+        notes.append(
+            f"μ_JT < 0: al estrangularlo el {fl.noun} se calienta, unos "
+            f"{_num(abs(K_bar), '.2g')} K por bar: está fuera de la curva de inversión."
+        )
+    if len(r.T_inversion) == 2:
+        lo, hi = (f"{_num(T - 273.15, '.4g')} °C" for T in r.T_inversion)
+        notes.append(
+            f"A esta presión el {fl.noun} se enfría al estrangularlo solo entre {lo} y {hi} (las "
+            "temperaturas de inversión): adentro de la curva de inversión."
+        )
+    elif len(r.T_inversion) == 1:
+        notes.append(
+            f"A esta presión la temperatura de inversión es "
+            f"{_num(r.T_inversion[0] - 273.15, '.4g')} °C."
+        )
+    else:
+        notes.append(
+            "A esta presión no hay temperatura de inversión en el rango de la ecuación de "
+            "estado: está por encima de la nariz de la curva."
+        )
+    notes.append(
+        "Un gas ideal tiene μ_JT = 0: su h depende solo de T, así que una válvula no le cambia "
+        "la temperatura. El enfriamiento de un gas real mide cuánto se aparta del ideal."
+    )
+    return tuple(notes)
+
+
+def clausius_curve(r: ClapeyronResult, points: int = 60) -> dict[str, list[float]]:
+    """p_sat(T) real (CoolProp) y la curva de Clausius–Clapeyron por (T₁, p₁) con h_fg(T₁)
+    constante, de la T mínima (o 0,45·T_cr) a la crítica: ``{"T", "real", "cc"}``."""
+    fl = r.fluid
+    state = CoolProp.AbstractState("HEOS", fl.key)
+    Ts = np.linspace(max(fl.T_min * 1.001, 0.45 * fl.T_cr), 0.999 * fl.T_cr, points)
+    real, cc = [], []
+    for T in Ts:
+        state.update(CoolProp.QT_INPUTS, 0.0, float(T))
+        real.append(float(state.p()))
+        cc.append(r.p_sat * math.exp(r.h_fg / fl.R * (1.0 / r.T - 1.0 / float(T))))
+    return {"T": [float(T) for T in Ts], "real": real, "cc": cc}
+
+
 # ---------------------------------------------------------------------
 # Ejemplos y export
 # ---------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class JouleThomsonExample:
+    inputs: JouleThomsonInputs
+    note: str = ""
 
 
 @dataclass(frozen=True)
@@ -798,6 +972,49 @@ CLAPEYRON_EXAMPLES: dict[str, ClapeyronExample] = {
         "Clausius–Clapeyron empeora: el vapor ya no es un gas ideal.",
     ),
 }
+
+
+JT_EXAMPLES: dict[str, JouleThomsonExample] = {
+    "Nitrógeno a 300 K y 50 bar (se enfría)": JouleThomsonExample(
+        JouleThomsonInputs("Nitrogen", 50e5, 300.0, 5e5),
+        "Por debajo de su máxima temperatura de inversión (≈ 620 K): se enfría.",
+    ),
+    "Hidrógeno a 300 K y 50 bar (se calienta)": JouleThomsonExample(
+        JouleThomsonInputs("Hydrogen", 50e5, 300.0, 5e5),
+        "Su máxima temperatura de inversión ronda los 200 K: a temperatura ambiente el "
+        "hidrógeno se calienta en una válvula. Hay que preenfriarlo para licuarlo.",
+    ),
+    "Aire a 20 °C y 200 bar (un tubo de buceo)": JouleThomsonExample(
+        JouleThomsonInputs("Air", 200e5, 20.0 + C, 10e5),
+        "El regulador de un tubo se enfría al bajar la presión.",
+    ),
+    "Dióxido de carbono a 40 °C y 60 bar": JouleThomsonExample(
+        JouleThomsonInputs("CarbonDioxide", 60e5, 40.0 + C, 5e5),
+        "Cerca del punto crítico μ_JT es grande: el CO₂ de un matafuego sale helado.",
+    ),
+    "Helio a 300 K y 10 bar": JouleThomsonExample(
+        JouleThomsonInputs("Helium", 10e5, 300.0, 1e5),
+        "Su máxima temperatura de inversión es ≈ 45 K: a temperatura ambiente se calienta.",
+    ),
+}
+
+
+def joule_thomson_to_dict(r: JouleThomsonResult) -> dict[str, Any]:
+    return {
+        "fluido": r.fluid.name,
+        "fase": r.phase,
+        "p_Pa": r.state.p,
+        "T_K": r.state.T,
+        "v": r.state.v,
+        "c_p": r.cp,
+        "dv_dT_p": r.dv_dT,
+        "dp_Pa": r.dp,
+        "mu_JT": r.mu,
+        "mu_JT_formula": r.mu_formula,
+        "mu_JT_diferencias": r.mu_finite,
+        "T_inversion_K": list(r.T_inversion),
+        "notas": list(r.notes),
+    }
 
 
 def relations_to_dict(r: RelationsResult) -> dict[str, Any]:

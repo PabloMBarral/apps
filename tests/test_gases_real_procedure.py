@@ -18,6 +18,7 @@ from core.gases.real_procedure import (
     clapeyron_steps,
     compressibility_steps,
     cubic_steps,
+    joule_thomson_steps,
     relations_steps,
 )
 from core.latex import latex_number, latex_quantity
@@ -266,3 +267,23 @@ def test_clapeyron_without_a_second_temperature() -> None:
     r = rl.clapeyron(rl.ClapeyronInputs("Water", 100.0 + C, 1.0))
     steps = clapeyron_steps(r, "SI")
     assert len(steps) == 4
+
+
+# ---------------------------------------------------------------------
+# Joule–Thomson
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("system", SYSTEMS)
+@pytest.mark.parametrize("name", list(rl.JT_EXAMPLES))
+def test_joule_thomson_steps_are_well_formed(name: str, system: str) -> None:
+    r = rl.joule_thomson(rl.JT_EXAMPLES[name].inputs)
+    steps = joule_thomson_steps(r, system)  # type: ignore[arg-type]
+    tex = _check_steps(steps)
+    assert _titles(steps) == [
+        "El estado",
+        "El coeficiente de Joule–Thomson",
+        "La temperatura de inversión",
+    ]
+    assert _q(r.mu_formula, "temperature_per_pressure", system) in tex
+    assert _q(r.mu_finite, "temperature_per_pressure", system) in tex

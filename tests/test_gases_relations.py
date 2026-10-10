@@ -271,3 +271,52 @@ def test_examples_and_export() -> None:
         c = rl.clapeyron(ex.inputs)
         json.dumps(rl.clapeyron_to_dict(c))
         assert pickle.loads(pickle.dumps(c)) == c
+
+
+# ---------------------------------------------------------------------
+# Joule–Thomson en un estado y Clausius–Clapeyron para el gráfico
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", list(rl.JT_EXAMPLES))
+def test_joule_thomson_three_ways(name: str) -> None:
+    r = rl.joule_thomson(rl.JT_EXAMPLES[name].inputs)
+    assert r.mu_formula == pytest.approx(r.mu, rel=1e-9)
+    assert r.mu_finite == pytest.approx(r.mu, rel=0.01)
+    lo, hi = r.isenthalpic
+    assert lo.h == pytest.approx(r.state.h) and hi.h == pytest.approx(r.state.h)
+    json.dumps(rl.joule_thomson_to_dict(r))
+    assert pickle.loads(pickle.dumps(r)) == r
+
+
+def test_nitrogen_cools_and_hydrogen_heats() -> None:
+    n2 = rl.joule_thomson(rl.JT_EXAMPLES["Nitrógeno a 300 K y 50 bar (se enfría)"].inputs)
+    h2 = rl.joule_thomson(rl.JT_EXAMPLES["Hidrógeno a 300 K y 50 bar (se calienta)"].inputs)
+    assert n2.mu > 0 and h2.mu < 0
+    assert n2.T_inversion[0] < 300.0 < n2.T_inversion[-1]  # adentro de la curva
+    assert h2.T_inversion[-1] < 300.0  # el H₂ invierte a ~200 K
+    assert any("se enfría" in n for n in n2.notes)
+    assert any("se calienta" in n for n in h2.notes)
+    state = CoolProp.AbstractState("HEOS", "Nitrogen")
+    for T in n2.T_inversion:  # μ_JT = 0 en cada temperatura de inversión
+        state.update(CoolProp.PT_INPUTS, 50e5, T)
+        assert abs(state.first_partial_deriv(CoolProp.iT, CoolProp.iP, CoolProp.iHmass)) < 1e-9
+
+
+def test_joule_thomson_errors() -> None:
+    with pytest.raises(ValueError, match="menor que la presión"):
+        rl.joule_thomson(rl.JouleThomsonInputs("Nitrogen", 1e5, 300.0, 2e5))
+    with pytest.raises(ValueError, match="fuera del rango"):
+        rl.joule_thomson(rl.JouleThomsonInputs("Nitrogen", 1e5, 5000.0))
+    with pytest.raises(ValueError, match="campana"):
+        # vapor apenas sobrecalentado: a p + Δp y h constante ya es mezcla
+        rl.joule_thomson(rl.JouleThomsonInputs("Water", 1e5, 375.0, 0.5e5))
+
+
+def test_clausius_curve() -> None:
+    c = rl.clapeyron(rl.CLAPEYRON_EXAMPLES["Agua a 100 °C"].inputs)
+    out = rl.clausius_curve(c)
+    k = min(range(len(out["T"])), key=lambda i: abs(out["T"][i] - c.T))
+    assert out["cc"][k] == pytest.approx(out["real"][k], rel=0.05)  # coinciden cerca de T₁
+    assert out["cc"][-1] > out["real"][-1]  # y se separan cerca del punto crítico
+    assert out["real"] == sorted(out["real"])
