@@ -20,7 +20,8 @@ abstract: >-
   isoentrópicos, ciclos termodinámicos, estequiometría y combustión,
   poder calorífico por composición última/próxima y por ISO 6976,
   exergía, psicrometría, transferencia de calor (conducción, aletas,
-  convección, radiación e intercambiadores) y diagramas de fluidos.
+  convección, radiación e intercambiadores), gases ideales y sus mezclas,
+  transformaciones politrópicas y diagramas de fluidos.
 keywords:
   - thermal-engineering
   - thermodynamics
@@ -44,8 +45,11 @@ keywords:
   - heat-transfer
   - thermal-radiation
   - heat-exchangers
+  - ideal-gas
+  - gas-mixtures
+  - polytropic-process
 license: MIT
-version: "0.25.1"
+version: "0.26.0"
 date-released: "2026-10-10"
 references:
   - type: article

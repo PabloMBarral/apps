@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.25.1` — página Acerca de (2026-10-10).
+> **Versión actual**: `0.26.0` — Fase 9.1, gases ideales (2026-10-10).
 
 ---
 
@@ -1464,6 +1464,85 @@
   partido (va sin ajustar, con su barra) y el mensaje del CFF decía «ver
   "references"» (la página usa su propio texto).
 
+### Fase 9.1 — Gases ideales
+- **Versión**: `0.26.0` (2026-10-10). Rama `claude/water-state-analyzer-f4fiev`.
+  La Fase 9 cubre los capítulos del vademecum sin página (§4 a §8 y §15); el plan
+  se mandó junto con la página Acerca de y el autor lo aprobó («OK»). Se parte
+  como la 8: esta entrega es la de los gases ideales y la 9.2 trae los reales.
+- **Scope**:
+  - **`core/gases/ideal.py`** (nuevo): `IdealGas` con 15 gases (los nueve de la
+    tabla del vademecum §4.7 y CO, NH₃, SO₂, etano, propano y n-butano) sobre los
+    polinomios NASA-9 de la combustión (el helio, monoatómico, con c_p = 5/2·R):
+    c_p, c_v, k, h y u desde 25 °C, s°, p_r y v_r. Un gas entre dos estados con
+    dos de p, T y v en cada uno: Δu, Δh y Δs con c_p constante a 25 °C, con el
+    c_p a la temperatura media y con c_p variable, el error de los dos primeros y
+    el Z de CoolProp para ver si vale el gas ideal (o si el estado es líquido).
+  - **`core/gases/mixture.py`** (nuevo): la composición por masas, moles,
+    fracciones másicas o molares, con M, R, c_p, c_v y k de la mezcla, Dalton,
+    Amagat, la entropía con el término de mezcla y el aviso del agua que
+    condensaría; la mezcla adiabática de 2 a 4 corrientes en un tanque (U
+    constante, con el volumen de cada compartimiento) o en una cámara de flujo
+    permanente (H constante, a la presión de salida), con c_p constante o
+    variable: T y p finales, S_gen por corriente separada en igualar T y p y en
+    mezclar gases distintos (dos corrientes del mismo gas no suman entropía de
+    mezcla) y X_dest = T₀·S_gen.
+  - **`core/gases/polytropic.py`** (nuevo): la isócora, la isóbara, la isoterma,
+    la adiabática reversible (con c_p constante, p·v^k = cte; con c_p variable,
+    Δs = 0 por s° o por v_r) y la politrópica con n, en sistema cerrado o abierto,
+    hasta p₂, v₁/v₂ o T₂: el estado 2, n, c, Δu, Δh, Δs, w, w_f y q (por kg y
+    totales) y la comparación con el otro modelo; los cinco caminos hasta el mismo
+    dato; la compresión en N etapas con interenfriamiento perfecto (con sus curvas
+    para el p–v) y el exponente n de dos estados medidos.
+  - `ideal_procedure.py`: el procedimiento de los tres modos en los tres
+    sistemas, con el factor de p·v a la vista en el Técnico (100) y el Inglés
+    (0,18505).
+  - **`ui/gas_charts.py`** (nuevo): c_p(T) con la recta del valor constante, el
+    punto de la temperatura media y el tramo del proceso; la composición másica y
+    molar en barras apiladas; la entropía generada por corriente; los cinco
+    caminos en el p–v y el T–s; el trabajo y el calor de cada camino (puntos) y la
+    compresión en etapas contra una etapa y la isoterma.
+  - **Página `/Gases_Ideales` (🎈)**, en el menú después de Intercambiadores,
+    con la teoría (vademecum §4, §5, §6 y §10.5), el procedimiento y el export.
+  - Cambios chicos: `units_system` suma volumen, entropía, flujo de entropía,
+    masa molar y cantidad de sustancia; las citas del vademecum de los módulos
+    nuevos se verificaron contra `vademecum.tex` (Mayer §4.6, la tabla §4.7, los
+    polinomios §4.8, el resumen de las politrópicas §6.4.5).
+- **Validación**, contra Çengel: aire comprimido de §7-9 (Δs = −0,3845 kJ/(kg·K)
+  contra −0,3842), los compresores de §7-12 (263,2 isoentrópico, 246,4 con
+  n = 1,3, 189,2 isotérmico y 215,3 kJ/kg en dos etapas), el motor de auto de
+  §7-9 (662,8 K con v_r contra 662,7), el helio a 40,5 psia, la mezcla de §13-1
+  (M = 19,60 kg/kmol, y = 0,092, 0,175 y 0,733), el tanque de §13-3 (32,2 °C y
+  114,5 kPa) y el O₂ con el CO₂ (S_gen = 44,0 kJ/K, X_dest = 13 120 kJ contra
+  13 100). La tabla del vademecum §4.7 contra NASA a 25 °C (0,05 %). Primer
+  principio en cada proceso, w contra la integral de p·dv, w_f = n·w, Δs = 0 en
+  la adiabática con c_p variable, las etapas con N = 1 y el n de dos estados
+  contra el del dato; en las mezclas, los balances de energía cierran a 1e-9 y
+  S_gen ≥ 0 (0 de mezcla con el mismo gas).
+- **Mensajes al alumno**: temperaturas fuera del rango de los polinomios, dato
+  final que no sirve para el proceso («en una isóbara p₂ = p₁»), n = 1 o n = 0
+  («es una isoterma: elegí ese proceso»), fracciones que no suman 1, un gas
+  repetido, cantidades negativas, una cámara de mezcla que comprimiría, T₀ fuera
+  de rango, p₂ ≤ p₁ en las etapas y dos estados con la misma presión o el mismo
+  volumen en el exponente.
+- **Tests**: de 4820 a 5266 passed (10 skipped), sin warnings.
+  - `tests/test_gases_ideal.py` (45), `tests/test_gases_mixture.py` (23),
+    `tests/test_gases_polytropic.py` (58), `tests/test_gases_procedure.py` (212),
+    `tests/test_gas_charts.py` (9) y `tests/test_page_gases_ideales.py` (37,
+    AppTest), más las unidades en `tests/test_units_system.py` y la página en
+    `test_navigation.py`.
+  - LaTeX: 3486 expresiones distintas del procedimiento y 26 de la teoría
+    validan con KaTeX estricto y entran en 315 px como máximo en los tres
+    sistemas.
+  - Smoke test en Chromium a 390 y 1280 px: 16 casos (los tres modos con sus
+    submodos, en los tres sistemas) con la teoría y el procedimiento abiertos,
+    sin errores, sin desborde y sin ecuaciones que se pasen de su expansor. Las
+    capturas encontraron tres detalles que se corrigieron: la teoría tenía seis
+    renglones con tres fórmulas que no entraban a 390 px; la isócora hasta la p₂
+    de un compresor (9·T₁) aplastaba el T–s y el gráfico del trabajo (ahora queda
+    oculta en la leyenda del T–s, fuera del de trabajo y la página lo dice); y el
+    rótulo del estado 2 en el borde del p–v se cortaba.
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
@@ -1481,6 +1560,11 @@
     modelo; el título no coincide con la palanca a T constante), y justo
     en el borde los clasifica como líquido comprimido / vapor
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
+- **Fase 9.2 — Gases reales** (`/Gases_Reales`, versión 0.27.0): el factor de
+  compresibilidad (Lee–Kesler, Van der Waals con la construcción de Maxwell y
+  Peng–Robinson), las relaciones de Maxwell (exactas con CoolProp y por
+  diferencias finitas), α, κ_T, Mayer generalizada, Clapeyron y Joule–Thomson
+  con la curva de inversión.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
 - **HRSG (continuación)**: secciones intercaladas o en paralelo

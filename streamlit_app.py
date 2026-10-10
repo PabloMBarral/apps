@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.25.1"
+PAGE_VERSION = "0.26.0"
 
 
 def _home_page() -> None:
@@ -178,6 +178,15 @@ def _home_page() -> None:
           c_p de CoolProp o dado y una corriente que cambia de fase, la
           comparación de los tipos y la exergía destruida (ejemplos de Cengel
           y Ghajar cap. 11).
+        - 🎈 **Gases ideales** — un gas **entre dos estados** con c_p
+          constante a 25 °C, a la temperatura media o variable (polinomios
+          NASA) y cuánto te equivocás con c_p constante; las **mezclas**
+          (composición por masas, moles o fracciones, Dalton, Amagat y la
+          entropía de mezcla) y la **mezcla adiabática** en un tanque o una
+          cámara, con la entropía generada; y las **transformaciones
+          politrópicas**: los cinco caminos hasta el mismo dato en el p–v y
+          el T–s, la compresión en etapas con interenfriamiento y el
+          exponente n de dos estados medidos (ejemplos de Cengel cap. 7 y 13).
         - 📈 **Diagramas** — Propiedades, Isoentrópicos, Rankine,
           Refrigeración y Ciclo combinado incluyen
           gráficos interactivos con isolíneas (log p–h, T–s, h–s,
@@ -209,8 +218,8 @@ def _home_page() -> None:
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
         Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado,
-        Exergía, Transferencia de calor, Radiación e Intercambiadores.
-        Interpolación respeta las unidades del CSV original; ISO 6976 usa
+        Exergía, Transferencia de calor, Radiación, Intercambiadores y Gases
+        ideales. Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
     )
@@ -237,6 +246,7 @@ pages = [
     st.Page("app_pages/14_Transferencia_de_Calor.py", title="Transferencia de calor", icon="🧱"),
     st.Page("app_pages/15_Radiacion.py", title="Radiación", icon="☀️"),
     st.Page("app_pages/16_Intercambiadores.py", title="Intercambiadores", icon="🔄"),
+    st.Page("app_pages/17_Gases_Ideales.py", title="Gases ideales", icon="🎈"),
     st.Page("app_pages/99_Acerca.py", title="Acerca de", icon="ℹ️"),
 ]
 pg = st.navigation(pages)
