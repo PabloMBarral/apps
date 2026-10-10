@@ -24,6 +24,7 @@ Licencia: MIT.
 - **TESPy** — simulación de ciclos termodinámicos
 - **fluprodia** — diagramas de propiedades de fluidos
 - **NumPy, SciPy, pandas, matplotlib** — utilitarios numéricos y plots base
+- **PyYAML** — lectura del `CITATION.cff` (página Acerca de)
 - **pytest** — tests
 - **ruff** — lint y format
 
@@ -120,7 +121,10 @@ apps/
 │   │                          # dimensionamiento (ε-NTU y LMTD con F), ensayo con
 │   │                          # las cuatro temperaturas y U global con
 │   │                          # ensuciamiento; comparación de tipos y exergía.
-│   └── 99_Acerca.py           # Créditos, licencias, citas
+│   └── 99_Acerca.py           # ✅ 0.25.1 — Créditos, cómo citar la app (APA y
+│                              # BibTeX), las fuentes del CITATION.cff por tipo
+│                              # (con búsqueda y la bibliografía .bib), las
+│                              # licencias de los datos y las versiones.
 ├── core/                      # Lógica pura, sin dependencia de Streamlit
 │   ├── __init__.py
 │   ├── units.py               # Conversiones simples + normalizador de
@@ -162,6 +166,11 @@ apps/
 │   │                          # latex_paren (negativos tras un signo).
 │   ├── export.py              # ✅ Fase 1.7 — flatten / dict_to_csv: el dict de
 │   │                          # un resultado → CSV (campo, valor) y JSON.
+│   ├── citation.py            # ✅ 0.25.1 — CITATION.cff → Citation (PyYAML),
+│   │                          # citation_apa / reference_apa (APA 7 en castellano,
+│   │                          # texto o Markdown), bibliography_bibtex,
+│   │                          # group_references, reference_matches,
+│   │                          # DATA_SOURCES, LIBRARIES y package_info.
 │   ├── interpolation.py       # ✅ Fase 1.1 — Interpolación lineal y doble entrada
 │   │                          # (+ interpolation_to_dict, Fase 1.7).
 │   ├── isentropic.py          # ✅ Fase 1.3 — Turbina / compresor / bomba; multietapa.
@@ -1299,8 +1308,15 @@ Notas de la Fase 8.2 (radiación e intercambiadores):
   exige actualizar `CITATION.cff` con su referencia formal y `README.md`
   con su BibTeX.
 - **Normas técnicas** (ISO, ASHRAE, IRAM): citar siempre versión y año.
-- En la página `99_Acerca.py` se muestra dinámicamente el contenido de
-  `CITATION.cff` y la licencia.
+- La página `99_Acerca.py` lee el `CITATION.cff` con `core/citation.py`: la
+  cita de la app, todas las referencias (APA y BibTeX, con la bibliografía
+  para descargar) y las licencias. Una referencia nueva en el CFF aparece
+  sola; un archivo nuevo en `data/`, una dependencia nueva o una versión
+  nueva hacen fallar un test hasta actualizar `DATA_SOURCES`, `LIBRARIES`,
+  la cita del README y la versión de la home. No es un módulo de cálculo:
+  no lleva teoría ni procedimiento (descarga el CFF y la bibliografía). Un
+  número con cero adelante en el CFF va entre comillas (YAML lo lee en
+  octal): un test lo vigila.
 
 ## Comandos
 

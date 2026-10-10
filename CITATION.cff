@@ -45,8 +45,8 @@ keywords:
   - thermal-radiation
   - heat-exchangers
 license: MIT
-version: "0.25.0"
-date-released: "2026-10-09"
+version: "0.25.1"
+date-released: "2026-10-10"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"
@@ -120,6 +120,14 @@ references:
     title: "plotly.py"
     url: "https://plotly.com/python/"
     repository-code: "https://github.com/plotly/plotly.py"
+  - type: software
+    scope: "Lectura del CITATION.cff en la página Acerca de (PyYAML)"
+    authors:
+      - family-names: "Simonov"
+        given-names: "Kirill"
+    title: "PyYAML"
+    license: MIT
+    repository-code: "https://github.com/yaml/pyyaml"
   - type: standard
     scope: "Cálculo de poder calorífico de gas natural"
     authors:
@@ -842,4 +850,5 @@ references:
       - family-names: "Barral"
         given-names: "Pablo M."
     title: "vademecum-termo"
+    doi: "10.5281/zenodo.20092635"
     repository-code: "https://github.com/PabloMBarral/vademecum-termo"
