@@ -176,6 +176,12 @@ class RealFluid:
         """El nombre con la fórmula, para los selectores."""
         return self.name if self.formula == "—" else f"{self.name} ({self.formula})"
 
+    @property
+    def noun(self) -> str:
+        """El nombre dentro de una oración: «del agua», «el R-134a», «del aire»."""
+        short = self.name.split(" (")[0]
+        return short if short.startswith("R-") else short.lower()
+
 
 @cache
 def _constants(key: str) -> dict[str, float]:
@@ -551,7 +557,7 @@ def _real_state(fl: RealFluid, inputs: CompressibilityInputs) -> CoolProp.Abstra
     ):
         if value is not None and not (math.isfinite(value) and value > 0.0):
             raise ValueError(f"{name}.")
-    name = fl.name.lower() if fl.key != "Air" else "aire"
+    name = fl.noun
     if T is not None and not (fl.T_min <= T <= fl.T_max):
         raise ValueError(
             f"La temperatura ({_num(T, '.4g')} K) está fuera del rango de la ecuación de estado "
@@ -831,7 +837,7 @@ def _notes(r: CompressibilityResult) -> tuple[str, ...]:
         )
     if fl.key in ("Helium", "Hydrogen"):
         notes.append(
-            f"El {fl.name.lower()} es un gas cuántico (ω = {_num(fl.omega, '.3f')} < 0): la "
+            f"El {fl.noun} es un gas cuántico (ω = {_num(fl.omega, '.3f')} < 0): la "
             "carta generalizada se armó con gases normales y no lo representa bien."
         )
     if fl.key in ("Water", "Ammonia", "R134a", "R32"):
