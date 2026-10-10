@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.26.0` — Fase 9.1, gases ideales (2026-10-10).
+> **Versión actual**: `0.27.0` — Fase 9.2, gases reales (2026-10-10).
 
 ---
 
@@ -1541,6 +1541,99 @@
     de un compresor (9·T₁) aplastaba el T–s y el gráfico del trabajo (ahora queda
     oculta en la leyenda del T–s, fuera del de trabajo y la página lo dice); y el
     rótulo del estado 2 en el borde del p–v se cortaba.
+### Fase 9.2 — Gases reales
+- **Versión**: `0.27.0` (2026-10-10). Rama `claude/water-state-analyzer-f4fiev`.
+  La segunda mitad de la Fase 9 (el plan aprobado junto con la 9.1, con
+  Peng–Robinson, Clapeyron y Joule–Thomson; las funciones de discrepancia
+  quedaron afuera).
+- **Scope**:
+  - **`core/gases/real.py`** (nuevo): 14 fluidos con el punto crítico y ω de
+    CoolProp; Lee–Kesler (el fluido simple y el de referencia, sus raíces y la
+    presión de vapor generalizada); las cúbicas de Van der Waals y Peng–Robinson
+    en Z; el factor de compresibilidad con dos de p, T y v contra seis modelos
+    (gas ideal, la carta generalizada Z⁰, Lee–Kesler con ω, Van der Waals,
+    Peng–Robinson y el real de CoolProp), con p_R, T_R, v_R, el v′_R
+    pseudorreducido y notas; la carta generalizada y la isoterma Z(p) de cada
+    modelo.
+  - **`core/gases/cubic.py`** (nuevo): las tres raíces de cada cúbica con ln φ y
+    cuál es la estable, la presión de saturación de cada una (φ_f = φ_g: la
+    construcción de Maxwell), el ω que implica, las isotermas reducidas de Van
+    der Waals (vademecum §8.4), las del fluido y las curvas de saturación.
+  - **`core/gases/relations.py`** (nuevo): los potenciales y sus derivadas
+    naturales (§15.1 y §15.2), las cuatro relaciones de Maxwell exactas y por
+    diferencias centradas en cuatro caminos con su convergencia (§15.3), α, κ_T
+    y la relación de Mayer general (§15.4 y §15.5); Clapeyron y
+    Clausius–Clapeyron; Joule–Thomson con las temperaturas de inversión, la
+    curva de inversión y las isentálpicas.
+  - `real_procedure.py`: el procedimiento de los cinco cálculos en los tres
+    sistemas, con el factor de p·v a la vista en las derivadas con s.
+  - **`ui/real_gas_charts.py`** (nuevo): la carta generalizada con el estado,
+    la isoterma Z(p) de los seis modelos, las isotermas del fluido con los lazos
+    y las rectas de Maxwell, las isotermas reducidas de Van der Waals con las
+    dos áreas iguales, las curvas de saturación, la convergencia de las
+    diferencias (pendiente 2), la curva de inversión con las isentálpicas y
+    Clausius–Clapeyron contra la curva real.
+  - **Página `/Gases_Reales` (🫧)**, en el menú después de Gases ideales, con la
+    teoría (vademecum §7, §8 y §15; Lee y Kesler, Peng y Robinson y Çengel
+    §12-3 y §12-5 para lo que no está en el vademecum), el procedimiento y el
+    export.
+  - `units_system` suma κ_T, las derivadas de Maxwell (∂T/∂p, ∂p/∂T, ∂v/∂T y
+    ∂T/∂v) y μ_JT. `CITATION.cff` y el README suman Van der Waals (1873), Nelson
+    y Obert (1954), Pitzer et al. (1955), Lee y Kesler (1975) y Peng y Robinson
+    (1976), con los DOI confirmados por búsqueda (doi.org y Crossref estaban
+    bloqueados por la red).
+- **Validación**, contra Çengel: R-134a a 1 MPa y 50 °C (§3-7: el gas ideal se
+  equivoca 20,8 %; Z⁰ = 0,857 contra el 0,84 que el libro lee en la carta;
+  Lee–Kesler con ω, 0,3 %); N₂ a 175 K y 0,00375 m³/kg (§3-8: 13 851 kPa como
+  gas ideal y 9511 con Van der Waals; el libro, 9471, con a y b redondeadas:
+  con ellas la app da lo mismo); vapor a 600 °F y 0,51431 ft³/lb (§3-7: 1000
+  psia, 1227 como gas ideal, v′_R = 2,372); Maxwell en el vapor a 250 °C y
+  300 kPa (§12-2: −0,00165 y −0,00159 m³/(kg·K) con los pasos del libro; las
+  derivadas exactas coinciden en −0,0015868); h_fg del R-134a a 20 °C con
+  Clapeyron (§12-3: 17,69 kPa/K y 182,45 kJ/kg contra 17,70 y 182,40 del
+  libro; tabla 182,28 contra 182,27). Van der Waals equivale a ω = −0,30 para
+  cualquier fluido; las relaciones de Maxwell exactas cierran a 1e-12 y las
+  diferencias convergen con Δ²; c_p − c_v = T·v·α²/κ_T contra CoolProp; μ_JT de
+  la fórmula contra el exacto y μ = 0 sobre la curva de inversión.
+- **Detectado**:
+  - El vademecum §7.5 da Z_cr = 0,288 para el O₂ y el punto crítico de CoolProp
+    da 0,294 (otra densidad crítica de la literatura). La app usa CoolProp; un
+    test lo documenta.
+  - El primer borrador del ejemplo de Clapeyron citaba a Çengel con el R-134a a
+    −10 °C; el ejemplo del libro es a 20 °C (se verificó el enunciado y se
+    corrigió antes del PR). La máxima temperatura de inversión del N₂ con
+    CoolProp es 607,9 K (el ejemplo decía ≈ 620 K) y la nariz de su curva está
+    a 394 bar y 277 K.
+  - Las capturas del smoke test mostraron la curva de inversión con la nariz
+    cortada por la grilla en p y, en siete fluidos cuya rama alta pasa la
+    temperatura máxima de la ecuación de estado, cerrada con una diagonal que
+    dejaba afuera estados que se enfrían (el metano a 50 bar y 300 K). Ahora la
+    nariz sale a T fija y la zona se cierra por ese borde, con una línea
+    punteada; las notas y el procedimiento dicen de qué lado se enfría cuando
+    hay una sola temperatura de inversión en el rango (o ninguna).
+- **Mensajes al alumno**: un estado dentro de la campana con (T, v) o (p, v) (con
+  su título), justo la presión de saturación con (p, T) («corré un poco la
+  presión o la temperatura»), un volumen menor que el covolumen b de la cúbica
+  («pasa con los líquidos»), un modelo sin raíz en la fase del fluido real
+  (aviso), fuera del rango de ajuste de Lee–Kesler (nota), pasos de las
+  diferencias que caen en la campana («achicá ΔT o Δp»; en un líquido, con
+  α/κ_T en bar por kelvin), datos fuera del rango de la ecuación de estado, y
+  T ± ΔT o T₂ fuera de la campana en Clapeyron.
+- **Tests**: de 5266 a 5548 passed (10 skipped), sin warnings.
+  - `tests/test_gases_real.py` (52), `tests/test_gases_cubic.py` (31),
+    `tests/test_gases_relations.py` (49), `tests/test_gases_real_procedure.py`
+    (95), `tests/test_real_gas_charts.py` (9) y `tests/test_page_gases_reales.py`
+    (41, AppTest), más las unidades en `tests/test_units_system.py` y la página
+    en `test_navigation.py`.
+  - LaTeX: 7156 expresiones distintas del procedimiento y 26 de la teoría
+    validan con KaTeX estricto y entran en 318 y 314 px como máximo en los tres
+    sistemas.
+  - Smoke test en Chromium a 390 y 1280 px: los 24 casos (los tres modos con
+    sus submodos y los ejemplos, en los tres sistemas) con la teoría y el
+    procedimiento abiertos, más Joule–Thomson con metano, R-134a y agua: sin
+    errores, sin desborde y sin ecuaciones que se pasen de su expansor. Las
+    capturas encontraron la curva de inversión cortada (arriba, en
+    «Detectado»); Clapeyron y Joule–Thomson se repitieron después del arreglo.
 - **Dependencias**: ninguna nueva.
 
 ---
@@ -1560,11 +1653,10 @@
     modelo; el título no coincide con la palanca a T constante), y justo
     en el borde los clasifica como líquido comprimido / vapor
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
-- **Fase 9.2 — Gases reales** (`/Gases_Reales`, versión 0.27.0): el factor de
-  compresibilidad (Lee–Kesler, Van der Waals con la construcción de Maxwell y
-  Peng–Robinson), las relaciones de Maxwell (exactas con CoolProp y por
-  diferencias finitas), α, κ_T, Mayer generalizada, Clapeyron y Joule–Thomson
-  con la curva de inversión.
+- **Gases reales (continuación)**: las funciones de discrepancia (Δh, Δu y Δs
+  de un gas real con la carta generalizada, Çengel §12-6), la ecuación virial,
+  Beattie–Bridgeman y Benedict–Webb–Rubin (Çengel §3-8), Soave–Redlich–Kwong,
+  mezclas de gases reales (regla de Kay, Amagat con Z) y la fugacidad.
 - **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
   cuando se incorpore ISO 14912:2003 Formula (69).
 - **HRSG (continuación)**: secciones intercaladas o en paralelo

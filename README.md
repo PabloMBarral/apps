@@ -497,9 +497,9 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   carta; N₂ a 175 K: 13 851 kPa como gas ideal y 9511 con Van der Waals, 9471
   con las a y b redondeadas del libro; vapor a 600 °F: 1227 psia como gas
   ideal; Maxwell en el vapor a 250 °C y 300 kPa, −0,00165 y −0,00159
-  m³/(kg·K); h_fg del R-134a a −10 °C con Clapeyron, 206,1 kJ/kg contra 205,97
-  de las tablas). Procedimiento en los tres sistemas y export. _Fase 9.2
-  cerrada._
+  m³/(kg·K); h_fg del R-134a a 20 °C con Clapeyron y las presiones a 16 y
+  24 °C, 182,45 kJ/kg contra 182,40 del libro y 182,27 de las tablas).
+  Procedimiento en los tres sistemas y export. _Fase 9.2 cerrada._
 - ✅ **Acerca de** (página `/Acerca`). Cómo citar la app (APA y BibTeX), todas
   las fuentes del `CITATION.cff` agrupadas por tipo, con búsqueda y la
   bibliografía para descargar, las licencias de la app y de los datos de

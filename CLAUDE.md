@@ -127,6 +127,13 @@ apps/
 │   │                          # adiabática (tanque o cámara, S_gen por corriente),
 │   │                          # transformaciones (los cinco caminos en el p–v y el
 │   │                          # T–s, etapas y el n de dos estados).
+│   ├── 18_Gases_Reales.py     # ✅ Fase 9.2 — El factor de compresibilidad (seis
+│   │                          # modelos contra CoolProp, la carta generalizada y
+│   │                          # la isoterma Z(p)), Van der Waals y Peng–Robinson
+│   │                          # (raíces, Maxwell con las áreas, saturación) y las
+│   │                          # funciones características (Maxwell exacta y por
+│   │                          # diferencias, Clapeyron y Joule–Thomson con la
+│   │                          # curva de inversión).
 │   └── 99_Acerca.py           # ✅ 0.25.1 — Créditos, cómo citar la app (APA y
 │                              # BibTeX), las fuentes del CITATION.cff por tipo
 │                              # (con búsqueda y la bibliografía .bib), las
@@ -159,6 +166,11 @@ apps/
 │   │                          # (J/K | kJ/K | Btu/°R), entropy_flow, molar_mass
 │   │                          # (kg/mol | kg/kmol | lb/lbmol) y amount (mol |
 │   │                          # kmol | lbmol).
+│   │                          # Fase 9.2: + isothermal_compressibility (κ_T:
+│   │                          # 1/Pa | 1/bar | 1/psia), temperature_per_pressure
+│   │                          # (μ_JT: K/Pa | K/bar | °F/psia),
+│   │                          # pressure_per_temperature, volume_per_temperature
+│   │                          # y temperature_per_volume (Maxwell).
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
@@ -258,7 +270,7 @@ apps/
 │   │   └── exchangers_procedure.py # ✅ Fase 8.2 — exchanger_steps (los tres
 │   │                          # problemas, con la exergía), overall_u_steps,
 │   │                          # EPS_FORMULAS y NTU_FORMULAS (renglones).
-│   ├── gases/                 # ✅ Fase 9.1 (la 9.2 suma los gases reales)
+│   ├── gases/                 # ✅ Fase 9.1 (ideales) y 9.2 (reales)
 │   │   ├── ideal.py           # IdealGas (15 gases, NASA-9; el helio con 5/2·R):
 │   │   │                      # cp, h, u, s°, p_r, v_r; model_cp/h/u/s (c_p a
 │   │   │                      # 25 °C o variable); estados con dos de p, T, v;
@@ -273,8 +285,29 @@ apps/
 │   │   │                      # variable), process_comparison (los cinco caminos),
 │   │   │                      # process_curve, staged_compression y staged_curves,
 │   │   │                      # exponent_from_states, ejemplos y export.
-│   │   └── ideal_procedure.py # state_change_steps, mixture_steps, mixing_steps,
-│   │                          # process_steps, staged_steps y exponent_steps.
+│   │   ├── ideal_procedure.py # state_change_steps, mixture_steps, mixing_steps,
+│   │   │                      # process_steps, staged_steps y exponent_steps.
+│   │   ├── real.py            # ✅ Fase 9.2 — RealFluid (14 fluidos, crítico y ω
+│   │   │                      # de CoolProp), Lee–Kesler (lk_z_of_vr, lee_kesler,
+│   │   │                      # lee_kesler_psat_reduced), las cúbicas en Z
+│   │   │                      # (cubic_constants, cubic_z_roots, pr_kappa),
+│   │   │                      # compressibility (seis modelos con (p, T), (T, v)
+│   │   │                      # o (p, v)), generalized_chart, z_isotherm,
+│   │   │                      # ejemplos y export.
+│   │   ├── cubic.py           # ✅ Fase 9.2 — solve_cubic (las raíces de Van der
+│   │   │                      # Waals y Peng–Robinson, ln φ y la estable), maxwell
+│   │   │                      # (φ_f = φ_g), implied_omega, vdw_reduced_isotherms
+│   │   │                      # (§8.4), fluid_isotherms, saturation_curves,
+│   │   │                      # ejemplos y export.
+│   │   ├── relations.py       # ✅ Fase 9.2 — relations (potenciales, derivadas
+│   │   │                      # naturales, Maxwell exacta y por diferencias en
+│   │   │                      # cuatro caminos con su convergencia, α, κ_T,
+│   │   │                      # Mayer), clapeyron y clausius_curve,
+│   │   │                      # joule_thomson, inversion_curve, isenthalps,
+│   │   │                      # ejemplos y export.
+│   │   └── real_procedure.py  # ✅ Fase 9.2 — compressibility_steps, cubic_steps,
+│   │                          # relations_steps, clapeyron_steps y
+│   │                          # joule_thomson_steps.
 │   ├── exergy/                # ✅ Fase 7 (reemplaza al placeholder exergy.py)
 │   │   ├── physical.py        # Ambient (T₀, p₀), PhysicalExergy /
 │   │   │                      # physical_exergy (ψ, φ, térmica y mecánica, V²/2,
@@ -460,6 +493,11 @@ apps/
 │   └── gas_charts.py          # ✅ Fase 9.1 — cp_figure, composition_figure,
 │                              # mixing_entropy_figure, pv_figure, ts_figure (con
 │                              # far_paths ocultos), work_figure y staged_figure.
+│   └── real_gas_charts.py     # ✅ Fase 9.2 — generalized_chart_figure,
+│                              # z_isotherm_figure, fluid_isotherm_figure,
+│                              # vdw_isotherms_figure (las áreas de Maxwell),
+│                              # saturation_figure, convergence_figure,
+│                              # inversion_figure y clausius_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
@@ -1379,6 +1417,94 @@ Notas de la Fase 9.1 (gases ideales):
   (bar·m³/kg = 100 kJ/kg) y 0,18505 en el Inglés.
 - Smoke test a 390 y 1280 px: 16 casos (los tres modos y sus submodos, en los
   tres sistemas) sin errores ni desbordes.
+
+Notas de la Fase 9.2 (gases reales):
+
+- Página /Gases_Reales (🫧, después de /Gases_Ideales), keys `rg_mode`,
+  `rz_{ejemplo}_…` (los datos llevan el par: `rz_{e}_{pT|Tv|pv}_{p|T|v}`),
+  `rw_…` (cúbicas), `rm_kind` y `rm_…` (Maxwell), `rc_…` (Clapeyron) y `rj_…`
+  (Joule–Thomson). Recalcula sola (`st.cache_data` con los dataclasses).
+- **Secciones del vademecum, verificadas contra `vademecum.tex`**: §7.1 p_R y
+  T_R, §7.2 v_R, §7.3 Z, §7.4 v′_R (Nelson–Obert), §7.5 la tabla de propiedades
+  críticas; §8.1 la ecuación, §8.2 a y b, §8.3 el punto crítico (Z_cr = 3/8),
+  §8.4 la forma reducida; §15.1 los potenciales, §15.2 las variables naturales,
+  §15.3 Maxwell, §15.4 α y κ_T, §15.5 Mayer generalizada. Lee–Kesler,
+  Peng–Robinson, Clapeyron y Joule–Thomson no están en el vademecum: se citan
+  sus fuentes (Lee y Kesler, 1975; Peng y Robinson, 1976; Çengel §12-3 y §12-5).
+- 14 fluidos (`REAL_FLUIDS`: los nueve de §7.5 y R-134a, amoníaco, propano,
+  isobutano y R-32) con el punto crítico y ω de CoolProp. El Z_cr del O₂ da
+  0,294 y el vademecum dice 0,288 (otra densidad crítica de la literatura): un
+  test lo documenta; los demás coinciden.
+- Lee–Kesler: la ecuación de cada fluido (simple y de referencia) en v_R, con
+  las raíces de una grilla de 3000 v_R (0,015 a 10⁴) y `brentq`. Con varias
+  raíces el vapor es la mayor y el líquido la menor; bajo T_R = 1 una raíz de
+  vapor tiene Z > Z_cr del modelo y una de líquido v < v_cr (Z < Z_cr·p_R/T_R).
+  Z_cr: 0,2905 (simple) y 0,2560 (referencia), de la inflexión de T_R = 1;
+  3/8 Van der Waals; 0,3074 Peng–Robinson. Si el modelo solo tiene la raíz de
+  la otra fase, «no tiene solución en esa fase» (aviso, no error). La carta
+  (Z⁰) evalúa solo el fluido simple: con He y H₂ el de referencia no tiene raíz
+  de vapor a esas T_R y la carta fallaba sin motivo. Con (T, v) la carta da Z⁰
+  directo de v′_R (Çengel §3-7). Fuera de 0,3 ≤ T_R ≤ 4 y p_R ≤ 10 (el ajuste
+  de Lee y Kesler), nota.
+- Cúbicas: la estable es la de menor ln φ; la presión de saturación del modelo,
+  `brentq` en p con φ_f = φ_g (la construcción de Maxwell). Van der Waals
+  equivale a ω = −0,30 para cualquier fluido (es de dos parámetros): con el
+  agua a 20 °C da p_sat = 3,05 bar (130 veces la real) y Peng–Robinson −16 %;
+  al R-134a líquido a 10 bar y 20 °C Van der Waals lo llama vapor (nota). Las
+  isotermas reducidas de §8.4 van con v_R = v/(3b).
+- Maxwell: las derivadas exactas con `first_partial_deriv` de CoolProp (v por
+  la densidad) y las diferencias centradas en cuatro caminos (isoterma e
+  isoentrópica en p ± Δp, isobara e isócora en T ± ΔT), como con las tablas
+  (Çengel §12-2: −0,00165 y −0,00159 m³/(kg·K) con sus pasos). Con los pasos a
+  la mitad la diferencia baja ~4 veces (error ∝ Δ²: nota y gráfico con la
+  pendiente 2). En un líquido la isócora cambia la presión α/κ_T (≈ 4,9 bar/K
+  el agua): un paso grande cae en la campana y el error lo explica; el ejemplo
+  del agua va a 100 bar con ΔT = 1 K. Con α ≈ 0 (agua cerca de 4 °C,
+  `degenerate`) las diferencias relativas no dicen nada: nota en vez de ellas.
+- Unidades de las derivadas: el lado con s se pasa con el factor de p·v (1,
+  100 en el Técnico, 0,18505 en el Inglés): se divide con s en el numerador y
+  se multiplica con s en el denominador; las magnitudes nuevas de
+  `units_system` son el lado p–v–T.
+- Clapeyron con p_sat a T ± ΔT y Clausius–Clapeyron (vapor ideal, sin v_f)
+  para llevar p_sat a T₂; cerca del punto crítico (N₂ a 100 K) se aparta mucho
+  y la nota lo dice. El ejemplo de Çengel (§12-3) es el R-134a a **20 °C** con
+  las presiones a 16 y 24 °C: 17,70 kPa/K y 182,40 kJ/kg (tabla: 182,27); con
+  CoolProp, 17,69 y 182,45 (182,28). Un primer borrador lo ponía a −10 °C con
+  −8 y −12 °C, que no es el del libro: se corrigió buscando el enunciado.
+- Joule–Thomson: μ_JT exacto, de [T·(∂v/∂T)_p − v]/c_p y por diferencias a h
+  constante (Δp = 10 % de p por defecto). Las temperaturas de inversión buscan
+  los cambios de signo de μ(T) en 240 temperaturas sin contar el salto de la
+  saturación (`T_inversion_low` y `T_inversion_high`: con una sola en el rango,
+  o ninguna, la nota dice de qué lado se enfría). La curva va de 0,01·p_cr a
+  30·p_cr y la nariz sale de la presión de inversión a T fija entre las dos
+  ramas (`_nose`: la grilla en p la cortaba con una recta vertical). N₂: 607,9 K
+  con p → 0 (el ejemplo decía ≈ 620 K) y la nariz a 394 bar y 277 K. En siete
+  fluidos (metano, agua, R-134a, amoníaco, propano, isobutano y R-32) la rama
+  alta pasa por encima de la T máxima de la ecuación de estado: la zona donde
+  se enfría se cierra por ese borde (`p_edge`, `T_edge` y una línea punteada);
+  cerrada con una diagonal, el metano a 50 bar y 300 K quedaba afuera aunque se
+  enfría. El H₂ (200,8 K) y el He (45,6 K) se calientan a temperatura ambiente.
+- Gráficos (`ui/real_gas_charts.py`): cada modelo con su color fijo de la
+  paleta validada (real tinta, gas ideal gris rayado, carta aguamarina,
+  Lee–Kesler azul, Van der Waals naranja, Peng–Robinson magenta) y la curva
+  real abajo de todo (Peng–Robinson y Lee–Kesler casi la tapan). La carta
+  generalizada va con p_R logarítmica desde 0,01 y un rótulo por isoterma (en
+  un eje logarítmico plotly pide la x de una anotación en log₁₀). Las
+  isotermas son una sola entrada de la leyenda y las leyendas van abajo, en
+  horizontal (a 390 px arriba pisaban el título).
+- LaTeX: 7156 expresiones distintas del procedimiento (ejemplos y variantes de
+  cada par, fluido, modelo y sistema) y 26 de la teoría, KaTeX estricto,
+  máx. 318 y 314 px. Lo que hizo falta: la cúbica en Z en dos renglones
+  (`_cubic_poly`), los coeficientes de Lee–Kesler de a uno, los lados
+  izquierdos largos sin alinear (`_flush_chain`, `_stack_chain`), un κ
+  negativo entre paréntesis (`_kappa_term`), cada lado de una relación de
+  Maxwell en sus renglones y la teoría en bloques `aligned`.
+- Smoke test a 390 y 1280 px: los 24 casos (los tres modos con
+  sus submodos y los ejemplos, en los tres sistemas) y Joule–Thomson con
+  metano, R-134a y agua (la curva cortada), con la teoría y el procedimiento
+  abiertos: sin errores ni desbordes. Después de los arreglos se repitieron
+  Clapeyron y Joule–Thomson con el servidor reiniciado (sin reiniciar, la
+  página nueva le pedía `p_edge` a la versión vieja de `relations`).
 
 ### Citas y licencias
 
