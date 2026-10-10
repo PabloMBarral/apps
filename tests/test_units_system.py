@@ -634,3 +634,44 @@ def test_universal_gas_constant_in_each_system() -> None:
         1.98588, rel=1e-5
     )
     assert convert_from_si(0.028966, "molar_mass", "Técnico") == pytest.approx(28.966)
+
+
+@pytest.mark.parametrize("system", ["SI", "Técnico", "Inglés"])
+def test_real_gas_derivative_units_are_coherent(system: str) -> None:
+    """Fase 9.2: las derivadas de Maxwell en las unidades del lado p–v–T; el lado con s
+    pasa con el factor de p·v (con s arriba se divide, con s abajo se multiplica)."""
+
+    def si(value: float, kind: str) -> float:
+        return convert_to_si(value, kind, system)  # type: ignore[arg-type]
+
+    def back(value: float, kind: str) -> float:
+        return convert_from_si(value, kind, system)  # type: ignore[arg-type]
+
+    v, p, dT = si(1.0, "specific_volume"), si(1.0, "pressure"), si(1.0, "temperature_difference")
+    s = si(1.0, "specific_entropy")
+    f = pv_energy_factor(system)  # type: ignore[arg-type]
+    assert back(1.0 / p, "isothermal_compressibility") == pytest.approx(1.0)
+    assert back(dT / p, "temperature_per_pressure") == pytest.approx(1.0)
+    assert back(p / dT, "pressure_per_temperature") == pytest.approx(1.0)
+    assert back(v / dT, "volume_per_temperature") == pytest.approx(1.0)
+    assert back(dT / v, "temperature_per_volume") == pytest.approx(1.0)
+    # (∂s/∂p)_T = −(∂v/∂T)_p y (∂s/∂v)_T = (∂p/∂T)_v: s arriba, se divide por f
+    assert back(s / p, "volume_per_temperature") == pytest.approx(1.0 / f, rel=1e-4)
+    assert back(s / v, "pressure_per_temperature") == pytest.approx(1.0 / f, rel=1e-4)
+    # (∂v/∂s)_p = (∂T/∂p)_s y (∂p/∂s)_v = −(∂T/∂v)_s: s abajo, se multiplica por f
+    assert back(v / s, "temperature_per_pressure") == pytest.approx(f, rel=1e-4)
+    assert back(p / s, "temperature_per_volume") == pytest.approx(f, rel=1e-4)
+    # α = (1/v)·(∂v/∂T)_p y c_p − c_v = T·v·α²/κ_T en las unidades de c_p, con f
+    alpha = (v / dT) / v
+    cp_cv = si(1.0, "absolute_temperature") * v * alpha**2 / (1.0 / p)
+    assert back(alpha, "expansion_coefficient") == pytest.approx(1.0)
+    assert back(cp_cv, "specific_heat") == pytest.approx(f, rel=1e-4)
+
+
+def test_joule_thomson_of_air_in_each_system() -> None:
+    """μ_JT del aire a 300 K y 1 bar ≈ 0,22 K/bar = 2,3·10⁻⁶ K/Pa (orden de los libros)."""
+    mu = 2.2e-6  # K/Pa
+    assert convert_from_si(mu, "temperature_per_pressure", "Técnico") == pytest.approx(0.22)
+    assert convert_from_si(mu, "temperature_per_pressure", "Inglés") == pytest.approx(
+        0.0273, rel=1e-3
+    )

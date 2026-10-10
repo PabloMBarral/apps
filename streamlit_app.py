@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.26.0"
+PAGE_VERSION = "0.27.0"
 
 
 def _home_page() -> None:
@@ -187,6 +187,15 @@ def _home_page() -> None:
           politrópicas**: los cinco caminos hasta el mismo dato en el p–v y
           el T–s, la compresión en etapas con interenfriamiento y el
           exponente n de dos estados medidos (ejemplos de Cengel cap. 7 y 13).
+        - 🫧 **Gases reales** — el **factor de compresibilidad** Z con seis
+          modelos (gas ideal, la carta generalizada, Lee–Kesler con el factor
+          acéntrico, Van der Waals, Peng–Robinson y la ecuación de estado de
+          referencia) y la carta generalizada calculada; las **cúbicas** de
+          Van der Waals y Peng–Robinson con sus tres raíces y la construcción
+          de Maxwell (áreas iguales); y las **funciones características**:
+          las relaciones de Maxwell exactas y con las tablas, la relación de
+          Mayer generalizada, Clapeyron y Joule–Thomson con su curva de
+          inversión (ejemplos de Cengel cap. 3 y 12).
         - 📈 **Diagramas** — Propiedades, Isoentrópicos, Rankine,
           Refrigeración y Ciclo combinado incluyen
           gráficos interactivos con isolíneas (log p–h, T–s, h–s,
@@ -218,8 +227,8 @@ def _home_page() -> None:
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
         Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado,
-        Exergía, Transferencia de calor, Radiación, Intercambiadores y Gases
-        ideales. Interpolación respeta las unidades del CSV original; ISO 6976 usa
+        Exergía, Transferencia de calor, Radiación, Intercambiadores, Gases
+        ideales y Gases reales. Interpolación respeta las unidades del CSV original; ISO 6976 usa
         las unidades de la norma.
         """
     )
@@ -247,6 +256,7 @@ pages = [
     st.Page("app_pages/15_Radiacion.py", title="Radiación", icon="☀️"),
     st.Page("app_pages/16_Intercambiadores.py", title="Intercambiadores", icon="🔄"),
     st.Page("app_pages/17_Gases_Ideales.py", title="Gases ideales", icon="🎈"),
+    st.Page("app_pages/18_Gases_Reales.py", title="Gases reales", icon="🫧"),
     st.Page("app_pages/99_Acerca.py", title="Acerca de", icon="ℹ️"),
 ]
 pg = st.navigation(pages)

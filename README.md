@@ -476,6 +476,30 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   helio a 40,5 psia; mezcla de §13-1, M = 19,6 kg/kmol; tanque de §13-3, 32,2 °C
   y 114,5 kPa; O₂ y CO₂, S_gen = 44,0 kJ/K). Procedimiento en los tres sistemas
   (con el factor de p·v a la vista) y export. _Fase 9.1 cerrada._
+- ✅ **Gases reales** (página `/Gases_Reales`, vademecum §7, §8 y §15; Çengel
+  §3-7, §3-8, §12-2, §12-3 y §12-5). **El factor de compresibilidad** de 14
+  fluidos con dos de p, T y v: el estado real de CoolProp contra seis modelos
+  (gas ideal, la carta generalizada —el fluido simple de Lee y Kesler, la carta
+  de Nelson y Obert que trae Çengel—, Lee–Kesler con el factor acéntrico ω, Van
+  der Waals y Peng–Robinson), con p_R, T_R, v_R y el v′_R pseudorreducido, la
+  carta generalizada con el estado y la isoterma Z(p) de cada modelo. **Van der
+  Waals y Peng–Robinson**: las tres raíces de la cúbica en Z y cuál es estable
+  (φ_f = φ_g: la construcción de Maxwell, con las dos áreas iguales), las
+  isotermas del fluido con el lazo y la presión de saturación de cada cúbica
+  contra la real (la de Van der Waals equivale a un ω = −0,302). **Funciones
+  características y Maxwell**: las cuatro relaciones de Maxwell exactas y por
+  diferencias centradas (con el error ∝ Δ²), α, κ_T y la relación de Mayer
+  general, c_p − c_v = T·v·α²/κ_T; **Clapeyron** y Clausius–Clapeyron (h_fg de
+  la pendiente de la curva de saturación) y **Joule–Thomson** (μ_JT de la
+  fórmula y por diferencias, las temperaturas de inversión y la curva de
+  inversión con las isentálpicas). Reproduce Çengel (R-134a a 1 MPa y 50 °C:
+  20,8 % de error del gas ideal y Z⁰ = 0,857 contra el 0,84 que se lee en la
+  carta; N₂ a 175 K: 13 851 kPa como gas ideal y 9511 con Van der Waals, 9471
+  con las a y b redondeadas del libro; vapor a 600 °F: 1227 psia como gas
+  ideal; Maxwell en el vapor a 250 °C y 300 kPa, −0,00165 y −0,00159
+  m³/(kg·K); h_fg del R-134a a 20 °C con Clapeyron y las presiones a 16 y
+  24 °C, 182,45 kJ/kg contra 182,40 del libro y 182,27 de las tablas).
+  Procedimiento en los tres sistemas y export. _Fase 9.2 cerrada._
 - ✅ **Acerca de** (página `/Acerca`). Cómo citar la app (APA y BibTeX), todas
   las fuentes del `CITATION.cff` agrupadas por tipo, con búsqueda y la
   bibliografía para descargar, las licencias de la app y de los datos de
@@ -486,11 +510,6 @@ ecuaciones del procedimiento se escriben en renglones cortos (una
 igualdad por renglón) para que entren en el ancho de la pantalla.
 
 ### En desarrollo (roadmap)
-- **Gases reales** (Fase 9.2, página `/Gases_Reales`): el factor de
-  compresibilidad con la carta generalizada (Lee–Kesler), Van der Waals con la
-  construcción de Maxwell y Peng–Robinson; las relaciones de Maxwell (exactas y
-  por diferencias finitas), α, κ_T, Mayer generalizada, Clapeyron y
-  Joule–Thomson con la curva de inversión.
 - **Ciclo combinado (continuación)**: secciones intercaladas en la HRSG,
   quemadores suplementarios, pérdidas de carga, recirculación del
   precalentador y la turbina de gas con etapas (combustión secuencial) en el
@@ -557,7 +576,11 @@ apps/
 │   │   ├── ideal.py       # gas ideal entre dos estados: c_p constante, medio o NASA; p_r, v_r
 │   │   ├── mixture.py     # mezclas: fracciones, Dalton, Amagat, entropía; mezcla adiabática
 │   │   ├── polytropic.py  # politrópicas, los cinco caminos, etapas y n de dos estados
-│   │   └── ideal_procedure.py  # su procedimiento «como en el pizarrón»
+│   │   ├── ideal_procedure.py  # su procedimiento «como en el pizarrón»
+│   │   ├── real.py        # gases reales: Z con seis modelos, Lee–Kesler, carta generalizada
+│   │   ├── cubic.py       # Van der Waals y Peng–Robinson: raíces, Maxwell, saturación
+│   │   ├── relations.py   # relaciones de Maxwell, α, κ_T, Mayer, Clapeyron, Joule–Thomson
+│   │   └── real_procedure.py   # su procedimiento «como en el pizarrón»
 │   ├── heat_transfer/
 │   │   ├── conduction.py  # red de resistencias: capas, contacto, paralelo, radio crítico
 │   │   ├── fins.py        # aletas recta, de aguja y anular (Bessel); arreglos
@@ -605,7 +628,7 @@ apps/
 │                          # gráficos de la combustión, del poder calorífico, de la
 │                          # exergía (Grassmann), de la transferencia de calor, de la
 │                          # radiación, de los intercambiadores y de los gases
-│                          # ideales, créditos
+│                          # ideales y reales, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── data/                  # tablas: ISO 6976, polinomios NASA-9, biomasas (Ghugare),
 │                          # carbones de Argonne con el PCS medido y exergías
@@ -625,7 +648,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.26.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.27.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 La página **ℹ️ Acerca de** de la app arma esta cita y la de todas las fuentes
@@ -1247,6 +1270,66 @@ cruzado y el ensuciamiento (los libros de texto son los de arriba):
                   Association},
   edition      = {6},
   year         = {1978}
+}
+```
+
+**Gases reales** — la ecuación de Van der Waals, la carta generalizada, el
+factor acéntrico, Lee–Kesler y Peng–Robinson (Maxwell, Clapeyron y
+Joule–Thomson, de Çengel y del vademecum §15):
+
+```bibtex
+@book{vanderwaals1873over,
+  author    = {van der Waals, Johannes Diderik},
+  title     = {Over de continuiteit van den gas- en vloeistoftoestand},
+  publisher = {A. W. Sijthoff},
+  note      = {Tesis doctoral, Universidad de Leiden},
+  year      = {1873}
+}
+
+@article{nelson1954generalized,
+  author  = {Nelson, L. C. and Obert, E. F.},
+  title   = {Generalized {pvT} properties of gases},
+  journal = {Transactions of the ASME},
+  volume  = {76},
+  pages   = {1057--1066},
+  year    = {1954}
+}
+
+@article{pitzer1955volumetric,
+  author  = {Pitzer, Kenneth S. and Lippmann, David Z. and Curl, Jr., R. F.
+             and Huggins, Charles M. and Petersen, Donald E.},
+  title   = {The Volumetric and Thermodynamic Properties of Fluids. {II}.
+             Compressibility Factor, Vapor Pressure and Entropy of
+             Vaporization},
+  journal = {Journal of the American Chemical Society},
+  volume  = {77},
+  number  = {13},
+  pages   = {3433--3440},
+  year    = {1955},
+  doi     = {10.1021/ja01618a002}
+}
+
+@article{lee1975generalized,
+  author  = {Lee, Byung Ik and Kesler, Michael G.},
+  title   = {A generalized thermodynamic correlation based on
+             three-parameter corresponding states},
+  journal = {AIChE Journal},
+  volume  = {21},
+  number  = {3},
+  pages   = {510--527},
+  year    = {1975},
+  doi     = {10.1002/aic.690210313}
+}
+
+@article{peng1976new,
+  author  = {Peng, Ding-Yu and Robinson, Donald B.},
+  title   = {A New Two-Constant Equation of State},
+  journal = {Industrial \& Engineering Chemistry Fundamentals},
+  volume  = {15},
+  number  = {1},
+  pages   = {59--64},
+  year    = {1976},
+  doi     = {10.1021/i160057a011}
 }
 ```
 
