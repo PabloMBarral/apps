@@ -31,6 +31,9 @@ scipy>=1.11
 pandas>=2.1
 matplotlib>=3.8
 
+# --- Lectura del CITATION.cff (página Acerca de) ---
+PyYAML>=6.0
+
 # --- Desarrollo (tests y calidad) ---
 pytest>=8.0
 pytest-cov>=5.0

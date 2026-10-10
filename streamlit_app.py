@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.25.0"
+PAGE_VERSION = "0.25.1"
 
 
 def _home_page() -> None:
@@ -189,6 +189,9 @@ def _home_page() -> None:
         (🔬 *Procedimiento*) y la descarga de resultados en CSV / JSON.
         Está pensada para usarse también desde el celular.
 
+        En **ℹ️ Acerca de** están cómo citar la app, las fuentes en las que
+        se apoya (con su bibliografía en BibTeX) y las licencias.
+
         ### En desarrollo
 
         Exergoeconomía (el costo de la exergía en cada componente). Ver el
@@ -234,6 +237,7 @@ pages = [
     st.Page("app_pages/14_Transferencia_de_Calor.py", title="Transferencia de calor", icon="🧱"),
     st.Page("app_pages/15_Radiacion.py", title="Radiación", icon="☀️"),
     st.Page("app_pages/16_Intercambiadores.py", title="Intercambiadores", icon="🔄"),
+    st.Page("app_pages/99_Acerca.py", title="Acerca de", icon="ℹ️"),
 ]
 pg = st.navigation(pages)
 pg.run()

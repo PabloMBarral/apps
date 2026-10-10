@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.25.0` — Fase 8.2 cerrada (2026-10-09).
+> **Versión actual**: `0.25.1` — página Acerca de (2026-10-10).
 
 ---
 
@@ -1429,6 +1429,40 @@
 - **Red**: doi.org, Crossref y las editoriales siguen bloqueados; el DOI de
   CODATA 2018 se confirmó en NIST, los de Chang y Rhee y de Shah y Sekulić no, y
   se citan sin DOI.
+
+### Página Acerca de — cómo citar, fuentes y licencias
+- **Versión**: `0.25.1` (2026-10-10). Rama `claude/water-state-analyzer-f4fiev`.
+  `CLAUDE.md` describía una página `99_Acerca.py` que no existía; el autor pidió
+  crearla («hacé las dos cosas», junto con el plan de la Fase 9).
+- **Núcleo** (`core/citation.py`, sin Streamlit): lee el `CITATION.cff` con
+  PyYAML (dependencia nueva, en `requirements.txt` y en el CFF) y arma la cita de
+  la app y la de cada referencia según APA 7 en castellano («y» entre los dos
+  últimos autores, «s. f.», «5.ª ed.», «En» para un trabajo de congreso, el DOI
+  como URL; la entidad que firma no se repite como editora), en texto o en
+  Markdown (con los `$`, `*`, `_` y corchetes escapados para Streamlit), y en
+  BibTeX (`@article`, `@book`, `@techreport` para normas e informes,
+  `@inproceedings`, `@software`; claves únicas «apellido + año + palabra»).
+  Agrupa por tipo y busca sin tildes ni mayúsculas en la cita y en «para qué se
+  usa». `DATA_SOURCES` dice de dónde sale cada CSV de `data/` y con qué
+  licencia; `LIBRARIES`, para qué se usa cada dependencia.
+- **Página** (`/Acerca`, ℹ️, al final del menú): la app (resumen, versión,
+  fecha, licencia, autor con ORCID, links al repositorio y al vademecum con su
+  DOI), cómo citarla (APA para copiar, BibTeX y las descargas del CFF y de la
+  bibliografía `.bib` con la app y las 62 fuentes), las fuentes por tipo con un
+  filtro y una búsqueda (cada una con su «para qué»), las licencias (la MIT de
+  la app, la de los datos de modeldata y la lista de los datos de terceros) y
+  las versiones instaladas (para reportar un error en un issue).
+- **CITATION.cff**: 0.25.1, la referencia de PyYAML y el DOI del vademecum
+  (10.5281/zenodo.20092635, el de `ui/branding.py`).
+- **Tests**: `tests/test_citation.py` (29) y `tests/test_page_acerca.py` (4).
+  Vigilan que la versión del CFF sea la de la home, que la cita del README
+  coincida con la generada, que cada CSV de `data/` tenga su fuente, que
+  `LIBRARIES` sea `requirements.txt` sin las de desarrollo y que no haya números
+  con cero adelante sin comillas en el CFF (el `025010` de CODATA).
+- **Smoke test** en Chromium a 390 y 1280 px: sin errores ni desbordes; el
+  filtro por tipo funciona. A 390 px el BibTeX con renglones ajustados quedaba
+  partido (va sin ajustar, con su barra) y el mensaje del CFF decía «ver
+  "references"» (la página usa su propio texto).
 
 ---
 

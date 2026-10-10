@@ -453,6 +453,10 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   las tablas da 0,933) y 11-9 (ε = 0,462 y 38,4 kW con la fórmula; el libro lee
   0,47 en el gráfico). Procedimiento en los tres sistemas y export. _Fase 8.2
   cerrada._
+- ✅ **Acerca de** (página `/Acerca`). Cómo citar la app (APA y BibTeX), todas
+  las fuentes del `CITATION.cff` agrupadas por tipo, con búsqueda y la
+  bibliografía para descargar, las licencias de la app y de los datos de
+  terceros y las versiones instaladas de las librerías. _0.25.1._
 
 Todas las páginas están pensadas para usarse **desde el celular**: las
 ecuaciones del procedimiento se escriben en renglones cortos (una
@@ -513,6 +517,7 @@ apps/
 │   ├── units_system.py    # sistemas SI / Técnico / Inglés
 │   ├── latex.py           # cantidades y cadenas de igualdades en LaTeX
 │   ├── export.py          # dict → CSV (campo, valor) para las descargas
+│   ├── citation.py        # CITATION.cff → citas APA y BibTeX, fuentes y licencias (Acerca de)
 │   ├── diagrams.py        # diagramas de propiedades (fluprodia)
 │   ├── ideal_gas.py       # mezclas de gases ideales: aire, gases de combustión, s°(T)
 │   ├── psychrometrics.py  # aire húmedo (vademecum §14): estado, exergía, carta
@@ -586,8 +591,12 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.25.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.25.1)
 > [Software]. https://github.com/PabloMBarral/apps
+
+La página **ℹ️ Acerca de** de la app arma esta cita y la de todas las fuentes
+(en APA y en BibTeX, con la bibliografía para descargar) a partir del mismo
+`CITATION.cff`, y muestra las licencias y las versiones instaladas.
 
 ---
 
