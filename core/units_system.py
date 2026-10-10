@@ -47,6 +47,11 @@ entropy                J/K         kJ/K           Btu/°R
 entropy_flow           W/K         kW/K           Btu/(s·°R)
 molar_mass             kg/mol      kg/kmol        lb/lbmol
 amount                 mol         kmol           lbmol
+isothermal_compress.   1/Pa        1/bar          1/psia
+temperature_per_press. K/Pa        K/bar          °F/psia
+pressure_per_temp.     Pa/K        bar/K          psia/°R
+volume_per_temperature m³/(kg·K)   m³/(kg·K)      ft³/(lb·°R)
+temperature_per_volume K·kg/m³     K·kg/m³        °R·lb/ft³
 ====================== =========== ============== ============================
 
 ``specific_enthalpy`` también se usa para energía interna, calor latente
@@ -123,6 +128,11 @@ QuantityKind = Literal[
     "entropy_flow",
     "molar_mass",
     "amount",
+    "isothermal_compressibility",
+    "temperature_per_pressure",
+    "pressure_per_temperature",
+    "volume_per_temperature",
+    "temperature_per_volume",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -403,6 +413,36 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "mol"),
         "Técnico": (1.0e-3, 0.0, "kmol"),
         "Inglés": (1.0e-3 / _LB_PER_KG, 0.0, "lbmol"),
+    },
+    # Fase 9.2 (gases reales): las derivadas de las relaciones de Maxwell en las
+    # unidades del lado p–v–T de cada sistema. κ_T = −(1/v)·(∂v/∂p)_T; μ_JT y
+    # (∂T/∂p)_s en K/bar o °F/psia (una diferencia de temperatura); (∂p/∂T)_v y la
+    # pendiente de Clapeyron; (∂v/∂T)_p; (∂T/∂v)_s. El lado con s (kJ/(kg·K),
+    # Btu/(lb·°R)) se pasa a estas con el factor de p·v (100 o 0,18505).
+    "isothermal_compressibility": {
+        "SI": (1.0, 0.0, "1/Pa"),
+        "Técnico": (1.0e5, 0.0, "1/bar"),
+        "Inglés": (_PSI_PER_PA, 0.0, "1/psia"),
+    },
+    "temperature_per_pressure": {
+        "SI": (1.0, 0.0, "K/Pa"),
+        "Técnico": (1.0e5, 0.0, "K/bar"),
+        "Inglés": (9.0 / 5.0 * _PSI_PER_PA, 0.0, "°F/psia"),
+    },
+    "pressure_per_temperature": {
+        "SI": (1.0, 0.0, "Pa/K"),
+        "Técnico": (1.0e-5, 0.0, "bar/K"),
+        "Inglés": (5.0 / 9.0 / _PSI_PER_PA, 0.0, "psia/°R"),
+    },
+    "volume_per_temperature": {
+        "SI": (1.0, 0.0, "m³/(kg·K)"),
+        "Técnico": (1.0, 0.0, "m³/(kg·K)"),
+        "Inglés": (5.0 / 9.0 / _FT3_PER_LB_TO_M3_PER_KG, 0.0, "ft³/(lb·°R)"),
+    },
+    "temperature_per_volume": {
+        "SI": (1.0, 0.0, "K·kg/m³"),
+        "Técnico": (1.0, 0.0, "K·kg/m³"),
+        "Inglés": (9.0 / 5.0 * _FT3_PER_LB_TO_M3_PER_KG, 0.0, "°R·lb/ft³"),
     },
 }
 
