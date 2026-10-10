@@ -470,7 +470,7 @@ def _vdw_reduced_maxwell(Tr: float) -> tuple[float, float, float] | None:
 
 
 def vdw_reduced_isotherms(
-    Tr_values: tuple[float, ...] = (0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2),
+    Tr_values: tuple[float, ...] = (0.8, 0.9, 1.0, 1.1, 1.2),
     points: int = 300,
 ) -> dict[str, Any]:
     """Las isotermas reducidas de Van der Waals con su lazo y la recta de Maxwell.

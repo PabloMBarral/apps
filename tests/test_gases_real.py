@@ -394,7 +394,7 @@ def test_errors_for_the_student(pair: str, a: float, b: float, match: str) -> No
 def test_generalized_chart() -> None:
     chart = rg.generalized_chart()
     iso = chart["isotherms"]
-    assert set(iso) == {0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.5, 2.0, 3.0, 5.0}
+    assert set(iso) == {0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.5, 2.0, 3.0}
     for pr, z in iso.values():
         assert len(pr) == len(z) > 50
         assert z[0] == pytest.approx(1.0, abs=0.01)  # a p_R chica, gas ideal

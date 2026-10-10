@@ -865,26 +865,27 @@ def _notes(r: CompressibilityResult) -> tuple[str, ...]:
 
 
 def generalized_chart(
-    Tr_values: tuple[float, ...] = (0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.5, 2.0, 3.0, 5.0),
+    Tr_values: tuple[float, ...] = (0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.5, 2.0, 3.0),
     pr_max: float = 10.0,
     points: int = 80,
 ) -> dict[str, Any]:
     """Z⁰ de Lee y Kesler contra p_R para cada T_R, y la campana (Çengel, figura 3-51).
 
-    Devuelve ``{"isotherms": {T_R: (p_R, Z)}, "dome": (p_R, Z_f, Z_g)}``: bajo T_R = 1
-    cada isoterma sigue el vapor hasta p_sat (de la ecuación de Lee y Kesler con ω = 0) y
-    el líquido desde ahí, con un salto vertical en p_sat.
+    Devuelve ``{"isotherms": {T_R: (p_R, Z)}, "dome": (p_R, Z_f, Z_g)}``, con p_R de 0,01
+    a ``pr_max`` en escala logarítmica: bajo T_R = 1 cada isoterma sigue el vapor hasta
+    p_sat (de la ecuación de Lee y Kesler con ω = 0) y el líquido desde ahí, con un salto
+    vertical en p_sat.
     """
     isotherms: dict[float, tuple[list[float], list[float]]] = {}
     for Tr in Tr_values:
         psat = lee_kesler_psat_reduced(Tr) if Tr < 1.0 else math.inf
         if Tr < 1.0:
             grid = [
-                *np.geomspace(0.005, psat * (1 - 1e-9), max(points // 4, 10)),
-                *np.linspace(psat * (1 + 1e-9), pr_max, points),
+                *np.geomspace(0.01, psat * (1 - 1e-9), max(points // 3, 12)),
+                *np.geomspace(psat * (1 + 1e-9), pr_max, points),
             ]
         else:
-            grid = list(np.linspace(0.005, pr_max, points))
+            grid = list(np.geomspace(0.01, pr_max, points))
         xs: list[float] = []
         zs: list[float] = []
         for pr in grid:

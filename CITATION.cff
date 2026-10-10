@@ -21,7 +21,9 @@ abstract: >-
   poder calorífico por composición última/próxima y por ISO 6976,
   exergía, psicrometría, transferencia de calor (conducción, aletas,
   convección, radiación e intercambiadores), gases ideales y sus mezclas,
-  transformaciones politrópicas y diagramas de fluidos.
+  transformaciones politrópicas, gases reales (factor de compresibilidad,
+  Van der Waals, Peng–Robinson, relaciones de Maxwell, Clapeyron y
+  Joule–Thomson) y diagramas de fluidos.
 keywords:
   - thermal-engineering
   - thermodynamics
@@ -48,8 +50,12 @@ keywords:
   - ideal-gas
   - gas-mixtures
   - polytropic-process
+  - real-gas
+  - compressibility-factor
+  - equation-of-state
+  - maxwell-relations
 license: MIT
-version: "0.26.0"
+version: "0.27.0"
 date-released: "2026-10-10"
 references:
   - type: article
@@ -848,6 +854,81 @@ references:
     publisher:
       name: "TEMA"
     year: 1978
+  - type: book
+    scope: "Gases reales: la ecuación de estado de Van der Waals"
+    authors:
+      - family-names: "van der Waals"
+        given-names: "Johannes Diderik"
+    title: "Over de continuiteit van den gas- en vloeistoftoestand"
+    publisher:
+      name: "A. W. Sijthoff"
+    year: 1873
+    notes: "Tesis doctoral, Universidad de Leiden"
+  - type: article
+    scope: "Gases reales: la carta generalizada de compresibilidad y el volumen pseudorreducido v′_R"
+    authors:
+      - family-names: "Nelson"
+        given-names: "L. C."
+      - family-names: "Obert"
+        given-names: "E. F."
+    title: "Generalized pvT properties of gases"
+    journal: "Transactions of the ASME"
+    year: 1954
+    volume: 76
+    start: 1057
+    end: 1066
+  - type: article
+    scope: "Gases reales: el factor acéntrico ω (estados correspondientes de tres parámetros)"
+    authors:
+      - family-names: "Pitzer"
+        given-names: "Kenneth S."
+      - family-names: "Lippmann"
+        given-names: "David Z."
+      - family-names: "Curl"
+        given-names: "R. F."
+        name-suffix: "Jr."
+      - family-names: "Huggins"
+        given-names: "Charles M."
+      - family-names: "Petersen"
+        given-names: "Donald E."
+    title: "The Volumetric and Thermodynamic Properties of Fluids. II. Compressibility Factor, Vapor Pressure and Entropy of Vaporization"
+    journal: "Journal of the American Chemical Society"
+    year: 1955
+    volume: 77
+    issue: 13
+    start: 3433
+    end: 3440
+    doi: "10.1021/ja01618a002"
+  - type: article
+    scope: "Gases reales: Z con el fluido simple y el de referencia, y la presión de vapor generalizada"
+    authors:
+      - family-names: "Lee"
+        given-names: "Byung Ik"
+      - family-names: "Kesler"
+        given-names: "Michael G."
+    title: "A generalized thermodynamic correlation based on three-parameter corresponding states"
+    journal: "AIChE Journal"
+    year: 1975
+    volume: 21
+    issue: 3
+    start: 510
+    end: 527
+    doi: "10.1002/aic.690210313"
+  - type: article
+    scope: "Gases reales: la ecuación de estado cúbica de Peng y Robinson"
+    authors:
+      - family-names: "Peng"
+        given-names: "Ding-Yu"
+      - family-names: "Robinson"
+        given-names: "Donald B."
+    title: "A New Two-Constant Equation of State"
+    journal: "Industrial & Engineering Chemistry Fundamentals"
+    year: 1976
+    volume: 15
+    issue: 1
+    start: 59
+    end: 64
+    doi: "10.1021/i160057a011"
   - type: software
     scope: "Repositorio hermano: hoja de fórmulas teóricas"
     authors:

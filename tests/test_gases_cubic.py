@@ -217,7 +217,8 @@ def test_reduced_isotherms() -> None:
     assert cb.vdw_reduced_p(1.0, 1.0) == pytest.approx(1.0)  # el punto crítico
     k = int(np.argmin(np.abs(np.array(vr) - 1.0)))
     assert pr[k] == pytest.approx(1.0, abs=2e-3)
-    assert set(out["maxwell"]) == {0.8, 0.85, 0.9, 0.95}
+    assert set(out["maxwell"]) == {0.8, 0.9}
+    assert set(cb.vdw_reduced_isotherms((0.85, 1.0))["maxwell"]) == {0.85}
     dv, dp = out["dome"]
     assert max(dp) == pytest.approx(1.0) and dv[dp.index(max(dp))] == pytest.approx(1.0)
     # la campana: el líquido a la izquierda de v_R = 1 y el vapor a la derecha
