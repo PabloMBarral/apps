@@ -121,6 +121,12 @@ apps/
 │   │                          # dimensionamiento (ε-NTU y LMTD con F), ensayo con
 │   │                          # las cuatro temperaturas y U global con
 │   │                          # ensuciamiento; comparación de tipos y exergía.
+│   ├── 17_Gases_Ideales.py    # ✅ Fase 9.1 — Un gas entre dos estados (c_p a
+│   │                          # 25 °C, a la T media o NASA, y el error), mezclas
+│   │                          # (composición, Dalton, Amagat, entropía) y mezcla
+│   │                          # adiabática (tanque o cámara, S_gen por corriente),
+│   │                          # transformaciones (los cinco caminos en el p–v y el
+│   │                          # T–s, etapas y el n de dos estados).
 │   └── 99_Acerca.py           # ✅ 0.25.1 — Créditos, cómo citar la app (APA y
 │                              # BibTeX), las fuentes del CITATION.cff por tipo
 │                              # (con búsqueda y la bibliografía .bib), las
@@ -149,6 +155,10 @@ apps/
 │   │                          # wavelength (μm), wavelength_temperature (λT),
 │   │                          # spectral_emissive_power (E_bλ por μm),
 │   │                          # fouling_resistance (R″_f) y entropy_rate (W/K).
+│   │                          # Fase 9.1: + volume (m³ | m³ | ft³), entropy
+│   │                          # (J/K | kJ/K | Btu/°R), entropy_flow, molar_mass
+│   │                          # (kg/mol | kg/kmol | lb/lbmol) y amount (mol |
+│   │                          # kmol | lbmol).
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
@@ -248,6 +258,23 @@ apps/
 │   │   └── exchangers_procedure.py # ✅ Fase 8.2 — exchanger_steps (los tres
 │   │                          # problemas, con la exergía), overall_u_steps,
 │   │                          # EPS_FORMULAS y NTU_FORMULAS (renglones).
+│   ├── gases/                 # ✅ Fase 9.1 (la 9.2 suma los gases reales)
+│   │   ├── ideal.py           # IdealGas (15 gases, NASA-9; el helio con 5/2·R):
+│   │   │                      # cp, h, u, s°, p_r, v_r; model_cp/h/u/s (c_p a
+│   │   │                      # 25 °C o variable); estados con dos de p, T, v;
+│   │   │                      # ideal_gas_check (Z de CoolProp); solve_state_change
+│   │   │                      # (tres modelos y su error), ejemplos y export.
+│   │   ├── mixture.py         # solve_mixture (cuatro bases, Dalton, Amagat, s con
+│   │   │                      # la mezcla, agua que condensaría) y solve_mixing
+│   │   │                      # (tanque o cámara, c_p constante o variable,
+│   │   │                      # S_gen_TP y S_gen_mix, X_dest), ejemplos y export.
+│   │   ├── polytropic.py      # solve_process (cinco procesos, dato p₂, v₁/v₂ o
+│   │   │                      # T₂, cerrado o abierto, la adiabática con c_p
+│   │   │                      # variable), process_comparison (los cinco caminos),
+│   │   │                      # process_curve, staged_compression y staged_curves,
+│   │   │                      # exponent_from_states, ejemplos y export.
+│   │   └── ideal_procedure.py # state_change_steps, mixture_steps, mixing_steps,
+│   │                          # process_steps, staged_steps y exponent_steps.
 │   ├── exergy/                # ✅ Fase 7 (reemplaza al placeholder exergy.py)
 │   │   ├── physical.py        # Ambient (T₀, p₀), PhysicalExergy /
 │   │   │                      # physical_exergy (ψ, φ, térmica y mecánica, V²/2,
@@ -430,6 +457,9 @@ apps/
 │   └── exchanger_charts.py    # ✅ Fase 8.2 — effectiveness_figure (ε–NTU),
 │                              # f_factor_figure (F–P), profile_figure,
 │                              # type_comparison_figure y u_resistance_figure.
+│   └── gas_charts.py          # ✅ Fase 9.1 — cp_figure, composition_figure,
+│                              # mixing_entropy_figure, pv_figure, ts_figure (con
+│                              # far_paths ocultos), work_figure y staged_figure.
 ├── tests/                     # pytest: tests/test_<modulo>.py; páginas con
 │                              # streamlit.testing (tests/test_page_<pagina>.py)
 ├── data/                      # Tablas, propiedades por componente, etc.
@@ -1301,6 +1331,54 @@ Notas de la Fase 8.2 (radiación e intercambiadores):
   nombre (t₁…t₄; u, v, a, b, c).
 - CITATION.cff: un número de artículo con cero adelante (025010) va entre
   comillas: sin ellas YAML lo lee en octal (10760).
+
+Notas de la Fase 9.1 (gases ideales):
+
+- La Fase 9 se partió como la 8: 9.1 = gases ideales (esta entrega, página
+  /Gases_Ideales, 🎈, keys `ig_mode`, `gi_…`, `gm_kind`, `gm_c…`, `gm_a…`,
+  `gp_kind`, `gp_p…`, `gp_s_…` y `gp_n_…`); 9.2 = gases reales (/Gases_Reales).
+  La página recalcula sola (`st.cache_data` con los dataclasses).
+- **Secciones del vademecum, verificadas contra `vademecum.tex`**: §4.2 p·v = R·T
+  y R = R_u/M, §4.3 h = u + R·T, §4.5 Δu y Δh, §4.6 Mayer, §4.7 la tabla de
+  gases, §4.8 los polinomios NASA; §5.1 a §5.7 las mezclas; §6.1 la ley general,
+  §6.2 y §6.3 los trabajos, §6.3.1 las etapas, §6.4.1 c = c_v·(n − k)/(n − 1),
+  §6.4.2 k, §6.4.5 el resumen; §10.5.1 a §10.5.3 la entropía (p_r, v_r); §11.8
+  T₀·S_gen. Los primeros borradores citaban §4.5 (Mayer), §4.6 (tabla), §4.7
+  (NASA) y §6.5 (resumen), que no existen o son otra cosa.
+- c_p variable con los polinomios NASA-9 de McBride et al. (2002) que ya usaba la
+  combustión (el vademecum §4.8 trae la forma de cinco términos): a 25 °C
+  coinciden con la tabla del vademecum al 0,05 %. h, u y s° desde 25 °C; el helio
+  es monoatómico (c_p = 5/2·R exacto). El tercer modelo, c_p a la temperatura
+  media, es el de Çengel §7-9.
+- Mezclas con la notación del vademecum: x es la fracción másica e y la molar.
+  La entropía de mezcla se muestra como −R_M·Σ y·ln y (= −Σ x·R·ln y, porque
+  x_i·R_i = y_i·R_M): con el producto x·R·ln y no entraba en 324 px. Un gas con
+  fracción 0 se acepta (sin entropía, «—» en la tabla).
+- Ruido de redondeo: la adiabática reversible tiene Δs = 0 exacto y una corriente
+  que ya está a la T y la p final, Δs_TP = 0 (si no, el procedimiento mostraba
+  7·10⁻¹⁵ y 6,8·10⁻¹⁸).
+- Los cinco caminos (`process_comparison`): la politrópica usa el n del dato o
+  1,3. La isócora hasta la p₂ de un compresor llega a 9·T₁ y aplastaba el T–s y
+  el gráfico del trabajo: `far_paths` (T₂ − T₁ más de 5 veces la del dato, o
+  50 K) la oculta en el T–s (`visible="legendonly"`, se ve tocándola en la
+  leyenda) y la saca del gráfico del trabajo; la página lo dice y la tabla tiene
+  todo. En el p–v queda (es vertical). Los rótulos de los estados van con
+  `cliponaxis=False` (el «2» en el borde se cortaba).
+- Gráficos con la paleta validada en su orden fijo (azul, naranja, aguamarina,
+  amarillo, magenta, verde; validada para barras y líneas): cada proceso tiene
+  su color y los gases de una mezcla toman los colores en el orden en que se
+  cargan. Los tres claros no llegan a 3:1: las barras llevan sus porcentajes y la
+  página trae las tablas.
+- LaTeX: 3486 expresiones distintas del procedimiento (los ejemplos y variantes
+  de cada proceso, dato, modelo y sistema) y 26 de la teoría, KaTeX estricto,
+  máx. 315 y 293 px. Lo que hizo falta: las sumas de una mezcla de a un término
+  por renglón (el lado izquierdo de un `aligned` se suma al ancho); en la mezcla
+  adiabática, Δs_j de cada corriente antes de S_gen; el w_f de la isócora con la
+  resta en otro renglón si hay factor de p·v o ×10ⁿ; la teoría sin `\qquad` de
+  tres fórmulas (394 px). p·v lleva el factor a la vista: 100 en el Técnico
+  (bar·m³/kg = 100 kJ/kg) y 0,18505 en el Inglés.
+- Smoke test a 390 y 1280 px: 16 casos (los tres modos y sus submodos, en los
+  tres sistemas) sin errores ni desbordes.
 
 ### Citas y licencias
 

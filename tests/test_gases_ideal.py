@@ -13,7 +13,7 @@ from core.gases import ideal as ig
 
 C = 273.15
 
-# Tabla del vademecum §4.6 (CoolProp a 25 °C): M, R, c_p y c_v
+# Tabla del vademecum §4.7 (CoolProp a 25 °C): M, R, c_p y c_v
 VADEMECUM_TABLE = {
     "air": (28.97, 0.287, 1.005, 0.718),
     "Ar": (39.95, 0.208, 0.520, 0.312),

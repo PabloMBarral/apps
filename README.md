@@ -453,6 +453,29 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   las tablas da 0,933) y 11-9 (ε = 0,462 y 38,4 kW con la fórmula; el libro lee
   0,47 en el gráfico). Procedimiento en los tres sistemas y export. _Fase 8.2
   cerrada._
+- ✅ **Gases ideales** (página `/Gases_Ideales`, vademecum §4, §5, §6 y §10.5;
+  Çengel caps. 7 y 13). **Un gas entre dos estados** (15 gases: los nueve de la
+  tabla del vademecum y seis más de los polinomios NASA), con dos de p, T y v
+  en cada estado: Δu, Δh y Δs con c_p constante a 25 °C, con el c_p a la
+  temperatura media y con c_p variable (polinomios NASA-9 de McBride et al.),
+  el error de los dos primeros, p_r y v_r, el Z de CoolProp para ver si vale el
+  gas ideal y el gráfico c_p(T). **Mezclas**: la composición por masas, moles o
+  fracciones, M, R, c_p, c_v y k de la mezcla, Dalton, Amagat y la entropía con
+  el término de mezcla; la **mezcla adiabática** de 2 a 4 corrientes en un
+  tanque (U constante) o en una cámara de flujo permanente (H constante), con c_p
+  constante o variable, la entropía generada por corriente (igualar T y p contra
+  mezclar gases distintos) y la exergía destruida. **Transformaciones**: la
+  isócora, la isóbara, la isoterma, la adiabática reversible (con c_p constante o
+  variable, por s° o por v_r) y la politrópica con n, en sistema cerrado o
+  abierto, hasta p₂, v₁/v₂ o T₂; **los cinco caminos** hasta el mismo dato (la
+  tabla resumen del vademecum §6.4.5, con números) en el p–v, el T–s y un gráfico
+  del trabajo y el calor; la **compresión en etapas** con interenfriamiento y el
+  **exponente n** de dos estados medidos. Reproduce Çengel (aire comprimido de
+  §7-9, Δs = −0,3845 kJ/(kg·K) contra −0,3842; compresores de §7-12, 263,2,
+  246,4, 189,2 y 215,3 kJ/kg en dos etapas; motor de auto, 662,8 K contra 662,7;
+  helio a 40,5 psia; mezcla de §13-1, M = 19,6 kg/kmol; tanque de §13-3, 32,2 °C
+  y 114,5 kPa; O₂ y CO₂, S_gen = 44,0 kJ/K). Procedimiento en los tres sistemas
+  (con el factor de p·v a la vista) y export. _Fase 9.1 cerrada._
 - ✅ **Acerca de** (página `/Acerca`). Cómo citar la app (APA y BibTeX), todas
   las fuentes del `CITATION.cff` agrupadas por tipo, con búsqueda y la
   bibliografía para descargar, las licencias de la app y de los datos de
@@ -463,6 +486,11 @@ ecuaciones del procedimiento se escriben en renglones cortos (una
 igualdad por renglón) para que entren en el ancho de la pantalla.
 
 ### En desarrollo (roadmap)
+- **Gases reales** (Fase 9.2, página `/Gases_Reales`): el factor de
+  compresibilidad con la carta generalizada (Lee–Kesler), Van der Waals con la
+  construcción de Maxwell y Peng–Robinson; las relaciones de Maxwell (exactas y
+  por diferencias finitas), α, κ_T, Mayer generalizada, Clapeyron y
+  Joule–Thomson con la curva de inversión.
 - **Ciclo combinado (continuación)**: secciones intercaladas en la HRSG,
   quemadores suplementarios, pérdidas de carga, recirculación del
   precalentador y la turbina de gas con etapas (combustión secuencial) en el
@@ -525,6 +553,11 @@ apps/
 │   ├── psychrometrics_procedure.py  # su procedimiento «como en el pizarrón»
 │   ├── interpolation.py
 │   ├── isentropic.py
+│   ├── gases/
+│   │   ├── ideal.py       # gas ideal entre dos estados: c_p constante, medio o NASA; p_r, v_r
+│   │   ├── mixture.py     # mezclas: fracciones, Dalton, Amagat, entropía; mezcla adiabática
+│   │   ├── polytropic.py  # politrópicas, los cinco caminos, etapas y n de dos estados
+│   │   └── ideal_procedure.py  # su procedimiento «como en el pizarrón»
 │   ├── heat_transfer/
 │   │   ├── conduction.py  # red de resistencias: capas, contacto, paralelo, radio crítico
 │   │   ├── fins.py        # aletas recta, de aguja y anular (Bessel); arreglos
@@ -571,7 +604,8 @@ apps/
 │                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica,
 │                          # gráficos de la combustión, del poder calorífico, de la
 │                          # exergía (Grassmann), de la transferencia de calor, de la
-│                          # radiación y de los intercambiadores, créditos
+│                          # radiación, de los intercambiadores y de los gases
+│                          # ideales, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── data/                  # tablas: ISO 6976, polinomios NASA-9, biomasas (Ghugare),
 │                          # carbones de Argonne con el PCS medido y exergías
@@ -591,7 +625,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.25.1)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.26.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 La página **ℹ️ Acerca de** de la app arma esta cita y la de todas las fuentes

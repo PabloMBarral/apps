@@ -109,7 +109,7 @@ def test_reversible_entropy_change_is_the_heat_over_T(kind: str, final: str) -> 
 
 
 def test_specific_heat_of_the_polytropic() -> None:
-    """c = c_v·(n − k)/(n − 1) (vademecum §6.5)."""
+    """c = c_v·(n − k)/(n − 1) (vademecum §6.4.1)."""
     r = pt.solve_process(_example("Nitrógeno en un cilindro"))
     g = r.gas
     cv, k = g.cv(ig.T_REF_K), g.k(ig.T_REF_K)
@@ -224,3 +224,45 @@ def test_examples(name: str) -> None:
     assert pickle.loads(pickle.dumps(r)) == r
     for row in pt.process_comparison(r.inputs):
         assert row.result is not None or row.reason
+
+
+# ---------------------------------------------------------------------
+# Curvas de las etapas y export
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("stages", [1, 2, 3, 4])
+def test_staged_curves(stages: int) -> None:
+    """Cada etapa arranca en la isoterma a T₁ y sigue p·vⁿ = cte; el interenfriador va a p cte."""
+    r = pt.staged_compression(pt.StagedInputs("air", 1e5, 300.0, 9e5, 1.3, stages))
+    c = pt.staged_curves(r, points=30)
+    R, T1 = r.gas.R, 300.0
+    st_v, st_p = c["stages"]["v"], c["stages"]["p"]
+    assert st_p[0] == pytest.approx(1e5) and st_p[-1] == pytest.approx(9e5)
+    assert st_v[0] == pytest.approx(R * T1 / 1e5)
+    # el último punto de la compresión en etapas sale a T_x (no a T₁)
+    assert st_p[-1] * st_v[-1] / R == pytest.approx(r.T_out_K, rel=1e-9)
+    # sin interenfriador con una etapa: 30 puntos; con N, N·30 + (N − 1)
+    assert len(st_v) == stages * 30 + (stages - 1)
+    for p_x in r.pressures_Pa[1:-1]:  # cada interenfriador termina sobre la isoterma
+        k = next(i for i, p in enumerate(st_p) if p == p_x and abs(st_v[i] - R * T1 / p) < 1e-12)
+        assert st_p[k - 1] == pytest.approx(p_x)
+    one_v, one_p = c["single"]["v"], c["single"]["p"]
+    assert one_p[-1] * one_v[-1] / R == pytest.approx(r.T_out_single_K, rel=1e-9)
+    iso_v, iso_p = c["isothermal"]["v"], c["isothermal"]["p"]
+    assert all(p * v == pytest.approx(R * T1) for p, v in zip(iso_p, iso_v, strict=True))
+
+
+def test_staged_and_exponent_export() -> None:
+    r = pt.staged_compression(pt.StagedInputs("air", 1e5, 300.0, 9e5, 1.3, 2))
+    data = pt.staged_to_dict(r)
+    json.dumps(data)
+    assert data["w_f_J_per_kg"] == pytest.approx(r.w_f)
+    assert data["presiones_Pa"] == pytest.approx([1e5, 3e5, 9e5])
+    E = pt.EXPONENT_EXAMPLE
+    e = pt.exponent_from_states("air", E["p1_Pa"], E["p2_Pa"], T1_K=E["T1_K"], T2_K=E["T2_K"])
+    data = pt.exponent_to_dict(e, "air", E["p1_Pa"], E["p2_Pa"], T1_K=E["T1_K"], T2_K=E["T2_K"])
+    json.dumps(data)
+    assert data["n"] == pytest.approx(e.n) and "T1_K" in data and "v1_m3_per_kg" not in data
+    v = pt.exponent_to_dict(e, "air", 1e5, 6e5, v1=0.84, v2=0.22)
+    assert "v1_m3_per_kg" in v and "T1_K" not in v

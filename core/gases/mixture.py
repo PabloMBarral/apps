@@ -13,7 +13,7 @@ s_i(T, p) = s°_i(T) − R_i·ln(p/p°), s° = 0 a 25 °C y p° = 1 bar.
 - en una cámara de flujo permanente: H = cte y la presión de salida es un dato.
 La entropía generada se parte en lo que cuesta llevar cada gas a la T y la p
 finales y lo que cuesta mezclarlos (−R_i·ln y_i); dos corrientes del mismo gas
-no suman entropía de mezcla. X_dest = T₀·S_gen (Gouy–Stodola, vademecum §11).
+no suman entropía de mezcla. X_dest = T₀·S_gen (Gouy–Stodola, vademecum §11.8).
 
 Con c_p constante (a 25 °C) o variable (polinomios NASA), como ``core.gases.ideal``.
 Todo en SI.

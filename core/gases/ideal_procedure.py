@@ -146,7 +146,7 @@ def _gas_step(g: IdealGas, system: UnitSystem, with_cp: bool = True) -> Procedur
             text += " El helio es monoatómico: c_p = 5/2·R exacto."
         else:
             lines.append(latex_chain(r"c_p", r"c_p(25\,^{\circ}\mathrm{C})", q(cp, _S, system)))
-            text += " El c_p constante es el de 25 °C, el de la tabla del vademecum (§4.6)."
+            text += " El c_p constante es el de 25 °C, el de la tabla del vademecum (§4.7)."
         lines.append(
             latex_chain(
                 "c_v",
@@ -156,7 +156,7 @@ def _gas_step(g: IdealGas, system: UnitSystem, with_cp: bool = True) -> Procedur
             )
         )
         lines.append(latex_chain("k", frac("c_p", "c_v"), _r(cp / cv, 5)))
-        text += " c_v sale de la relación de Mayer, c_p − c_v = R (§4.5)."
+        text += " c_v sale de la relación de Mayer, c_p − c_v = R (§4.6)."
     return ProcedureStep("El gas", text, tuple(lines))
 
 
@@ -284,8 +284,9 @@ def state_change_steps(r: StateChange, system: UnitSystem) -> list[ProcedureStep
         ),
     ]
     text = (
-        "h(T) y s°(T) salen de integrar el polinomio NASA de 9 coeficientes (vademecum §4.7 y "
-        "§10.5.2), con h = s° = 0 a 25 °C; Δu = Δh − R·ΔT porque h = u + R·T."
+        "h(T) y s°(T) salen de integrar los polinomios NASA (vademecum §4.8 y §10.5.2; acá, "
+        "los de 9 coeficientes de McBride et al., 2002), con h = s° = 0 a 25 °C; Δu = Δh − R·ΔT "
+        "porque h = u + R·T (§4.3)."
     )
     if g.monatomic:
         text = "El helio tiene c_p constante exacto: h = c_p·(T − 25 °C) y s° = c_p·ln(T/298,15 K)."
@@ -852,7 +853,7 @@ def mixing_steps(r: MixingResult, system: UnitSystem) -> list[ProcedureStep]:
     steps.append(
         ProcedureStep(
             "La exergía destruida",
-            "Gouy–Stodola: la exergía destruida es T₀ por la entropía generada (vademecum §11).",
+            "Gouy–Stodola: la exergía destruida es T₀ por la entropía generada (vademecum §11.8).",
             (
                 latex_chain(
                     r"X_{\text{dest}}" if tank else r"\dot{X}_{\text{dest}}",
@@ -892,7 +893,7 @@ def process_steps(r: ProcessResult, system: UnitSystem) -> list[ProcedureStep]:
     if model == "variable":
         steps[0] = ProcedureStep(
             steps[0].title,
-            steps[0].text + " Con c_p variable, u, h y s° salen del polinomio NASA (§4.7).",
+            steps[0].text + " Con c_p variable, u, h y s° salen del polinomio NASA (§4.8).",
             steps[0].latex,
         )
     steps.append(
@@ -927,7 +928,7 @@ def process_steps(r: ProcessResult, system: UnitSystem) -> list[ProcedureStep]:
                     q(s2.p_Pa, _P, system),
                 )
             )
-        text = "En la isócora v₂ = v₁, así que T₂/T₁ = p₂/p₁ (vademecum §6.5)."
+        text = "En la isócora v₂ = v₁, así que T₂/T₁ = p₂/p₁ (vademecum §6.4.5)."
     elif kind == "isobaric":
         if inp.final == "ratio":
             lines.append(
@@ -935,7 +936,7 @@ def process_steps(r: ProcessResult, system: UnitSystem) -> list[ProcedureStep]:
                     "T_2", r"\frac{T_1}{v_1/v_2}", frac(T1t, _r(ratio)), q(s2.T_K, _T, system)
                 )
             )
-        text = "En la isóbara p₂ = p₁, así que T₂/T₁ = v₂/v₁ (vademecum §6.5)."
+        text = "En la isóbara p₂ = p₁, así que T₂/T₁ = v₂/v₁ (vademecum §6.4.5)."
     elif kind == "isothermal":
         if inp.final == "ratio":
             lines.append(
@@ -943,7 +944,7 @@ def process_steps(r: ProcessResult, system: UnitSystem) -> list[ProcedureStep]:
                     "p_2", r"p_1\,\frac{v_1}{v_2}", times(p1t, _r(ratio)), q(s2.p_Pa, _P, system)
                 )
             )
-        text = "En la isoterma T₂ = T₁, así que p₁·v₁ = p₂·v₂ (vademecum §6.5)."
+        text = "En la isoterma T₂ = T₁, así que p₁·v₁ = p₂·v₂ (vademecum §6.4.5)."
     elif kind == "adiabatic" and model == "variable":
         R = g.R
         s01, s02 = g.s0(s1.T_K), g.s0(s2.T_K)
@@ -1051,7 +1052,7 @@ def process_steps(r: ProcessResult, system: UnitSystem) -> list[ProcedureStep]:
         else:
             text = (
                 f"Con c_p constante la adiabática reversible es p·v^k = cte, con k = "
-                f"{_r_txt(e_val)} (vademecum §6.4)."
+                f"{_r_txt(e_val)} (vademecum §6.4.2)."
             )
     lines.append(_v_from_pT(g, s2.p_Pa, s2.T_K, system, "2"))
     steps.append(ProcedureStep(title, text, tuple(lines)))
@@ -1073,7 +1074,7 @@ def process_steps(r: ProcessResult, system: UnitSystem) -> list[ProcedureStep]:
                 q(r.dh, _E, system),
             ),
         ]
-        en_text = "Con c_p constante, Δu = c_v·ΔT y Δh = c_p·ΔT (vademecum §6.5)."
+        en_text = "Con c_p constante, Δu = c_v·ΔT y Δh = c_p·ΔT (vademecum §4.5)."
     else:
         en_lines = [
             latex_chain(
@@ -1121,7 +1122,7 @@ def process_steps(r: ProcessResult, system: UnitSystem) -> list[ProcedureStep]:
             )
         )
         w_lines.append(latex_chain("w_f", r"-\int v\,dp", q(0.0, _E, system)))
-        w_text = "En la isóbara w = p·(v₂ − v₁) = R·(T₂ − T₁) y w_f = 0 (vademecum §6.5)."
+        w_text = "En la isóbara w = p·(v₂ − v₁) = R·(T₂ − T₁) y w_f = 0 (vademecum §6.4.5)."
     elif kind == "isothermal":
         w_lines.append(
             latex_chain(
@@ -1183,7 +1184,10 @@ def process_steps(r: ProcessResult, system: UnitSystem) -> list[ProcedureStep]:
                     q(r.q, _E, system),
                 )
             )
-            q_text = "El calor de la politrópica es q = c·ΔT con c = c_v·(n − k)/(n − 1) (§6.5)."
+            q_text = (
+                "El calor de la politrópica es q = c·ΔT con c = c_v·(n − k)/(n − 1) (vademecum "
+                "§6.4.1 y §6.4.3)."
+            )
         else:
             q_lines.append(
                 latex_chain(

@@ -5,10 +5,10 @@ salen de los polinomios NASA de 9 coeficientes (McBride, Zehe y Gordon, 2002),
 los mismos de /Combustion, y Δu, Δh y Δs se calculan con tres modelos para ver
 cuánto pesa suponer c_p constante (Çengel, *Termodinámica*, §7-9):
 
-- ``constant``: c_p a 25 °C (la tabla del vademecum §4.6, que coincide con la
-  NASA al 0,05 %) y c_v = c_p − R (relación de Mayer, §4.5);
+- ``constant``: c_p a 25 °C (la tabla del vademecum §4.7, que coincide con la
+  NASA al 0,05 %) y c_v = c_p − R (relación de Mayer, §4.6);
 - ``mean``: c_p a la temperatura media del proceso;
-- ``variable``: las integrales exactas con el polinomio (§4.7 y §10.5.2), h(T)
+- ``variable``: las integrales exactas con el polinomio (§4.8 y §10.5.2), h(T)
   y s°(T) con h = s° = 0 a 25 °C, así que p_r(25 °C) = 1.
 
 El aire es la mezcla seca de cuatro componentes (N₂, O₂, Ar y CO₂, la de
@@ -152,7 +152,7 @@ class IdealGas:
         return self._molar(lambda s, T: s.cp(T), T_K) / self.M
 
     def cv(self, T_K: float) -> float:
-        """c_v = c_p − R (J/(kg·K)), la relación de Mayer (vademecum §4.5)."""
+        """c_v = c_p − R (J/(kg·K)), la relación de Mayer (vademecum §4.6)."""
         return self.cp(T_K) - self.R
 
     def k(self, T_K: float) -> float:
@@ -160,7 +160,7 @@ class IdealGas:
         return self.cp(T_K) / self.cv(T_K)
 
     def h(self, T_K: float) -> float:
-        """h(T) − h(25 °C) (J/kg): ∫c_p dT desde 25 °C (vademecum §4.7)."""
+        """h(T) − h(25 °C) (J/kg): ∫c_p dT desde 25 °C con el polinomio (vademecum §4.5 y §4.8)."""
         if self.monatomic:
             return 2.5 * self.R * (T_K - T_REF_K)
         return self._molar(lambda s, T: s.delta_h(T), T_K) / self.M
@@ -187,13 +187,13 @@ class IdealGas:
 
     @property
     def cp_ref(self) -> float:
-        """El c_p constante: a 25 °C, el de la tabla del vademecum §4.6."""
+        """El c_p constante: a 25 °C, el de la tabla del vademecum §4.7."""
         return self.cp(T_REF_K)
 
 
 _AIR = (("N2", 0.7808), ("O2", 0.2095), ("Ar", 0.0093), ("CO2", 0.0004))
 
-#: Los gases de la página: los 9 de la tabla del vademecum §4.6 y algunos más.
+#: Los gases de la página: los 9 de la tabla del vademecum §4.7 y algunos más.
 IDEAL_GASES: dict[str, IdealGas] = {
     g.key: g
     for g in (
@@ -214,7 +214,7 @@ IDEAL_GASES: dict[str, IdealGas] = {
         IdealGas("n-C4H10", "n-Butano", "C₄H₁₀", "n-Butane", (("n-C4H10", 1.0),)),
     )
 }
-#: Los de la tabla del vademecum §4.6, en su orden.
+#: Los de la tabla del vademecum §4.7, en su orden.
 VADEMECUM_GASES: tuple[str, ...] = ("air", "Ar", "CO2", "He", "H2", "CH4", "N2", "O2", "H2O")
 
 #: Presión de referencia de la entropía: s(T, p°) = s°(T).
@@ -442,7 +442,7 @@ def solve_state_change(inputs: StateChangeInputs) -> StateChange:
     - c_p constante: Δh = c_p·ΔT, Δu = c_v·ΔT, Δs = c_p·ln(T₂/T₁) − R·ln(p₂/p₁)
       (vademecum §4.5 y §10.5.1);
     - c_p variable: Δh = h(T₂) − h(T₁), Δu = Δh − R·ΔT, Δs = s°₂ − s°₁ − R·ln(p₂/p₁)
-      (§4.7 y §10.5.2).
+      (§4.8 y §10.5.2).
     """
     g = gas(inputs.gas_key)
     s1 = state_from_pair(g, inputs.state1, "1")

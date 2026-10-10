@@ -8,7 +8,7 @@ Con la notación del vademecum, w = ∫p dv es el trabajo de expansión (sistema
 cerrado) y w_f = −∫v dp el de circulación (sistema abierto en régimen
 permanente); los dos son positivos si los hace el gas, así que una compresión
 tiene w_f < 0. En la politrópica, T₂/T₁ = (p₂/p₁)^((n−1)/n), w = R·(T₂ − T₁)/(1 − n),
-w_f = n·w y q = c·(T₂ − T₁) con c = c_v·(n − k)/(n − 1) (§6.2 a §6.5).
+w_f = n·w y q = c·(T₂ − T₁) con c = c_v·(n − k)/(n − 1) (§6.2 a §6.4).
 
 Con c_p variable (polinomios NASA) p·vⁿ = cte sigue fijando T₂, Δu sale del
 polinomio y q = Δu + w; la adiabática reversible ya no es p·v^k = cte: T₂ sale de
@@ -58,11 +58,14 @@ __all__ = [
     "SystemKind",
     "allowed_finals",
     "exponent_from_states",
+    "exponent_to_dict",
     "process_comparison",
     "process_curve",
     "process_to_dict",
     "solve_process",
     "staged_compression",
+    "staged_curves",
+    "staged_to_dict",
 ]
 
 ProcessKind = Literal["isochoric", "isobaric", "isothermal", "adiabatic", "polytropic"]
@@ -555,6 +558,65 @@ def staged_compression(inputs: StagedInputs) -> StagedResult:
     )
 
 
+def staged_curves(result: StagedResult, points: int = 40) -> dict[str, dict[str, list[float]]]:
+    """Los caminos del p–v de la compresión en etapas (Çengel §7-12, figura del interenfriamiento).
+
+    - ``"stages"``: cada etapa (p·vⁿ = cte desde T₁) seguida del interenfriador (a p
+      constante, de T_x a T₁), una detrás de la otra;
+    - ``"single"``: la misma compresión en una etapa;
+    - ``"isothermal"``: la isoterma a T₁ (el mínimo trabajo, el límite con infinitas etapas).
+
+    Cada camino es un dict con ``v`` y ``p`` (SI).
+    """
+    inp = result.inputs
+    R, T1, n = result.gas.R, inp.T1_K, inp.n
+    ps = result.pressures_Pa
+
+    def polytropic(pa: float, pb: float) -> tuple[list[float], list[float]]:
+        pp = np.geomspace(pa, pb, points)
+        va = R * T1 / pa
+        vv = va * (pa / pp) ** (1.0 / n)
+        return [float(v) for v in vv], [float(p) for p in pp]
+
+    v_st: list[float] = []
+    p_st: list[float] = []
+    for j in range(len(ps) - 1):
+        vv, pp = polytropic(ps[j], ps[j + 1])
+        v_st += vv
+        p_st += pp
+        if j < len(ps) - 2:  # el interenfriador: a p constante hasta T₁
+            v_st.append(R * T1 / ps[j + 1])
+            p_st.append(ps[j + 1])
+    v_one, p_one = polytropic(ps[0], ps[-1])
+    pp = np.geomspace(ps[0], ps[-1], points)
+    return {
+        "stages": {"v": v_st, "p": p_st},
+        "single": {"v": v_one, "p": p_one},
+        "isothermal": {"v": [float(R * T1 / p) for p in pp], "p": [float(p) for p in pp]},
+    }
+
+
+def staged_to_dict(result: StagedResult) -> dict[str, Any]:
+    """La compresión en etapas para exportar (SI)."""
+    inp = result.inputs
+    return {
+        "gas": result.gas.name,
+        "p1_Pa": inp.p1_Pa,
+        "T1_K": inp.T1_K,
+        "p2_Pa": inp.p2_Pa,
+        "n": inp.n,
+        "etapas": inp.stages,
+        "presiones_Pa": list(result.pressures_Pa),
+        "relacion_por_etapa": result.stage_ratio,
+        "T_salida_etapa_K": result.T_out_K,
+        "w_f_J_per_kg": result.w_f,
+        "q_interenfriadores_J_per_kg": result.q_intercoolers,
+        "w_f_una_etapa_J_per_kg": result.w_f_single,
+        "T_salida_una_etapa_K": result.T_out_single_K,
+        "ahorro": result.saving,
+    }
+
+
 @dataclass(frozen=True)
 class ExponentResult:
     """El exponente politrópico de dos estados medidos."""
@@ -625,6 +687,26 @@ def exponent_from_states(
     else:
         text = "n < 1: el gas recibe mucho calor; la temperatura sube al expandirse."
     return ExponentResult(n=n, k=k, text=text)
+
+
+def exponent_to_dict(
+    result: ExponentResult,
+    gas_key: str,
+    p1_Pa: float,
+    p2_Pa: float,
+    *,
+    T1_K: float | None = None,
+    T2_K: float | None = None,
+    v1: float | None = None,
+    v2: float | None = None,
+) -> dict[str, Any]:
+    """El exponente de dos estados para exportar (SI)."""
+    data: dict[str, Any] = {"gas": gas(gas_key).name, "p1_Pa": p1_Pa, "p2_Pa": p2_Pa}
+    if v1 is not None and v2 is not None:
+        data |= {"v1_m3_per_kg": v1, "v2_m3_per_kg": v2}
+    else:
+        data |= {"T1_K": T1_K, "T2_K": T2_K}
+    return data | {"n": result.n, "k": result.k, "interpretacion": result.text}
 
 
 # ---------------------------------------------------------------------

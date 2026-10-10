@@ -13,6 +13,7 @@ import re
 
 import pytest
 
+from core.state_report import pv_energy_factor
 from core.units_system import (
     DEFAULT_SYSTEM,
     SUPPORTED_SYSTEMS,
@@ -598,35 +599,37 @@ def test_radiation_and_exchanger_units_are_coherent() -> None:
     )
 
 
-def test_ideal_gas_units_are_coherent() -> None:
+@pytest.mark.parametrize("system", SUPPORTED_SYSTEMS)
+def test_ideal_gas_units_are_coherent(system: str) -> None:
     """Fase 9: cada sustitución de la página de gases ideales cierra sin factores."""
-    for system in SUPPORTED_SYSTEMS:
 
-        def si(value: float, kind: str) -> float:
-            return convert_to_si(value, kind, system)  # type: ignore[arg-type]
+    def si(value: float, kind: str) -> float:
+        return convert_to_si(value, kind, system)  # type: ignore[arg-type]
 
-        def back(value: float, kind: str) -> float:
-            return convert_from_si(value, kind, system)  # type: ignore[arg-type]
+    def back(value: float, kind: str) -> float:
+        return convert_from_si(value, kind, system)  # type: ignore[arg-type]
 
-        # m·v = V, m·s = S, ṁ·s = Ṡ y n·M = m
-        assert back(si(1.0, "mass") * si(1.0, "specific_volume"), "volume") == pytest.approx(1.0)
-        assert back(si(1.0, "mass") * si(1.0, "specific_entropy"), "entropy") == pytest.approx(1.0)
-        assert back(si(1.0, "mass_flow") * si(1.0, "specific_entropy"), "entropy_flow") == (
-            pytest.approx(1.0)
-        )
-        assert back(si(1.0, "amount") * si(1.0, "molar_mass"), "mass") == pytest.approx(1.0)
-        # T₀·S = X (energía) y T₀·Ṡ = Ẋ (potencia), con T₀ absoluta
-        t0 = si(1.0, "absolute_temperature")
-        assert back(t0 * si(1.0, "entropy"), "energy") == pytest.approx(1.0)
-        assert back(t0 * si(1.0, "entropy_flow"), "power") == pytest.approx(1.0)
-        # R = R_u/M y p·V = n·R_u·T
-        r = si(1.0, "molar_entropy") / si(1.0, "molar_mass")
-        assert back(r, "specific_entropy") == pytest.approx(1.0)
-        pv = si(1.0, "pressure") * si(1.0, "volume")
-        nrt = si(1.0, "amount") * si(1.0, "molar_entropy") * t0
-        # p·V en las unidades de presión y volumen de cada sistema, contra n·R_u·T en energía
-        assert back(pv, "energy") / back(nrt, "energy") == pytest.approx(pv / nrt)
-    # R_u en cada sistema: 8,314 J/(mol·K) = 8,314 kJ/(kmol·K) = 1,98588 Btu/(lbmol·°R)
+    # m·v = V, m·s = S, ṁ·s = Ṡ y n·M = m
+    assert back(si(1.0, "mass") * si(1.0, "specific_volume"), "volume") == pytest.approx(1.0)
+    assert back(si(1.0, "mass") * si(1.0, "specific_entropy"), "entropy") == pytest.approx(1.0)
+    assert back(si(1.0, "mass_flow") * si(1.0, "specific_entropy"), "entropy_flow") == (
+        pytest.approx(1.0)
+    )
+    assert back(si(1.0, "amount") * si(1.0, "molar_mass"), "mass") == pytest.approx(1.0)
+    # T₀·S = X (energía) y T₀·Ṡ = Ẋ (potencia), con T₀ absoluta
+    t0 = si(1.0, "absolute_temperature")
+    assert back(t0 * si(1.0, "entropy"), "energy") == pytest.approx(1.0)
+    assert back(t0 * si(1.0, "entropy_flow"), "power") == pytest.approx(1.0)
+    # R = R_u/M
+    r = si(1.0, "molar_entropy") / si(1.0, "molar_mass")
+    assert back(r, "specific_entropy") == pytest.approx(1.0)
+    # p·V lleva el factor de p·v: 1 Pa·m³ = 1 J, 1 bar·m³ = 100 kJ, 1 psia·ft³ = 0,18505 Btu
+    pV = si(1.0, "pressure") * si(1.0, "volume")
+    assert back(pV, "energy") == pytest.approx(pv_energy_factor(system), rel=1e-4)  # type: ignore[arg-type]
+
+
+def test_universal_gas_constant_in_each_system() -> None:
+    """R_u = 8,314 J/(mol·K) = 8,314 kJ/(kmol·K) = 1,98588 Btu/(lbmol·°R) (vademecum §4.1)."""
     assert convert_from_si(8.314462618, "molar_entropy", "Inglés") == pytest.approx(
         1.98588, rel=1e-5
     )
