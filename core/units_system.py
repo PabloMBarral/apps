@@ -42,6 +42,11 @@ wavelength_temperature μm·K        μm·K           μm·°R
 spectral_emissive_pow. W/(m²·μm)   W/(m²·μm)      Btu/(h·ft²·μm)
 fouling_resistance     m²·K/W      m²·K/W         h·ft²·°F/Btu
 entropy_rate           W/K         W/K            Btu/(h·°R)
+volume                 m³          m³             ft³
+entropy                J/K         kJ/K           Btu/°R
+entropy_flow           W/K         kW/K           Btu/(s·°R)
+molar_mass             kg/mol      kg/kmol        lb/lbmol
+amount                 mol         kmol           lbmol
 ====================== =========== ============== ============================
 
 ``specific_enthalpy`` también se usa para energía interna, calor latente
@@ -113,6 +118,11 @@ QuantityKind = Literal[
     "spectral_emissive_power",
     "fouling_resistance",
     "entropy_rate",
+    "volume",
+    "entropy",
+    "entropy_flow",
+    "molar_mass",
+    "amount",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -363,6 +373,36 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "W/K"),
         "Técnico": (1.0, 0.0, "W/K"),
         "Inglés": (5.0 / 9.0 / _BTU_PER_H_W, 0.0, "Btu/(h·°R)"),
+    },
+    # Fase 9 (gases ideales): coherentes con la masa y las magnitudes específicas
+    # de cada sistema, como ``mass`` y ``energy``: kg · m³/kg = m³, kg · kJ/(kg·K)
+    # = kJ/K, kg/s · kJ/(kg·K) = kW/K (con T₀ da kW, la ``power`` del Técnico);
+    # lb · Btu/(lb·°R) = Btu/°R y lb/s · Btu/(lb·°R) = Btu/(s·°R). La masa molar
+    # y la cantidad, por mol como ``molar_enthalpy``: kmol · kg/kmol = kg.
+    "volume": {
+        "SI": (1.0, 0.0, "m³"),
+        "Técnico": (1.0, 0.0, "m³"),
+        "Inglés": (1.0 / _FT_PER_M**3, 0.0, "ft³"),
+    },
+    "entropy": {
+        "SI": (1.0, 0.0, "J/K"),
+        "Técnico": (1.0e-3, 0.0, "kJ/K"),
+        "Inglés": (5.0 / 9.0 / _BTU_IT_J, 0.0, "Btu/°R"),
+    },
+    "entropy_flow": {
+        "SI": (1.0, 0.0, "W/K"),
+        "Técnico": (1.0e-3, 0.0, "kW/K"),
+        "Inglés": (5.0 / 9.0 / _BTU_IT_J, 0.0, "Btu/(s·°R)"),
+    },
+    "molar_mass": {
+        "SI": (1.0, 0.0, "kg/mol"),
+        "Técnico": (1.0e3, 0.0, "kg/kmol"),
+        "Inglés": (1.0e3, 0.0, "lb/lbmol"),
+    },
+    "amount": {
+        "SI": (1.0, 0.0, "mol"),
+        "Técnico": (1.0e-3, 0.0, "kmol"),
+        "Inglés": (1.0e-3 / _LB_PER_KG, 0.0, "lbmol"),
     },
 }
 

@@ -57,6 +57,11 @@ _KINDS = (
     "spectral_emissive_power",
     "fouling_resistance",
     "entropy_rate",
+    "volume",
+    "entropy",
+    "entropy_flow",
+    "molar_mass",
+    "amount",
 )
 
 
@@ -153,6 +158,18 @@ class TestUnitLabels:
             ("fouling_resistance", "Inglés", "h·ft²·°F/Btu"),
             ("entropy_rate", "Técnico", "W/K"),
             ("entropy_rate", "Inglés", "Btu/(h·°R)"),
+            ("volume", "Técnico", "m³"),
+            ("volume", "Inglés", "ft³"),
+            ("entropy", "SI", "J/K"),
+            ("entropy", "Técnico", "kJ/K"),
+            ("entropy", "Inglés", "Btu/°R"),
+            ("entropy_flow", "Técnico", "kW/K"),
+            ("entropy_flow", "Inglés", "Btu/(s·°R)"),
+            ("molar_mass", "SI", "kg/mol"),
+            ("molar_mass", "Técnico", "kg/kmol"),
+            ("molar_mass", "Inglés", "lb/lbmol"),
+            ("amount", "Técnico", "kmol"),
+            ("amount", "Inglés", "lbmol"),
         ],
     )
     def test_label(self, kind: str, system: str, expected: str) -> None:
@@ -197,6 +214,11 @@ class TestRoundTrip:
         "spectral_emissive_power": (0.0, 1.0, 3.846e9, 8.3e13),
         "fouling_resistance": (0.0, 1.0e-4, 9.0e-4, 0.01),
         "entropy_rate": (0.0, 0.5, 120.0, 1.0e5),
+        "volume": (0.0, 1.0e-3, 8.011, 1.0e4),
+        "entropy": (0.0, 1.0, 4.4e4, 1.0e7),
+        "entropy_flow": (0.0, 1.0, 950.0, 1.0e6),
+        "molar_mass": (2.016e-3, 0.028966, 0.18),
+        "amount": (0.0, 1.0, 361.6, 8000.0),
     }
 
     @pytest.mark.parametrize("kind", _KINDS)
@@ -574,3 +596,38 @@ def test_radiation_and_exchanger_units_are_coherent() -> None:
     assert convert_from_si(2.897771955e-3, "wavelength_temperature", "Inglés") == pytest.approx(
         5216.0, abs=0.1
     )
+
+
+def test_ideal_gas_units_are_coherent() -> None:
+    """Fase 9: cada sustitución de la página de gases ideales cierra sin factores."""
+    for system in SUPPORTED_SYSTEMS:
+
+        def si(value: float, kind: str) -> float:
+            return convert_to_si(value, kind, system)  # type: ignore[arg-type]
+
+        def back(value: float, kind: str) -> float:
+            return convert_from_si(value, kind, system)  # type: ignore[arg-type]
+
+        # m·v = V, m·s = S, ṁ·s = Ṡ y n·M = m
+        assert back(si(1.0, "mass") * si(1.0, "specific_volume"), "volume") == pytest.approx(1.0)
+        assert back(si(1.0, "mass") * si(1.0, "specific_entropy"), "entropy") == pytest.approx(1.0)
+        assert back(si(1.0, "mass_flow") * si(1.0, "specific_entropy"), "entropy_flow") == (
+            pytest.approx(1.0)
+        )
+        assert back(si(1.0, "amount") * si(1.0, "molar_mass"), "mass") == pytest.approx(1.0)
+        # T₀·S = X (energía) y T₀·Ṡ = Ẋ (potencia), con T₀ absoluta
+        t0 = si(1.0, "absolute_temperature")
+        assert back(t0 * si(1.0, "entropy"), "energy") == pytest.approx(1.0)
+        assert back(t0 * si(1.0, "entropy_flow"), "power") == pytest.approx(1.0)
+        # R = R_u/M y p·V = n·R_u·T
+        r = si(1.0, "molar_entropy") / si(1.0, "molar_mass")
+        assert back(r, "specific_entropy") == pytest.approx(1.0)
+        pv = si(1.0, "pressure") * si(1.0, "volume")
+        nrt = si(1.0, "amount") * si(1.0, "molar_entropy") * t0
+        # p·V en las unidades de presión y volumen de cada sistema, contra n·R_u·T en energía
+        assert back(pv, "energy") / back(nrt, "energy") == pytest.approx(pv / nrt)
+    # R_u en cada sistema: 8,314 J/(mol·K) = 8,314 kJ/(kmol·K) = 1,98588 Btu/(lbmol·°R)
+    assert convert_from_si(8.314462618, "molar_entropy", "Inglés") == pytest.approx(
+        1.98588, rel=1e-5
+    )
+    assert convert_from_si(0.028966, "molar_mass", "Técnico") == pytest.approx(28.966)
