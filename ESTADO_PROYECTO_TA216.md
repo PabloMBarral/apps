@@ -1524,7 +1524,7 @@
   repetido, cantidades negativas, una cámara de mezcla que comprimiría, T₀ fuera
   de rango, p₂ ≤ p₁ en las etapas y dos estados con la misma presión o el mismo
   volumen en el exponente.
-- **Tests**: 384 nuevos en los archivos de la fase, sin warnings.
+- **Tests**: de 4820 a 5266 passed (10 skipped), sin warnings.
   - `tests/test_gases_ideal.py` (45), `tests/test_gases_mixture.py` (23),
     `tests/test_gases_polytropic.py` (58), `tests/test_gases_procedure.py` (212),
     `tests/test_gas_charts.py` (9) y `tests/test_page_gases_ideales.py` (37,
