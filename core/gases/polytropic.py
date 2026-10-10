@@ -254,6 +254,7 @@ def _numbers(inputs: PolytropicInputs, g: IdealGas, s1: GasState, s2: GasState) 
         w_f = w
     elif kind == "adiabatic":
         w, w_f = -du, -dh
+        ds = 0.0  # reversible: lo que da la cuenta es redondeo (~1e-15)
     else:
         n = inputs.n
         w = R * (T2 - T1) / (1.0 - n)

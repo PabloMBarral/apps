@@ -413,6 +413,8 @@ def solve_mixing(inputs: MixingInputs) -> MixingResult:
     for m, g, st in zip(masses, gases, streams, strict=True):
         y = moles_by_gas[g.key] / n_tot
         ds_TP = _s(g, T, p, model) - _s(g, st.T_K, st.p_Pa, model)
+        if abs(ds_TP) < 1e-9:  # misma T y misma p: lo que queda es redondeo (~1e-13)
+            ds_TP = 0.0
         ds_mix = -g.R * math.log(y)
         S_TP += m * ds_TP
         S_mix += m * ds_mix
