@@ -231,6 +231,16 @@ def test_every_joule_thomson_example(name: str) -> None:
     assert _charts(at) == 1
 
 
+def test_inversion_curve_cut_by_the_equation_of_state() -> None:
+    """El metano: la rama alta de la curva pasa la T máxima de su ecuación de estado."""
+    at = _mode(_app(), M_REL, REL_JT)
+    at.selectbox(key="rj_0_fluid").set_value("Methane").run()
+    _no_problems(at)
+    assert any("La línea punteada" in c.value for c in at.caption)
+    assert any("temperatura máxima de la ecuación de estado" in i.value for i in at.info)
+    assert _charts(at) == 1
+
+
 # ---------------------------------------------------------------------
 # Unidades y teoría
 # ---------------------------------------------------------------------

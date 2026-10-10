@@ -1246,16 +1246,30 @@ def joule_thomson_steps(r: JouleThomsonResult, system: UnitSystem) -> list[Proce
             _jt_lines(s, r.dv_dT, r.cp, r.mu_formula, r.mu_finite, r.isenthalpic, r.dp, system),
         ),
     ]
-    if r.T_inversion:
-        temps = " y ".join(_txt_q(T, "temperature", system) for T in r.T_inversion)
-        text = (
-            "La curva de inversión es donde μ_JT = 0, es decir T·(∂v/∂T)_p = v. A esta presión "
-            f"pasa por {temps}: entre esas temperaturas el fluido se enfría al estrangularlo."
+    lo, hi = r.T_inversion_low, r.T_inversion_high
+    text = "La curva de inversión es donde μ_JT = 0, es decir T·(∂v/∂T)_p = v. "
+    if lo is not None and hi is not None:
+        text += (
+            f"A esta presión pasa por {_txt_q(lo, 'temperature', system)} y "
+            f"{_txt_q(hi, 'temperature', system)}: entre esas temperaturas el fluido se enfría "
+            "al estrangularlo."
+        )
+    elif lo is not None:
+        text += (
+            f"A esta presión pasa por {_txt_q(lo, 'temperature', system)}: arriba de esa "
+            "temperatura el fluido se enfría al estrangularlo (la rama alta queda por encima de "
+            "la temperatura máxima de la ecuación de estado)."
+        )
+    elif hi is not None:
+        text += (
+            f"A esta presión pasa por {_txt_q(hi, 'temperature', system)}: abajo de esa "
+            "temperatura el fluido se enfría al estrangularlo."
         )
     else:
-        text = (
-            "La curva de inversión es donde μ_JT = 0, es decir T·(∂v/∂T)_p = v; a esta presión "
-            "no la corta (está por encima de su nariz)."
+        how = "se enfría" if r.mu > 0 else "se calienta"
+        text += (
+            "A esta presión no la corta dentro del rango de la ecuación de estado: el fluido "
+            f"{how} al estrangularlo a cualquier temperatura de ese rango."
         )
     steps.append(ProcedureStep("La temperatura de inversión", text))
     return numbered(steps)

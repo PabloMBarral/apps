@@ -77,6 +77,10 @@ def _num(x: float, fmt: str = ".3g") -> str:
     return f"{x:{fmt}}".replace(".", ",").replace("-", "−")
 
 
+def _celsius(T: float) -> str:
+    return f"{_num(T - 273.15, '.4g')} °C"
+
+
 def _pct(x: float, decimals: int = 1) -> str:
     return f"{100.0 * x:.{decimals}f} %".replace(".", ",").replace("-", "−")
 
@@ -721,23 +725,70 @@ def _T_grid(fl: RealFluid) -> np.ndarray:
     return np.geomspace(fl.T_min * 1.01, fl.T_max * 0.99, 240)
 
 
+def _nose(
+    state: CoolProp.AbstractState,
+    last: tuple[float, float, float],
+    p_beyond: float,
+    points: int = 12,
+) -> list[tuple[float, float]]:
+    """La punta de la curva de inversión (la presión máxima), con p_inv(T) a T fija.
+
+    ``last`` = (p, T_baja, T_alta) del último p de la grilla con las dos ramas: entre las
+    dos temperaturas μ > 0 a esa p y μ < 0 a ``p_beyond``, la primera p sin inversión.
+    Sin esto la grilla en p corta la punta con una recta vertical.
+    """
+    p_last, T_lo, T_hi = last
+    out: list[tuple[float, float]] = []
+    for T in (float(x) for x in np.linspace(T_lo, T_hi, points + 2)[1:-1]):
+
+        def mu_at(pp: float, T: float = T) -> float:
+            return _mu(state, pp, T)
+
+        try:
+            p = float(brentq(mu_at, p_last, p_beyond, xtol=1e-6 * p_last))
+        except ValueError:
+            continue
+        out.append((p, T))
+    return out
+
+
 def inversion_curve(fluid_key: str, points: int = 50) -> dict[str, list[float]]:
     """La curva de inversión de Joule–Thomson (μ_JT = 0) en el plano T–p (Çengel §12-5).
 
-    Devuelve ``{"p": [...], "T": [...]}`` en orden: la rama baja de p chica a la nariz y
-    la alta de vuelta.
+    Devuelve ``{"p": [...], "T": [...], "p_edge": [...], "T_edge": [...]}``. ``p`` y ``T``
+    son la curva, en orden: la rama baja de p chica a la nariz, la nariz (con la presión de
+    inversión a T fija) y la rama alta de vuelta. Si la rama alta pasa por encima de la
+    temperatura máxima de la ecuación de estado (el metano, el agua, los refrigerantes),
+    la curva no vuelve a p chica: ``p_edge`` y ``T_edge`` cierran la zona donde se enfría
+    por ese borde (T = T_máx); si no, quedan vacías.
     """
     fl = real_fluid(fluid_key)
     state = CoolProp.AbstractState("HEOS", fl.key)
     lower: list[tuple[float, float]] = []
     upper: list[tuple[float, float]] = []
     Ts = _T_grid(fl)
+    last: tuple[float, float, float] | None = None
+    p_beyond: float | None = None
     for p in np.geomspace(0.01 * fl.p_cr, min(30.0 * fl.p_cr, fl.p_max), points):
         lo, hi = _inversion_temperatures(state, fl, float(p), Ts)
         lower += [(float(p), T) for T in lo]
         upper += [(float(p), T) for T in hi]
-    curve = [*lower, *reversed(upper)]
-    return {"p": [p for p, _ in curve], "T": [T for _, T in curve]}
+        if lo and hi:
+            last, p_beyond = (float(p), lo[-1], hi[0]), None
+        elif last is not None and p_beyond is None:
+            p_beyond = float(p)
+    nose = _nose(state, last, p_beyond) if last is not None and p_beyond is not None else []
+    curve = [*lower, *nose, *reversed(upper)]
+    p_low = 0.01 * fl.p_cr
+    edge: list[tuple[float, float]] = []
+    if curve and curve[-1][0] > 1.01 * p_low:
+        edge = [(curve[-1][0], fl.T_max), (p_low, fl.T_max)]
+    return {
+        "p": [p for p, _ in curve],
+        "T": [T for _, T in curve],
+        "p_edge": [p for p, _ in edge],
+        "T_edge": [T for _, T in edge],
+    }
 
 
 def isenthalps(
@@ -789,6 +840,8 @@ class JouleThomsonResult:
     isenthalpic: tuple[PathState, PathState]
     T_inversion: tuple[float, ...]  # las temperaturas de inversión a esta presión
     notes: tuple[str, ...]
+    T_inversion_low: float | None = None  # la rama baja: arriba de ella se enfría
+    T_inversion_high: float | None = None  # la rama alta: abajo de ella se enfría
 
 
 def joule_thomson(inputs: JouleThomsonInputs) -> JouleThomsonResult:
@@ -853,6 +906,8 @@ def joule_thomson(inputs: JouleThomsonInputs) -> JouleThomsonResult:
         isenthalpic=(lo, hi),
         T_inversion=tuple(sorted(low + up)),
         notes=(),
+        T_inversion_low=low[0] if low else None,
+        T_inversion_high=up[0] if up else None,
     )
     return replace(result, notes=_jt_notes(result))
 
@@ -871,21 +926,35 @@ def _jt_notes(r: JouleThomsonResult) -> tuple[str, ...]:
             f"μ_JT < 0: al estrangularlo el {fl.noun} se calienta, unos "
             f"{_num(abs(K_bar), '.2g')} K por bar: está fuera de la curva de inversión."
         )
-    if len(r.T_inversion) == 2:
-        lo, hi = (f"{_num(T - 273.15, '.4g')} °C" for T in r.T_inversion)
+    lo, hi = r.T_inversion_low, r.T_inversion_high
+    if lo is not None and hi is not None:
         notes.append(
-            f"A esta presión el {fl.noun} se enfría al estrangularlo solo entre {lo} y {hi} (las "
-            "temperaturas de inversión): adentro de la curva de inversión."
+            f"A esta presión el {fl.noun} se enfría al estrangularlo solo entre {_celsius(lo)} y "
+            f"{_celsius(hi)} (las temperaturas de inversión): adentro de la curva de inversión."
         )
-    elif len(r.T_inversion) == 1:
+    elif lo is not None:
         notes.append(
-            f"A esta presión la temperatura de inversión es "
-            f"{_num(r.T_inversion[0] - 273.15, '.4g')} °C."
+            f"A esta presión la temperatura de inversión es {_celsius(lo)}: arriba de ella el "
+            f"{fl.noun} se enfría al estrangularlo. La otra queda por encima de la temperatura "
+            f"máxima de la ecuación de estado ({_celsius(fl.T_max)})."
+        )
+    elif hi is not None:
+        vapor = " (en el vapor)" if r.state.p < fl.p_cr else ""
+        notes.append(
+            f"A esta presión la temperatura de inversión es {_celsius(hi)}: abajo de ella el "
+            f"{fl.noun} se enfría al estrangularlo{vapor}."
+        )
+    elif r.mu > 0:
+        upto = "en el vapor, hasta" if r.state.p < fl.p_cr else "hasta"
+        notes.append(
+            f"A esta presión el {fl.noun} se enfría al estrangularlo a cualquier temperatura del "
+            f"rango de la ecuación de estado ({upto} {_celsius(fl.T_max)}): la temperatura de "
+            "inversión queda más arriba."
         )
     else:
         notes.append(
-            "A esta presión no hay temperatura de inversión en el rango de la ecuación de "
-            "estado: está por encima de la nariz de la curva."
+            f"A esta presión el {fl.noun} se calienta al estrangularlo a cualquier temperatura "
+            "del rango de la ecuación de estado: no hay temperatura de inversión."
         )
     notes.append(
         "Un gas ideal tiene μ_JT = 0: su h depende solo de T, así que una válvula no le cambia "
@@ -1014,6 +1083,8 @@ def joule_thomson_to_dict(r: JouleThomsonResult) -> dict[str, Any]:
         "mu_JT_formula": r.mu_formula,
         "mu_JT_diferencias": r.mu_finite,
         "T_inversion_K": list(r.T_inversion),
+        "T_inversion_baja_K": r.T_inversion_low,
+        "T_inversion_alta_K": r.T_inversion_high,
         "notas": list(r.notes),
     }
 

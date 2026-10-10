@@ -565,18 +565,45 @@ def inversion_figure(
         )
     xs = _conv(curve["p"], p_kind, system)
     ys = _conv(curve["T"], T_kind, system)
+    # la zona donde se enfría: la curva y, si la corta la ecuación de estado, su borde
+    ex = _conv(curve.get("p_edge", []), p_kind, system)
+    ey = _conv(curve.get("T_edge", []), T_kind, system)
+    zone_x, zone_y = [*xs, *ex], [*ys, *ey]
     fig.add_trace(
         go.Scatter(
-            x=[*xs, xs[0]] if xs else [],
-            y=[*ys, ys[0]] if ys else [],
+            x=[*zone_x, zone_x[0]] if zone_x else [],
+            y=[*zone_y, zone_y[0]] if zone_y else [],
             mode="lines",
             fill="toself",
             fillcolor="rgba(42, 120, 214, 0.12)",
+            line={"width": 0},
+            legendgroup="inv",
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=xs,
+            y=ys,
+            mode="lines",
             name="curva de inversión (adentro se enfría)",
+            legendgroup="inv",
             line={"color": _BLUE, "width": 2.5},
             hovertemplate="μ_JT = 0<br>p = %{x:.4g}<br>T = %{y:.4g}<extra></extra>",
         )
     )
+    if ex:
+        fig.add_trace(
+            go.Scatter(
+                x=[0.0, 1.15 * max(x for x in zone_x if x is not None)],
+                y=[ey[0], ey[0]],
+                mode="lines",
+                name="T máxima de la ecuación de estado",
+                line={"color": _GRAY, "width": 1.5, "dash": "dot"},
+                hovertemplate="T máx. = %{y:.4g}<extra></extra>",
+            )
+        )
     if state is not None:
         fig.add_trace(
             go.Scatter(

@@ -856,7 +856,13 @@ def _jt_mode(system: UnitSystem) -> None:
         ),
         "rj_inv",
         "Adentro de la curva de inversión (μ_JT > 0) el gas se enfría al estrangularlo; afuera "
-        "se calienta. Cada línea gris es una válvula (h constante): su máximo cae sobre la curva.",
+        "se calienta. Cada línea gris es una válvula (h constante): su máximo cae sobre la curva."
+        + (
+            f" La línea punteada es la temperatura máxima de la ecuación de estado del {fl.noun}:"
+            " la rama alta de la curva queda más arriba."
+            if curve["p_edge"]
+            else ""
+        ),
     )
     _render_steps(joule_thomson_steps(r, system))
     _render_export(rl.joule_thomson_to_dict(r), "joule_thomson", "rj_dl")

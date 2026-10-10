@@ -8,6 +8,7 @@ import pickle
 import CoolProp
 import pytest
 
+from core.gases import real as rg
 from core.gases import relations as rl
 
 C = 273.15
@@ -164,17 +165,41 @@ def test_density_maximum_of_water() -> None:
     assert any("α ≈ 0" in n for n in r.notes)
 
 
-def test_inversion_curve_of_nitrogen() -> None:
-    """La máxima temperatura de inversión del N₂ (con la ecuación de estado de CoolProp)
-    ronda 608 K y la presión máxima, 380 bar."""
-    out = rl.inversion_curve("Nitrogen")
-    assert max(out["T"]) == pytest.approx(608.0, abs=2.0)
-    assert max(out["p"]) / 1e5 == pytest.approx(380.0, abs=15.0)
-    state = CoolProp.AbstractState("HEOS", "Nitrogen")
-    for p, T in list(zip(out["p"], out["T"], strict=True))[::7]:
+def _mu_is_zero_on(fluid: str, out: dict[str, list[float]]) -> None:
+    state = CoolProp.AbstractState("HEOS", fluid)
+    for p, T in list(zip(out["p"], out["T"], strict=True))[::5]:
         state.update(CoolProp.PT_INPUTS, p, T)
         mu = state.first_partial_deriv(CoolProp.iT, CoolProp.iP, CoolProp.iHmass)
         assert abs(mu) < 1e-9  # μ_JT = 0 sobre la curva (K/Pa)
+
+
+def test_inversion_curve_of_nitrogen() -> None:
+    """Con la ecuación de estado de CoolProp, la máxima temperatura de inversión del N₂ es
+    608 K y la nariz está a 394 bar y 277 K."""
+    out = rl.inversion_curve("Nitrogen")
+    assert max(out["T"]) == pytest.approx(608.0, abs=2.0)
+    k = max(range(len(out["p"])), key=out["p"].__getitem__)
+    assert out["p"][k] / 1e5 == pytest.approx(394.5, abs=1.0)
+    assert out["T"][k] == pytest.approx(277.0, abs=5.0)
+    assert out["p_edge"] == out["T_edge"] == []  # la curva vuelve a p chica
+    _mu_is_zero_on("Nitrogen", out)
+
+
+def test_the_nose_does_not_depend_on_the_grid() -> None:
+    """La punta sale de la presión de inversión a T fija: no la corta la grilla en p."""
+    coarse, fine = rl.inversion_curve("Nitrogen", 30), rl.inversion_curve("Nitrogen", 80)
+    assert max(coarse["p"]) == pytest.approx(max(fine["p"]), rel=2e-3)
+
+
+def test_inversion_curve_cut_by_the_equation_of_state() -> None:
+    """La ecuación de estado del metano llega a 625 K: la rama alta queda más arriba y la
+    zona donde se enfría se cierra por T = T_máx."""
+    fl = rg.real_fluid("Methane")
+    out = rl.inversion_curve("Methane")
+    assert out["T_edge"] == [fl.T_max, fl.T_max]
+    assert out["p_edge"][0] == out["p"][-1] > 100e5  # la curva termina arriba, no en p chica
+    assert out["p_edge"][1] == pytest.approx(0.01 * fl.p_cr)
+    _mu_is_zero_on("Methane", out)
 
 
 def test_isenthalps() -> None:
@@ -303,6 +328,26 @@ def test_nitrogen_cools_and_hydrogen_heats() -> None:
     for T in n2.T_inversion:  # μ_JT = 0 en cada temperatura de inversión
         state.update(CoolProp.PT_INPUTS, 50e5, T)
         assert abs(state.first_partial_deriv(CoolProp.iT, CoolProp.iP, CoolProp.iHmass)) < 1e-9
+
+
+@pytest.mark.parametrize(
+    ("args", "low", "high", "words"),
+    [
+        (("Methane", 50e5, 300.0), True, False, "temperatura máxima de la ecuación de estado"),
+        (("Nitrogen", 5e5, 300.0), False, True, "abajo de ella el nitrógeno se enfría"),
+        (("Methane", 5e5, 300.0), False, False, "se enfría al estrangularlo a cualquier"),
+        (("Nitrogen", 450e5, 300.0), False, False, "se calienta al estrangularlo a cualquier"),
+    ],
+)
+def test_one_or_no_inversion_temperature(
+    args: tuple[str, float, float], low: bool, high: bool, words: str
+) -> None:
+    """Con una sola temperatura de inversión en el rango (o ninguna), la nota dice de qué
+    lado se enfría."""
+    r = rl.joule_thomson(rl.JouleThomsonInputs(*args))
+    assert (r.T_inversion_low is not None, r.T_inversion_high is not None) == (low, high)
+    assert any(words in n for n in r.notes)
+    assert len(r.T_inversion) == low + high
 
 
 def test_joule_thomson_errors() -> None:

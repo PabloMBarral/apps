@@ -105,11 +105,24 @@ def test_inversion_figure() -> None:
     curve = rl.inversion_curve("Nitrogen", 30)
     lines = rl.isenthalps("Nitrogen", (200.0, 400.0), 1e5, 400e5)
     fig = inversion_figure(curve, lines, "Técnico", (50e5, 300.0))
+    zone = next(t for t in fig.data if t.fill == "toself")
+    assert zone.x[0] == zone.x[-1] and zone.showlegend is False  # la zona, cerrada
     inv = _trace(fig, "curva de inversión (adentro se enfría)")
-    assert inv.fill == "toself" and inv.x[0] == inv.x[-1]  # cerrada
+    assert inv.fill is None and len(inv.x) == len(curve["p"])  # la curva, solo donde μ = 0
     assert sum(t.legendgroup == "h" for t in fig.data) == 2
     state = _trace(fig, "el estado")
     assert (state.x[0], state.y[0]) == pytest.approx((50.0, 300.0 - C))
+    assert all(t.name != "T máxima de la ecuación de estado" for t in fig.data)
+
+
+def test_inversion_figure_cut_by_the_equation_of_state() -> None:
+    curve = rl.inversion_curve("Methane", 30)
+    fig = inversion_figure(curve, {}, "SI", (50e5, 300.0))
+    zone = next(t for t in fig.data if t.fill == "toself")
+    assert len(zone.x) == len(curve["p"]) + 3  # la curva, el borde (2) y el cierre
+    limit = _trace(fig, "T máxima de la ecuación de estado")
+    assert list(limit.y) == pytest.approx([625.0, 625.0])  # K en el SI
+    assert limit.line.dash == "dot"
 
 
 def test_clausius_figure() -> None:
