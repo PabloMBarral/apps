@@ -134,6 +134,13 @@ apps/
 │   │                          # funciones características (Maxwell exacta y por
 │   │                          # diferencias, Clapeyron y Joule–Thomson con la
 │   │                          # curva de inversión).
+│   ├── 19_Primer_Principio.py # ✅ Fase 10.1 — Balances de energía y de entropía
+│   │                          # (vademecum §3, §10 y §13) con fluido real, gas
+│   │                          # ideal o incompresible: sistema cerrado (siete
+│   │                          # procesos y el equilibrio térmico), flujo
+│   │                          # estacionario (dispositivo, mezcla, intercambiador)
+│   │                          # y régimen transitorio (llenado y vaciado), con el
+│   │                          # veredicto del segundo principio.
 │   └── 99_Acerca.py           # ✅ 0.25.1 — Créditos, cómo citar la app (APA y
 │                              # BibTeX), las fuentes del CITATION.cff por tipo
 │                              # (con búsqueda y la bibliografía .bib), las
@@ -308,6 +315,32 @@ apps/
 │   │   └── real_procedure.py  # ✅ Fase 9.2 — compressibility_steps, cubic_steps,
 │   │                          # relations_steps, clapeyron_steps y
 │   │                          # joule_thomson_steps.
+│   ├── balances/              # ✅ Fase 10.1
+│   │   ├── substance.py       # Substance (fluido real, gas ideal con c_p constante
+│   │   │                      # o variable, incompresible con c y ρ de Incropera o a
+│   │   │                      # elección), ThermoState y state(sub, par, a, b) con
+│   │   │                      # 12, 9 o 4 pares (VU, VS y VX con AbstractState);
+│   │   │                      # h = u + p·v en los tres; balance_state (un estado
+│   │   │                      # que sale de un balance) y saturation_dome.
+│   │   ├── common.py          # Veredicto (reversible, irreversible, imposible),
+│   │   │                      # snap_sgen con S_FLOOR, violation_message (con la
+│   │   │                      # T* = Q/ΔS) y heat_direction_message (Clausius).
+│   │   ├── closed.py          # solve_closed (siete procesos, W_b por el camino,
+│   │   │                      # otro trabajo, contra p_ext con el reversible),
+│   │   │                      # solve_equilibrium (dos cuerpos o un reservorio),
+│   │   │                      # allowed_processes/allowed_ends, ejemplos y export.
+│   │   ├── steady_flow.py     # solve_device (siete dispositivos, ω, z, η_s, caudal
+│   │   │                      # por ṁ, V̇, A·ω o la potencia, q y w por kg o
+│   │   │                      # totales, balance_unknown), solve_mixing,
+│   │   │                      # solve_exchanger (dos sustancias, cruces), ejemplos
+│   │   │                      # y export.
+│   │   ├── transient.py       # solve_charging (m₂ del estado (V/m, u) a p₂, o con
+│   │   │                      # T₂) y solve_discharging (∫h·dm por Simpson sobre la
+│   │   │                      # isoentrópica o la isoterma, flujo uniforme, válvula),
+│   │   │                      # ejemplos y export.
+│   │   └── balances_procedure.py # closed_steps, equilibrium_steps, device_steps,
+│   │                          # mixing_steps, exchanger_steps, charging_steps,
+│   │                          # discharging_steps y ke_factor.
 │   ├── exergy/                # ✅ Fase 7 (reemplaza al placeholder exergy.py)
 │   │   ├── physical.py        # Ambient (T₀, p₀), PhysicalExergy /
 │   │   │                      # physical_exergy (ψ, φ, térmica y mecánica, V²/2,
@@ -493,6 +526,10 @@ apps/
 │   └── gas_charts.py          # ✅ Fase 9.1 — cp_figure, composition_figure,
 │                              # mixing_entropy_figure, pv_figure, ts_figure (con
 │                              # far_paths ocultos), work_figure y staged_figure.
+│   └── balance_charts.py      # ✅ Fase 10.1 — state_diagram (p–v log–log o T–s
+│                              # con la campana), waterfall_figure (los balances
+│                              # en cascada), evolution_figure (p(m) y T(m) en dos
+│                              # paneles) y exchanger_tq_figure.
 │   └── real_gas_charts.py     # ✅ Fase 9.2 — generalized_chart_figure,
 │                              # z_isotherm_figure, fluid_isotherm_figure,
 │                              # vdw_isotherms_figure (las áreas de Maxwell),
@@ -1505,6 +1542,101 @@ Notas de la Fase 9.2 (gases reales):
   abiertos: sin errores ni desbordes. Después de los arreglos se repitieron
   Clapeyron y Joule–Thomson con el servidor reiniciado (sin reiniciar, la
   página nueva le pedía `p_edge` a la versión vieja de `relations`).
+
+Notas de la Fase 10.1 (balances de energía y de entropía):
+
+- La Fase 10 se partió como la 8 y la 9: 10.1 = balances (página
+  /Primer_Principio, ⚖️, en el menú después de Isoentrópicos); 10.2 = segundo
+  principio (/Segundo_Principio: máquinas, Carnot, Clausius). Keys `pp_mode`,
+  `pc_kind`, `pf_kind`, `pt_kind` y por modo `pc_{e}_…` (proceso), `pe_…`
+  (equilibrio), `pd_…` (dispositivo), `pm_…` (mezcla), `px_…`
+  (intercambiador), `pl_…` (llenado) y `pv_…` (vaciado). Los widgets que dependen
+  de la sustancia llevan `_tag(sub)` en la key (el h del aire ideal no es el del
+  agua). Recalcula sola (`st.cache_data` con los dataclasses).
+- **Secciones del vademecum, verificadas contra `vademecum.tex`**: §3.1 cerrado,
+  §3.2 h, §3.3 permanente, §3.4 transitorio, §3.5 trabajo cuasiestático, §3.6 no
+  cuasiestático (p_ext); §9.1 Clausius; §10.1 definición, §10.2 generación,
+  §10.3.1 a §10.3.3 los balances (T_k: la temperatura del medio en la frontera,
+  acá T_b), §10.4.1 a §10.4.4 los rendimientos (la tobera con ω₂²/ω₂ₛ²); §13
+  incompresibles. La velocidad es ω, como en el vademecum.
+- Tres modelos con la misma interfaz (`substance.py`) y h = u + p·v en los tres
+  (gas ideal e incompresible con u = 0 a 25 °C; el fluido real con la referencia
+  de CoolProp): sin eso el balance de un tanque que se llena no cierra. Los
+  incompresibles con c y ρ a 300 K de Incropera (tablas A.1, A.3, A.5 y A.6; el
+  plan decía la A-3 de Çengel) y a elección; los ejemplos de Çengel usan el
+  hierro con c = 0,45 kJ/(kg·K).
+- **Una S_gen < 0 no es un error**: el resultado lleva `violation` y el veredicto
+  «imposible», y la página muestra igual el balance de energía (el primer
+  principio no lo prohíbe; es el punto didáctico). El mensaje da la temperatura
+  límite de la fuente o del medio, T* = Q/ΔS. Además, calor desde una fuente
+  siempre más fría que el sistema (o hacia un medio siempre más caliente) es
+  imposible aunque la S_gen total salga positiva (`heat_direction_message`):
+  en un llenado la irreversibilidad de la mezcla la tapa. En el intercambiador,
+  una salida que pasa la entrada de la otra corriente también (ningún arreglo lo
+  logra).
+- El ejemplo del compresor de Çengel §5-4 (aire de 280 a 400 K y 6 bar con
+  16 kJ/kg de pérdida, 2,74 kW) **viola el segundo principio**: Δs = −0,155
+  kJ/(kg·K) pide ceder el calor a menos de T* = 103 K. Queda como ejemplo del
+  «solo el primer principio» (test).
+- Ruido: S_gen se pasa a 0 frente a |s₁| + |s₂| + 1000 J/(kg·K) (`S_FLOOR`; con
+  la referencia en 25 °C y 1 bar, |s| ≈ 0 y una tolerancia relativa a s no
+  servía: la isoentrópica daba −1,9·10⁻¹² y figuraba como imposible). El ruido
+  de CoolProp llega a 2·10⁻¹¹ relativo.
+- Sistema cerrado: la isoterma usa Q = m·T·Δs y W_b = Q − ΔU (vale en la
+  campana sin integrar p·dv); contra p_ext, el estado final sale de (p_ext,
+  h₂ = u₁ + p_ext·v₁ + (Q + W_ent)/m) y, adiabático, se compara con la expansión
+  reversible; la politrópica con W_b = m·(p₂v₂ − p₁v₁)/(1 − n) para cualquier
+  sustancia (n = 1 con un gas ideal y T₂ dada es error: no cambia T). El motor de
+  §7-9 da 662,8 K con NASA y 678,0 K con c_p a 25 °C (el libro, 662,7 con la
+  A-17).
+- Flujo estacionario: el balance despeja w (turbina, compresor, bomba), q
+  (calentador), ω₂ (tobera, difusor) o h₂ (con w, q u ω₂ dados);
+  `balance_unknown` lo dice. Una bomba con vapor o un compresor con líquido son
+  error («usá…»). El caudal puede salir de la potencia (5 MW de §5-4 → ṁ = 5,73
+  kg/s) y q y w pueden darse como Q̇ y Ẇ (el ducto de 15 kW de §5-4). Un balance
+  que da una h sin estado posible (`balance_state`) lo dice sin el detalle de
+  CoolProp.
+- Transitorio: el llenado busca m₂ (no T₂) con el estado (V/m, u) de CoolProp a
+  bajo nivel, así anda también en la campana; el tanque vacío y adiabático da
+  u₂ = h_línea (con c_p constante, T₂ = k·T_línea, test). El vaciado integra
+  ∫h·dm con Simpson en 201 puntos sobre la isoentrópica (d(m·u) = h·dm) o la
+  isoterma; el residuo es 10⁻⁵ J sobre 2976 kJ y la aproximación de flujo
+  uniforme deja 47,7 kJ sin cerrar (la página lo muestra). La válvula en el
+  volumen de control suma la entropía del estrangulamiento (contra la integral
+  cerrada del gas ideal, test). ∫h·dm depende de la referencia de h: los tests
+  comparan ∫(h − h₂)·dm.
+- LaTeX: 15 110 expresiones distintas del procedimiento (ejemplos y variantes de
+  cada proceso, dispositivo, caudal y sustancia, en los tres sistemas) y 14 de
+  la teoría, KaTeX estricto, máx. 319 y 291 px. Lo que hizo falta: los factores
+  de p·v (100 y 0,18505) y de ω²/2 y g·z (1000 m²/s² = 1 kJ/kg, 25 037 ft²/s² =
+  1 Btu/lb) a la vista; una resta con números largos se calcula antes de
+  multiplicarla (`_times_diff`: también con dos o más factores); `_vis` estima el
+  ancho del lado izquierdo y lo apila si pasa de 6 caracteres; los balances de
+  tres o cuatro términos van de a uno (Δe_c + Δe_p, q − w, u₁ + p_ext·v₁); las
+  formas que no dependen de la referencia: Q = m₁(u₂ − u₁) + m_e(u₂ − h_ℓ) en el
+  llenado y ṁ₁(s₃ − s₁) + ṁ₂(s₃ − s₂) en la mezcla.
+- Gráficos: las cascadas de los balances (lo que entra azul, lo que sale
+  naranja, el total gris), el p–v log–log y el T–s con la campana
+  (`saturation_dome`) y el camino rayado si no es cuasiestático, el T–Q del
+  intercambiador a contracorriente y la evolución del tanque en dos paneles con
+  la masa compartida (nunca un eje doble). Lo que encontraron las capturas del
+  smoke test: los ejes logarítmicos del p–v con la campana abarcan cinco
+  décadas y plotly rotulaba 20 o 0,2 con un «2» suelto (`_log_ticks`: 1-2-5
+  hasta dos décadas y media, si no las potencias de 10, y 10⁴ en adelante como
+  potencia); las barras en SI salían «1,563e+05» (`_bar_label`: cuatro cifras
+  sin exponente) y el Q de un llenado adiabático, −9,9·10⁻¹⁰ J (lo que es ruido
+  frente a los términos pasa a 0); el rótulo de 2s va a la izquierda (se pisaba
+  con el de 2), y `str.capitalize` dejaba «El r-134a» en la leyenda
+  (`upper_first`).
+- Smoke test a 390 y 1280 px: los 36 casos (los tres modos con sus submodos y
+  todos los ejemplos, en los tres sistemas) con la teoría y el procedimiento
+  abiertos, sin errores ni desbordes (el compresor de §5-4 muestra solo su
+  «Imposible»); después de los arreglos de los gráficos se repitieron 12 casos
+  con el servidor reiniciado. Las 72 corridas tardan ~45 min: en segundo plano
+  hace falta un `timeout` mayor que los 30 min por defecto (la primera corrida
+  se cortó en la 71).
+- CITATION.cff y el README suman Çengel, Boles y Kanoğlu (2019), 9.ª ed., que la
+  app cita en casi todas las páginas y no estaba.
 
 ### Citas y licencias
 
