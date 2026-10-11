@@ -49,6 +49,7 @@ from core.balances.substance import (
 
 __all__ = [
     "CHARGING_EXAMPLES",
+    "INTEGRATION_POINTS",
     "DISCHARGE_MODES",
     "DISCHARGING_EXAMPLES",
     "ChargingExample",
@@ -65,7 +66,7 @@ __all__ = [
 ]
 
 _PATH_POINTS = 41
-_INTEGRATION_POINTS = 201  # impar: Simpson
+INTEGRATION_POINTS = 201  # impar: Simpson
 
 
 def _kJ(x: float) -> str:
@@ -431,7 +432,7 @@ def solve_discharging(inputs: DischargingInputs) -> DischargingResult:
             "Lo que sale pasa por la válvula hacia una presión menor: p_sal tiene que ser "
             "positiva y no mayor que la presión final del tanque."
         )
-    pressures = np.geomspace(s1.p, p2, _INTEGRATION_POINTS)
+    pressures = np.geomspace(s1.p, p2, INTEGRATION_POINTS)
     states = []
     for p in pressures:
         if inputs.mode == "adiabatic":
@@ -466,8 +467,8 @@ def solve_discharging(inputs: DischargingInputs) -> DischargingResult:
         if S_gen < 0.0
         else None
     )
-    step = (_INTEGRATION_POINTS - 1) // (_PATH_POINTS - 1)
-    path = tuple((float(masses[i]), states[i]) for i in range(0, _INTEGRATION_POINTS, step))
+    step = (INTEGRATION_POINTS - 1) // (_PATH_POINTS - 1)
+    path = tuple((float(masses[i]), states[i]) for i in range(0, INTEGRATION_POINTS, step))
     result = DischargingResult(
         inputs=inputs,
         state1=s1,
