@@ -242,6 +242,7 @@ pages = [
     st.Page("app_pages/1_Propiedades.py", title="Propiedades", icon="💧"),
     st.Page("app_pages/2_Interpolacion.py", title="Interpolación", icon="📐"),
     st.Page("app_pages/3_Isoentropicos.py", title="Isoentrópicos", icon="⚙️"),
+    st.Page("app_pages/19_Primer_Principio.py", title="Primer principio", icon="⚖️"),
     st.Page("app_pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
     st.Page("app_pages/5_Rankine.py", title="Rankine", icon="♨️"),
     st.Page("app_pages/6_Refrigeracion.py", title="Refrigeración", icon="❄️"),

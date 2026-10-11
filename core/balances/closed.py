@@ -50,6 +50,7 @@ from core.balances.substance import (
     PairCode,
     Substance,
     ThermoState,
+    balance_state,
     fluid_substance,
     ideal_gas_substance,
     incompressible_substance,
@@ -118,6 +119,7 @@ ALLOWED_ENDS: dict[ProcessKind, tuple[EndKind, ...]] = {
 _ACCEPTS_W_IN: frozenset[ProcessKind] = frozenset({"v_const", "p_const", "p_ext"})
 
 _PATH_POINTS = 41
+_HEAT_HINT = "Revisá el calor (y el otro trabajo): con esos valores el estado final no existe."
 
 
 def allowed_processes(sub: Substance) -> tuple[ProcessKind, ...]:
@@ -352,7 +354,7 @@ def solve_closed(inputs: ClosedInputs) -> ClosedResult:
         if end == "T":
             s2 = state(sub, "TP", value, s1.p, "2")
         else:
-            s2 = state(sub, "PU", s1.p, s1.u + (value + W_in) / m, "2")
+            s2 = balance_state(sub, "PU", s1.p, s1.u + (value + W_in) / m, "2", _HEAT_HINT)
         W_b = 0.0
         path = _path(sub, "TP", _lin(s1.T, s2.T), [s1.p] * _PATH_POINTS)
     elif proc == "v_const":
@@ -363,7 +365,7 @@ def solve_closed(inputs: ClosedInputs) -> ClosedResult:
         elif end == "x":
             s2 = state(sub, "VX", s1.v, value, "2")
         else:
-            s2 = state(sub, "VU", s1.v, s1.u + (value + W_in) / m, "2")
+            s2 = balance_state(sub, "VU", s1.v, s1.u + (value + W_in) / m, "2", _HEAT_HINT)
         W_b = 0.0
         path = _path(sub, "VU", [s1.v] * _PATH_POINTS, _lin(s1.u, s2.u))
     elif proc == "p_const":
@@ -374,7 +376,7 @@ def solve_closed(inputs: ClosedInputs) -> ClosedResult:
         elif end == "x":
             s2 = state(sub, "PX", s1.p, value, "2")
         else:
-            s2 = state(sub, "PH", s1.p, s1.h + (value + W_in) / m, "2")
+            s2 = balance_state(sub, "PH", s1.p, s1.h + (value + W_in) / m, "2", _HEAT_HINT)
         W_b = m * s1.p * (s2.v - s1.v)
         path = _path(sub, "PH", [s1.p] * _PATH_POINTS, _lin(s1.h, s2.h))
     elif proc == "T_const":
@@ -385,7 +387,7 @@ def solve_closed(inputs: ClosedInputs) -> ClosedResult:
         elif end == "x":
             s2 = state(sub, "TX", s1.T, value, "2")
         else:
-            s2 = state(sub, "TS", s1.T, s1.s + value / (m * s1.T), "2")
+            s2 = balance_state(sub, "TS", s1.T, s1.s + value / (m * s1.T), "2", _HEAT_HINT)
         Q = s1.T * m * (s2.s - s1.s)
         W_b = Q - m * (s2.u - s1.u)
         path = _path(sub, "TV", [s1.T] * _PATH_POINTS, _geom(s1.v, s2.v))
@@ -421,7 +423,7 @@ def solve_closed(inputs: ClosedInputs) -> ClosedResult:
         assert p_ext is not None
         if end == "Q":
             h2 = s1.u + p_ext * s1.v + (value + W_in) / m
-            s2 = state(sub, "PH", p_ext, h2, "2")
+            s2 = balance_state(sub, "PH", p_ext, h2, "2", _HEAT_HINT)
         else:
             s2 = state(sub, "TP", value, p_ext, "2")
         W_b = m * p_ext * (s2.v - s1.v)

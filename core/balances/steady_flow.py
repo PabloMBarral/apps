@@ -40,6 +40,7 @@ from core.balances.substance import (
     PairCode,
     Substance,
     ThermoState,
+    balance_state,
     fluid_substance,
     ideal_gas_substance,
     incompressible_substance,
@@ -69,6 +70,7 @@ __all__ = [
     "MixingStream",
     "OutKind",
     "allowed_devices",
+    "balance_unknown",
     "allowed_out",
     "device_to_dict",
     "exchanger_to_dict",
@@ -305,7 +307,7 @@ def _check_device(inputs: DeviceInputs) -> None:
         raise ValueError(f"Caudal desconocido: {inputs.flow!r}.")
     _positive(inputs.flow_value, _FLOW_NOUNS[inputs.flow])
     if inputs.flow == "power":
-        if _unknown(dev, out) not in ("w", "q"):
+        if balance_unknown(dev, out) not in ("w", "q"):
             raise ValueError(
                 "La potencia sirve de dato del caudal cuando el balance da el trabajo (turbina, "
                 "compresor o bomba con T₂, x₂ o η_s) o el calor (calentador con T₂ o x₂)."
@@ -329,8 +331,9 @@ def _check_device(inputs: DeviceInputs) -> None:
         raise ValueError("La temperatura del ambiente T₀ tiene que estar entre −73 y 77 °C.")
 
 
-def _unknown(dev: DeviceKind, out: OutKind) -> str:
-    """Lo que despeja el balance de energía."""
+def balance_unknown(dev: DeviceKind, out: OutKind) -> str:
+    """Lo que despeja el balance de energía: ``"w"``, ``"q"``, ``"V"`` (ω₂) o ``"h"``
+    (el estado 2)."""
     if dev == "valve":
         return "h"
     if dev in _WORK_DEVICES:
@@ -413,7 +416,7 @@ def solve_device(inputs: DeviceInputs) -> DeviceResult:
     _check_inlet(dev, sub, s1)
     p2 = inputs.p2_Pa if inputs.p2_Pa is not None else s1.p
     _check_pressures(dev, s1.p, p2)
-    unknown = _unknown(dev, out)
+    unknown = balance_unknown(dev, out)
 
     m_dot: float | None = None
     V1 = inputs.V1
@@ -439,7 +442,7 @@ def solve_device(inputs: DeviceInputs) -> DeviceResult:
     if dev == "valve":
         V2 = V1
         q, w = 0.0, 0.0
-        s2 = state(sub, "PH", p2, s1.h - dpe, "2")
+        s2 = balance_state(sub, "PH", p2, s1.h - dpe, "2", "Revisá las alturas.")
     elif unknown in ("w", "q"):
         if out == "eta":
             s2s = state(sub, "PS", p2, s1.s, "2s")
@@ -461,7 +464,7 @@ def solve_device(inputs: DeviceInputs) -> DeviceResult:
         if out == "V":
             V2 = value
         h2 = s1.h + q - w - (V2**2 - V1**2) / 2.0 - dpe
-        s2 = state(sub, "PH", p2, h2, "2")
+        s2 = balance_state(sub, "PH", p2, h2, "2", "Revisá el calor, el trabajo y las velocidades.")
     else:  # tobera o difusor: el balance da ω₂
         q, w = q_known, 0.0
         if out == "eta":
@@ -770,7 +773,14 @@ def solve_mixing(inputs: MixingInputs) -> MixingResult:
     if inputs.out == "h":
         assert st1.m_dot is not None and st2.m_dot is not None
         m1, m2 = st1.m_dot, st2.m_dot
-        c = state(sub, "PH", p3, (m1 * a.h + m2 * b.h + Q) / (m1 + m2), "3")
+        c = balance_state(
+            sub,
+            "PH",
+            p3,
+            (m1 * a.h + m2 * b.h + Q) / (m1 + m2),
+            "3",
+            "Revisá los caudales y el calor.",
+        )
     else:
         if not math.isfinite(inputs.out_value):
             raise ValueError("Falta el dato de la salida.")
@@ -948,7 +958,15 @@ def solve_exchanger(inputs: ExchangerInputs) -> ExchangerResult:
         assert known.m_dot is not None and other.m_dot is not None
         p = other.p_out_Pa if other.p_out_Pa is not None else i_other.p
         h = i_other.h + (Q - known.m_dot * (o_known.h - i_known.h)) / other.m_dot
-        o_other = state(other.substance, "PH", p, h, "A2" if other is sa else "B2")
+        o_other = balance_state(
+            other.substance,
+            "PH",
+            p,
+            h,
+            "A2" if other is sa else "B2",
+            "Con esos caudales esa corriente tendría que ceder (o recibir) más calor del que "
+            "puede: revisá los caudales y la salida de la otra corriente.",
+        )
         oa, ob = (o_other, o_known) if other is sa else (o_known, o_other)
         m_a, m_b = sa.m_dot, sb.m_dot
     else:

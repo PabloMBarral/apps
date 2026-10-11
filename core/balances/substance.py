@@ -45,9 +45,11 @@ __all__ = [
     "ThermoState",
     "allowed_pairs",
     "fluid_substance",
+    "balance_state",
     "of",
     "ideal_gas_substance",
     "incompressible_substance",
+    "saturation_dome",
     "state",
 ]
 
@@ -488,3 +490,66 @@ def _incompressible_state(
     u = m.c * (T - T_REF_K)
     region = REGION_LIQUID if m.liquid else REGION_SOLID
     return ThermoState(p, T, v, u, u + p * v, m.c * math.log(T / T_REF_K), None, region, label)
+
+
+# --- estado que sale de un balance ------------------------------------------
+
+_BALANCE_PROPS = {"H": ("h", "kJ/kg"), "U": ("u", "kJ/kg"), "S": ("s", "kJ/(kg·K)")}
+
+
+def balance_state(
+    sub: Substance, pair: PairCode, a: float, b: float, label: str, hint: str
+) -> ThermoState:
+    """Un estado cuya segunda propiedad (h, u o s) sale de un balance.
+
+    Si no existe, el mensaje dice que es el balance el que no cierra con un estado real (y
+    ``hint`` qué dato revisar), en vez del detalle de la ecuación de estado.
+    """
+    try:
+        return state(sub, pair, a, b, label)
+    except ValueError as exc:
+        sym, unit = _BALANCE_PROPS.get(pair[1], (pair[1].lower(), ""))
+        where = "la ecuación de estado" if sub.kind == "fluid" else "del modelo"
+        raise ValueError(
+            f"El balance de energía da {sym} = {_num(b / 1e3)} {unit} en el estado {label}, y "
+            f"con ese valor no hay un estado posible {of(sub)} dentro del rango de {where}. "
+            f"{hint}"
+        ) from exc
+
+
+# --- campana de saturación ------------------------------------------------
+
+
+def saturation_dome(sub: Substance, points: int = 60) -> tuple[ThermoState, ...]:
+    """La campana de un fluido real para los diagramas p–v y T–s: el líquido saturado del
+    punto triple al crítico y el vapor saturado de vuelta (un solo trazo). Vacía si no es
+    un fluido real.
+    """
+    if sub.kind != "fluid":
+        return ()
+    limits = fl.fluid_limits(sub.key)
+    st = CoolProp.AbstractState("HEOS", sub.key)
+    T_lo = max(limits.T_triple_K, limits.T_min_K) * 1.0005
+    T_hi = limits.T_crit_K * 0.9995
+    # más puntos cerca del crítico, donde la campana se cierra
+    temps = [T_hi - (T_hi - T_lo) * (1.0 - k / (points - 1)) ** 1.6 for k in range(points)]
+    liquid, vapor = [], []
+    for T in temps:
+        for q, out in ((0.0, liquid), (1.0, vapor)):
+            try:
+                st.update(CoolProp.QT_INPUTS, q, T)
+            except ValueError:
+                continue
+            out.append(
+                ThermoState(
+                    float(st.p()),
+                    T,
+                    1.0 / float(st.rhomass()),
+                    float(st.umass()),
+                    float(st.hmass()),
+                    float(st.smass()),
+                    q,
+                    "saturated_liquid" if q == 0.0 else "saturated_vapor",
+                )
+            )
+    return tuple(liquid + vapor[::-1])
