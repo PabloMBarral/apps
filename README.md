@@ -61,6 +61,33 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   descarga CSV/JSON. Comparación opt-in en bomba contra el modelo de
   líquido incompresible `w_p ≈ v_1·Δp/η_s`. _Fase 1.3 cerrada; 1.5b y
   validaciones en la 1.7._
+- ✅ **Primer principio: balances de energía y de entropía** (página
+  `/Primer_Principio`, vademecum §3, §10 y §13; Çengel y Boles caps. 4, 5 y 7),
+  con un fluido real, un gas ideal (c_p constante o variable) o un
+  incompresible. **Sistema cerrado**: volumen, presión o temperatura constante,
+  politrópico, adiabático reversible, contra una presión exterior (no
+  cuasiestático, comparado con el reversible) o con el estado final dado, con
+  otro trabajo de entrada (resistencia, paleta); W_b por el camino, Q, ΔU, ΔS,
+  S_gen = ΔS − Q/T_b y X_dest = T₀·S_gen, en el p–v y el T–s con la campana; y
+  el **equilibrio térmico** de dos cuerpos o con un reservorio. **Flujo
+  estacionario**: tobera, difusor, válvula, turbina, compresor, bomba y
+  calentador, con ω, z, el rendimiento isoentrópico (§10.4) y el caudal por ṁ,
+  V̇, A·ω o la potencia; la **cámara de mezcla** y el **intercambiador** (dos
+  sustancias, T–Q). **Régimen transitorio**: el **llenado** de un tanque vacío o
+  con fluido (adiabático o con T₂) y el **vaciado** adiabático o isotérmico con
+  ∫h·dm, contra la aproximación de flujo uniforme. El **veredicto** del segundo
+  principio (reversible, irreversible o imposible, con la temperatura límite de
+  la fuente) se muestra junto al balance de energía, que cierra igual.
+  Reproduce Çengel (W_b = 96,4 Btu; 199,5 °C con la resistencia; p₂ = 3,170 kPa
+  en la expansión libre; ΔS = −1,1746 kJ/K del R-134a; 662,8 K en el motor;
+  25,6 °C y S_gen = 4,326 kJ/K con el bloque de hierro; difusor 78,7 kg/s y
+  303,1 K; tobera 42,1 m/s y 378,6 °C; turbina de 5 MW, 5,73 kg/s; η_s = 66,7 %;
+  x = 0,340 en la válvula; 21,9 °C en el ducto; s_gen = 0,371 kJ/(kg·K) en la
+  laminación; 22,7 lbm/min y 8,65 Btu/(min·R) en la cámara de mezcla; 29,1 kg/min
+  en el condensador; 456,4 °C en el tanque vacío; 9,58 kg y 339 kJ). El
+  compresor de §5-4 (2,74 kW) cierra la energía pero viola el segundo
+  principio: queda como ejemplo. Procedimiento en los tres sistemas (con los
+  factores de p·v y de ω²/2 a la vista) y export. _Fase 10.1 cerrada._
 - ✅ **Multifluido + selector global de unidades**: la página de
   Propiedades trabaja con cualquier fluido de `core.fluids.SUPPORTED_FLUIDS`
   (Water, R134a, R410A, R1234yf, NH₃, CO₂, Air y, para el ORC, R-245fa,
@@ -572,6 +599,13 @@ apps/
 │   ├── psychrometrics_procedure.py  # su procedimiento «como en el pizarrón»
 │   ├── interpolation.py
 │   ├── isentropic.py
+│   ├── balances/
+│   │   ├── substance.py   # fluido real, gas ideal o incompresible con los pares de un estado
+│   │   ├── closed.py      # sistemas cerrados (siete procesos) y equilibrio térmico
+│   │   ├── steady_flow.py # dispositivos, cámara de mezcla e intercambiador
+│   │   ├── transient.py   # llenado y vaciado de tanques (∫h·dm)
+│   │   ├── common.py      # el veredicto del segundo principio
+│   │   └── balances_procedure.py  # su procedimiento «como en el pizarrón»
 │   ├── gases/
 │   │   ├── ideal.py       # gas ideal entre dos estados: c_p constante, medio o NASA; p_r, v_r
 │   │   ├── mixture.py     # mezclas: fracciones, Dalton, Amagat, entropía; mezcla adiabática
@@ -627,8 +661,8 @@ apps/
 │                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica,
 │                          # gráficos de la combustión, del poder calorífico, de la
 │                          # exergía (Grassmann), de la transferencia de calor, de la
-│                          # radiación, de los intercambiadores y de los gases
-│                          # ideales y reales, créditos
+│                          # radiación, de los intercambiadores, de los gases
+│                          # ideales y reales y de los balances, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── data/                  # tablas: ISO 6976, polinomios NASA-9, biomasas (Ghugare),
 │                          # carbones de Argonne con el PCS medido y exergías
@@ -648,7 +682,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.27.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.28.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 La página **ℹ️ Acerca de** de la app arma esta cita y la de todas las fuentes
@@ -995,6 +1029,22 @@ componente (combustible, producto, destrucción y pérdida):
   edition   = {8},
   publisher = {Wiley},
   year      = {2014}
+}
+```
+
+**Termodinámica** — el texto de la cátedra: los ejemplos de los ciclos, la
+psicrometría, la combustión, la exergía y los balances de energía y de entropía,
+y la numeración de las secciones que cita la app (9.ª edición):
+
+```bibtex
+@book{cengel2019thermodynamics,
+  author    = {{\c{C}}engel, Yunus A. and Boles, Michael A. and Kano{\u{g}}lu, Mehmet},
+  title     = {Thermodynamics: An Engineering Approach},
+  edition   = {9},
+  publisher = {McGraw-Hill Education},
+  address   = {New York},
+  year      = {2019},
+  isbn      = {978-1-259-82267-4}
 }
 ```
 

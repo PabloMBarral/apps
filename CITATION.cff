@@ -23,7 +23,8 @@ abstract: >-
   convección, radiación e intercambiadores), gases ideales y sus mezclas,
   transformaciones politrópicas, gases reales (factor de compresibilidad,
   Van der Waals, Peng–Robinson, relaciones de Maxwell, Clapeyron y
-  Joule–Thomson) y diagramas de fluidos.
+  Joule–Thomson), balances de energía y de entropía (sistemas cerrados,
+  flujo estacionario y régimen transitorio) y diagramas de fluidos.
 keywords:
   - thermal-engineering
   - thermodynamics
@@ -54,9 +55,12 @@ keywords:
   - compressibility-factor
   - equation-of-state
   - maxwell-relations
+  - first-law
+  - entropy-balance
+  - control-volume
 license: MIT
-version: "0.27.0"
-date-released: "2026-10-10"
+version: "0.28.0"
+date-released: "2026-10-11"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"
@@ -493,6 +497,26 @@ references:
       name: "Wiley"
       city: "New York"
     year: 1996
+  - type: book
+    scope: >-
+      El texto de la cátedra: los ejemplos de los ciclos (caps. 9 a 11), la
+      psicrometría (cap. 14), la combustión (cap. 15), la exergía (cap. 8), los
+      balances de energía y de entropía (caps. 4, 5 y 7) y la numeración de las
+      secciones que cita la app
+    authors:
+      - family-names: "Çengel"
+        given-names: "Yunus A."
+      - family-names: "Boles"
+        given-names: "Michael A."
+      - family-names: "Kanoğlu"
+        given-names: "Mehmet"
+    title: "Thermodynamics: An Engineering Approach"
+    edition: "9"
+    publisher:
+      name: "McGraw-Hill Education"
+      city: "New York"
+    year: 2019
+    isbn: "978-1-259-82267-4"
   - type: book
     scope: "Tabla A-26: exergía química estándar en los modelos I y II"
     authors:
