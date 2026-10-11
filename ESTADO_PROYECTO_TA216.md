@@ -1803,9 +1803,7 @@
   - el título con un gas;
   - un incompresible;
   - un calor que sube de temperatura (Clausius).
-- **Tests**: la corrida completa de `pytest -W error` está en curso. Los módulos
-  de la fase y los que tocó pasan: 321 passed (segundo principio, gráficos de los
-  balances, las dos páginas, la navegación y las citas), sin warnings.
+- **Tests**: de 5964 a 6218 passed (10 skipped), sin warnings.
   - `tests/test_second_law.py` (90), `tests/test_second_law_procedure.py` (62),
     `tests/test_second_law_charts.py` (35), `tests/test_page_segundo_principio.py`
     (61, AppTest) y 5 más en `tests/test_balance_charts.py` (`value_axis`).
@@ -1813,9 +1811,11 @@
     con KaTeX estricto y entran en 305 y 221 px como máximo en los tres sistemas.
   - Smoke test en Chromium a 390 y 1280 px de los 21 casos (los cuatro modos,
     todos los ejemplos y el cambio de máquina, en los tres sistemas), con la
-    teoría y el procedimiento abiertos. La primera pasada a 390 px no dio errores
-    ni desbordes, y sus capturas encontraron los detalles de arriba. La segunda
-    pasada, con los arreglos y el servidor reiniciado, está en curso.
+    teoría y el procedimiento abiertos: sin errores (los tres ejemplos imposibles
+    muestran solo su «Imposible»), sin desbordes y sin ecuaciones que se pasen de
+    su expansor. Las capturas de la primera pasada encontraron los detalles de
+    arriba; después de los arreglos se repitieron las 42 corridas con el servidor
+    reiniciado.
 - **Dependencias**: ninguna nueva.
 
 ---

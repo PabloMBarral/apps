@@ -1732,9 +1732,10 @@ Notas de la Fase 10.2 (segundo principio):
     10 fuera de eso; vale también en /Primer_Principio.
 - Smoke test a 390 y 1280 px: los 21 casos (los cuatro modos, todos los ejemplos y
   el cambio de máquina, en los tres sistemas) con la teoría y el procedimiento
-  abiertos. Los tres ejemplos imposibles muestran solo su «Imposible». La primera
-  pasada a 390 px no dio errores ni desbordes; la segunda pasada, con los arreglos
-  de los gráficos y el servidor reiniciado, está en curso.
+  abiertos, sin errores ni desbordes. Los tres ejemplos imposibles muestran solo
+  su «Imposible». Después de los arreglos de los gráficos se repitieron las 42
+  corridas con el servidor reiniciado (~17 min, con el pytest completo corriendo
+  en paralelo).
 
 ### Citas y licencias
 
