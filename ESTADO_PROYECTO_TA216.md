@@ -1712,7 +1712,7 @@
   con vapor, un caudal que sale negativo en la mezcla o el intercambiador, una
   presión final fuera de rango en el tanque, un balance que da un estado
   imposible, y la S_gen < 0 con la temperatura límite de la fuente.
-- **Tests**: de 5548 a TOTAL_TESTS passed (10 skipped), sin warnings.
+- **Tests**: de 5548 a 5964 passed (10 skipped), sin warnings.
   - `tests/test_balances_substance.py` (44), `tests/test_balances_closed.py`
     (70), `tests/test_balances_steady_flow.py` (84),
     `tests/test_balances_transient.py` (29), `tests/test_balances_procedure.py`
@@ -1721,7 +1721,12 @@
   - LaTeX: 15 110 expresiones distintas del procedimiento y 14 de la teoría
     validan con KaTeX estricto y entran en 319 y 291 px como máximo en los tres
     sistemas.
-  - SMOKE_SUMMARY
+  - Smoke test en Chromium a 390 y 1280 px: los 36 casos (los tres modos con sus
+    submodos y todos los ejemplos, en los tres sistemas), con la teoría y el
+    procedimiento abiertos: sin errores (el compresor de §5-4 muestra solo su
+    «Imposible»), sin desbordes y sin ecuaciones que se pasen de su expansor.
+    Después de los arreglos de los gráficos se repitieron 12 casos con el
+    servidor reiniciado.
 - **Dependencias**: ninguna nueva.
 
 ---

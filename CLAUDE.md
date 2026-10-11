@@ -1628,6 +1628,13 @@ Notas de la Fase 10.1 (balances de energía y de entropía):
   frente a los términos pasa a 0); el rótulo de 2s va a la izquierda (se pisaba
   con el de 2), y `str.capitalize` dejaba «El r-134a» en la leyenda
   (`upper_first`).
+- Smoke test a 390 y 1280 px: los 36 casos (los tres modos con sus submodos y
+  todos los ejemplos, en los tres sistemas) con la teoría y el procedimiento
+  abiertos, sin errores ni desbordes (el compresor de §5-4 muestra solo su
+  «Imposible»); después de los arreglos de los gráficos se repitieron 12 casos
+  con el servidor reiniciado. Las 72 corridas tardan ~45 min: en segundo plano
+  hace falta un `timeout` mayor que los 30 min por defecto (la primera corrida
+  se cortó en la 71).
 - CITATION.cff y el README suman Çengel, Boles y Kanoğlu (2019), 9.ª ed., que la
   app cita en casi todas las páginas y no estaba.
 
