@@ -1815,9 +1815,13 @@ def _render_theory() -> None:
         st.markdown("**Sistema cerrado** (§3.1), con W el trabajo que hace el sistema:")
         st.latex(r"Q - W = \Delta U + \Delta E_c + \Delta E_p")
         st.markdown("**Trabajo de expansión** cuasiestático (§3.5) y contra p_ext (§3.6):")
-        st.latex(r"W = m \int_1^2 p\,dv \qquad W = m\,p_{\mathrm{ext}}\,(v_2 - v_1)")
+        st.latex(r"W = m \int_1^2 p\,dv")
+        st.latex(r"W = m\,p_{\mathrm{ext}}\,(v_2 - v_1)")
         st.markdown("**Flujo estacionario** (§3.3), por unidad de masa de una corriente:")
-        st.latex(r"q - w = (h_2 - h_1) + \frac{\omega_2^2 - \omega_1^2}{2} + g\,(z_2 - z_1)")
+        st.latex(
+            r"\begin{aligned}q - w &= (h_2 - h_1) + \frac{\omega_2^2 - \omega_1^2}{2} \\ "
+            r"&\quad + g\,(z_2 - z_1)\end{aligned}"
+        )
         st.markdown("**Régimen transitorio** (§3.4):")
         st.latex(
             r"\begin{aligned}Q - W &= \Delta U_{VC} + \sum_{\mathrm{sal}} m\,h \\ "
