@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.28.0` — Fase 10.1, balances de energía y de entropía (2026-10-11).
+> **Versión actual**: `0.29.0` — Fase 10.2, segundo principio (2026-10-11).
 
 ---
 
@@ -1729,6 +1729,95 @@
     servidor reiniciado.
 - **Dependencias**: ninguna nueva.
 
+### Fase 10.2 — Segundo principio: máquinas, Clausius, Carnot y la entropía del calor
+- **Versión**: `0.29.0` (2026-10-11). Rama `claude/water-state-analyzer-f4fiev`.
+  La segunda mitad de la Fase 10 (el plan aprobado).
+- **Scope**:
+  - **`core/balances/second_law.py`** (nuevo):
+    - `solve_machine`: máquina térmica, refrigerador o bomba de calor entre dos
+      fuentes, con dos datos de Q_H, Q_C, W y η (o el COP), o uno y la máquina
+      reversible. Da el veredicto contra Carnot (§9.2, §9.2.1 y §9.3), ΣQ/T
+      (§9.1), S_gen, el trabajo perdido, X_dest y η_ex (§11.10). Si la máquina es
+      imposible, da las temperaturas que harían falta; con Q_C = 0, invoca
+      Kelvin–Planck.
+    - `solve_clausius`: un ciclo con N fuentes.
+    - `solve_carnot`: los cuatro procesos de un fluido real o un gas ideal, con
+      su camino, en un cilindro o en flujo estacionario.
+    - `solve_heat_path`: un calor entre dos fuentes o a través de una pared con
+      sus capas de aire, con la exergía del calor a cada temperatura.
+    - Además: ejemplos y export.
+  - `second_law_procedure.py`: los cuatro procedimientos en los tres sistemas, con
+    las temperaturas absolutas a la vista.
+  - **`ui/second_law_charts.py`** (nuevo): la máquina contra la curva del
+    reversible, con la zona imposible, y la exergía del calor en barras. Las
+    cascadas, el T–s y el p–v salen de `ui/balance_charts.py`.
+  - **Página `/Segundo_Principio` (🔁)**, en el menú después de
+    /Primer_Principio, con:
+    - la teoría (vademecum §9, §10 y §11);
+    - el procedimiento;
+    - el export.
+- **Validación**, contra Çengel y Boles (9.ª ed.):
+  - §6-3: η = 37,5 % y 30 MW.
+  - §6-4: COP_R = 3 y Q̇_H = 480 kJ/min; la bomba de calor, 8,89 kW y
+    48 000 kJ/h.
+  - §6-10: η = 67,2 % y Q_C = 163,8 kJ.
+  - §6-11: COP_R,rev = 12,37 contra los 13,5 del inventor (imposible);
+    COP_B,rev = 11,31 y 3,31 kW. El libro da 3,32 kW porque usa 273 K.
+  - §7-2: S_gen = 1,5 y 0,167 kJ/K.
+  - §7-13: 0,190 W/K en la pared y 0,341 W/K con las capas de aire. El libro da
+    0,191 W/K en la pared, también con 273 K.
+  - Identidades:
+    - η_ex = rendimiento/rendimiento_rev y X_dest = trabajo perdido con el T₀ de
+      la fuente de afuera;
+    - η = 1 − T_C/T_H en el ciclo de Carnot de cualquier fluido (el agua:
+      Q_H = h_fg = 1715,2 kJ/kg y η = 40,14 %);
+    - la exergía del calor baja tramo a tramo en T₀·S_gen.
+- **Detectado**:
+  - Los ejemplos de §6-3 y §6-4 no dan todas las temperaturas. Se tomaron la
+    central entre 600 y 15 °C y la cocina a 25 °C, y la descripción del ejemplo lo
+    dice.
+  - Al cambiar de máquina, los calores del ejemplo daban una bomba de calor
+    imposible entre las fuentes de la central (lo encontró un AppTest). Ahora la
+    máquina nueva arranca posible: el mismo W y el rendimiento a mitad de camino
+    del reversible.
+  - La primera versión del procedimiento tenía 29 ecuaciones de más de 324 px (el
+    W neto en SI y las sumas de Clausius de tres términos). La teoría tenía 3 (los
+    COP y los calores del Carnot con `\qquad`).
+  - El ciclo de Carnot dejaba un W de −7·10⁻¹⁰ J (ruido de CoolProp).
+  - El export de un ciclo reversible decía ΣQ/T = −0.0.
+  - Las keys del ambiente (`…_T0`) chocaban con la primera temperatura de la lista.
+  - En las capturas del smoke test:
+    - «esta máquina» se cortaba en el borde derecho del gráfico (la bomba de calor
+      en el Inglés, a 390 px);
+    - los nombres de la exergía del calor, en dos renglones y girados, se
+      mezclaban;
+    - los ejes de las cascadas mostraban los prefijos de plotly: «80k» junto a kW
+      y «0,8M» junto a J. Esto también pasaba en /Primer_Principio.
+
+    Se corrigieron y se repitió el smoke test completo.
+- **Mensajes al alumno**:
+  - datos que sobran o faltan;
+  - η fuera de (0, 1], COP_R ≤ 0 o COP_B < 1;
+  - una fuente fría más caliente que la caliente;
+  - un ciclo de Carnot con s₂ ≤ s₁ (con un gas, p₂ ≥ p₁);
+  - el título con un gas;
+  - un incompresible;
+  - un calor que sube de temperatura (Clausius).
+- **Tests**: la corrida completa de `pytest -W error` está en curso. Los módulos
+  de la fase y los que tocó pasan: 321 passed (segundo principio, gráficos de los
+  balances, las dos páginas, la navegación y las citas), sin warnings.
+  - `tests/test_second_law.py` (90), `tests/test_second_law_procedure.py` (62),
+    `tests/test_second_law_charts.py` (35), `tests/test_page_segundo_principio.py`
+    (61, AppTest) y 5 más en `tests/test_balance_charts.py` (`value_axis`).
+  - LaTeX: 5787 expresiones distintas del procedimiento y 17 de la teoría validan
+    con KaTeX estricto y entran en 305 y 221 px como máximo en los tres sistemas.
+  - Smoke test en Chromium a 390 y 1280 px de los 21 casos (los cuatro modos,
+    todos los ejemplos y el cambio de máquina, en los tres sistemas), con la
+    teoría y el procedimiento abiertos. La primera pasada a 390 px no dio errores
+    ni desbordes, y sus capturas encontraron los detalles de arriba. La segunda
+    pasada, con los arreglos y el servidor reiniciado, está en curso.
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
@@ -1746,10 +1835,13 @@
     modelo; el título no coincide con la palanca a T constante), y justo
     en el borde los clasifica como líquido comprimido / vapor
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
-- **Fase 10.2 — Segundo principio** (página `/Segundo_Principio`, 0.29.0):
-  máquinas térmicas, refrigeradores y bombas de calor contra Carnot con el
-  veredicto, la desigualdad de Clausius con N fuentes, el ciclo de Carnot con un
-  fluido real o un gas ideal y la entropía generada por transferencia de calor.
+- **Segundo principio (continuación)**:
+  - máquinas de Carnot en serie;
+  - una máquina entre dos cuerpos finitos (el trabajo máximo);
+  - el rendimiento a potencia máxima (Curzon–Ahlborn, η = 1 − √(T_C/T_H));
+  - la escala termodinámica de temperatura (Çengel §6-9).
+- **Edición de Çengel y Boles de la cátedra**: la app cita la 9.ª (2019). Falta
+  confirmar cuál usa la cátedra.
 - **Balances (continuación)**: un pistón con resorte (p lineal en V), el trabajo
   de eje en un sistema cerrado, varias entradas y salidas en un volumen de
   control, el tanque con mezcla líquido–vapor que descarga vapor (olla a
