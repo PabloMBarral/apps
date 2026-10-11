@@ -40,6 +40,7 @@ from core.balances.balances_procedure import (
     exchanger_steps,
     mixing_steps,
 )
+from core.balances.common import upper_first
 from core.export import dict_to_csv
 from core.gases import ideal as gi
 from core.state_report import ProcedureStep, format_value
@@ -426,7 +427,7 @@ def _ambient_inputs(
 ) -> tuple[float | None, float]:
     """La temperatura de la fuente o el medio del calor (T_b) y la del ambiente (T₀)."""
     other = st.checkbox(
-        f"{heat_label.capitalize()} pasa desde (o hacia) un medio a otra temperatura que el "
+        f"{upper_first(heat_label)} pasa desde (o hacia) un medio a otra temperatura que el "
         "ambiente",
         value=T_b is not None,
         key=f"{key}_has_Tb",

@@ -18,6 +18,7 @@ __all__ = [
     "heat_direction_message",
     "num",
     "snap_sgen",
+    "upper_first",
     "verdict",
     "violation_message",
 ]
@@ -44,6 +45,12 @@ def num(x: float, fmt: str = ".4g") -> str:
 
 def deg_c(T: float) -> str:
     return f"{num(T - 273.15)} °C"
+
+
+def upper_first(text: str) -> str:
+    """La primera letra en mayúscula sin tocar el resto: «el R-134a» → «El R-134a»
+    (``str.capitalize`` lo dejaba «El r-134a»)."""
+    return text[:1].upper() + text[1:]
 
 
 def snap_sgen(S_gen: float, scale: float) -> float:

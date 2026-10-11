@@ -33,6 +33,7 @@ from core.balances.common import (
     heat_direction_message,
     num,
     snap_sgen,
+    upper_first,
     verdict,
     violation_message,
 )
@@ -994,7 +995,7 @@ def solve_exchanger(inputs: ExchangerInputs) -> ExchangerResult:
 def _exchanger_flow(rhs: float, dh: float, name: str) -> float:
     if dh == 0.0:
         raise ValueError(
-            f"{name.capitalize()} no cambia de entalpía: su caudal no se puede despejar."
+            f"{upper_first(name)} no cambia de entalpía: su caudal no se puede despejar."
         )
     m = rhs / dh
     if not m > 0.0:
@@ -1061,7 +1062,7 @@ def _exchanger_notes(r: ExchangerResult) -> tuple[str, ...]:
     for s, o in zip((r.inputs.stream_a, r.inputs.stream_b), r.outlets, strict=True):
         if s.substance.kind == "fluid" and o.is_two_phase:
             name = s.label or "una corriente"
-            notes.append(f"{name.capitalize()} sale como mezcla (x = {num(o.x or 0.0, '.3g')}).")
+            notes.append(f"{upper_first(name)} sale como mezcla (x = {num(o.x or 0.0, '.3g')}).")
     return tuple(notes)
 
 
