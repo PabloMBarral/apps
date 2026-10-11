@@ -7,6 +7,7 @@ cualquier fluido y X_Q,entra − X_Q,sale = T₀·S_gen.
 
 from __future__ import annotations
 
+import json
 import math
 import pickle
 from dataclasses import replace
@@ -206,6 +207,12 @@ def test_two_sources_engine() -> None:
 def test_carnot_cycle_gives_the_equality() -> None:
     r = sl.solve_clausius(sl.CLAUSIUS_EXAMPLES["Ciclo de Carnot (la igualdad)"].inputs)
     assert r.S_gen == 0.0 and r.verdict == "reversible"
+    # ΣQ/T = −S_gen sin −0,0: el export decía «-0.0»
+    assert math.copysign(1.0, r.clausius_sum) == 1.0
+    assert "-0.0" not in json.dumps(sl.clausius_to_dict(r))
+    m = _machine("Máquina de Carnot (Çengel §6-10)")
+    assert math.copysign(1.0, m.clausius_sum) == 1.0
+    assert "-0.0" not in json.dumps(sl.machine_to_dict(m))
 
 
 def test_impossible_cycle() -> None:

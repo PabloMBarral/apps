@@ -33,6 +33,7 @@ __all__ = [
     "evolution_figure",
     "exchanger_tq_figure",
     "state_diagram",
+    "value_axis",
     "waterfall_figure",
 ]
 
@@ -209,6 +210,14 @@ def state_diagram(
     return fig
 
 
+def value_axis(values: Sequence[float]) -> dict[str, str]:
+    """Los rótulos del eje de valores sin los prefijos de plotly: «80k» junto a «kW» se leía
+    como 80 000 kW y «0,8M» junto a «J», raro. Números enteros (con espacio de miles) hasta
+    10⁶ y potencias de 10 fuera de eso, como las barras (:func:`_bar_label`)."""
+    top = max((abs(v) for v in values), default=0.0)
+    return {"exponentformat": "none" if 1e-3 <= top < 1e6 else "power"}
+
+
 def waterfall_figure(
     title: str,
     items: Sequence[tuple[str, float]],
@@ -248,7 +257,12 @@ def waterfall_figure(
         height=320,
         margin={"l": 10, "r": 10, "t": 40, "b": 10},
         title={"text": title, "x": 0},
-        yaxis={"title": unit, "gridcolor": _GRID, "zerolinecolor": _INK},
+        yaxis={
+            "title": unit,
+            "gridcolor": _GRID,
+            "zerolinecolor": _INK,
+            **value_axis([*values, total]),
+        },
         xaxis={"type": "category"},
         showlegend=False,
         separators=", ",

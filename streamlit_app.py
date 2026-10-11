@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.28.0"
+PAGE_VERSION = "0.29.0"
 
 
 def _home_page() -> None:
@@ -76,6 +76,12 @@ def _home_page() -> None:
           fluido real, un gas ideal o un incompresible: el trabajo, el calor, la
           entropía generada, la exergía destruida y si el proceso es posible
           (ejemplos de Cengel cap. 4, 5 y 7).
+        - 🔁 **Segundo principio** — una **máquina térmica, un refrigerador o
+          una bomba de calor** contra el límite de **Carnot** (si es posible,
+          cuánta entropía genera y cuánto trabajo pierde), la **desigualdad de
+          Clausius** de un ciclo con varias fuentes, el **ciclo de Carnot** de
+          un fluido real o un gas ideal y la **entropía que genera un calor**
+          al pasar de una temperatura a otra (ejemplos de Cengel cap. 6 y 7).
         - 🔥 **ISO 6976** — poder calorífico (bruto y neto), densidad,
           densidad relativa al aire e índice de Wobbe de mezclas
           gaseosas combustibles, con propagación de incertidumbre y los
@@ -238,7 +244,8 @@ def _home_page() -> None:
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
         Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado,
         Exergía, Transferencia de calor, Radiación, Intercambiadores, Gases
-        ideales, Gases reales y Primer principio. Interpolación respeta las
+        ideales, Gases reales, Primer principio y Segundo principio.
+        Interpolación respeta las
         unidades del CSV original; ISO 6976 usa las unidades de la norma.
         """
     )
@@ -253,6 +260,7 @@ pages = [
     st.Page("app_pages/2_Interpolacion.py", title="Interpolación", icon="📐"),
     st.Page("app_pages/3_Isoentropicos.py", title="Isoentrópicos", icon="⚙️"),
     st.Page("app_pages/19_Primer_Principio.py", title="Primer principio", icon="⚖️"),
+    st.Page("app_pages/20_Segundo_Principio.py", title="Segundo principio", icon="🔁"),
     st.Page("app_pages/4_ISO6976.py", title="ISO 6976", icon="🔥"),
     st.Page("app_pages/5_Rankine.py", title="Rankine", icon="♨️"),
     st.Page("app_pages/6_Refrigeracion.py", title="Refrigeración", icon="❄️"),

@@ -192,8 +192,9 @@ class MachineResult:
 
     @property
     def clausius_sum(self) -> float:
-        """ΣQ/T del ciclo con el signo del vademecum §9.1 (= −S_gen)."""
-        return -self.S_gen
+        """ΣQ/T del ciclo con el signo del vademecum §9.1 (= −S_gen; 0 − S_gen para que
+        un ciclo reversible no quede en −0,0)."""
+        return 0.0 - self.S_gen
 
     @property
     def X_dest(self) -> float:
@@ -559,8 +560,9 @@ class ClausiusResult:
 
     @property
     def clausius_sum(self) -> float:
-        """ΣQ/T (= −S_gen: las fuentes ganan lo que el ciclo les da)."""
-        return -self.S_gen
+        """ΣQ/T (= −S_gen: las fuentes ganan lo que el ciclo les da; 0 − S_gen para que un
+        ciclo reversible no quede en −0,0)."""
+        return 0.0 - self.S_gen
 
     @property
     def W(self) -> float:
