@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.27.0` — Fase 9.2, gases reales (2026-10-10).
+> **Versión actual**: `0.28.0` — Fase 10.1, balances de energía y de entropía (2026-10-11).
 
 ---
 
@@ -1636,6 +1636,94 @@
     «Detectado»); Clapeyron y Joule–Thomson se repitieron después del arreglo.
 - **Dependencias**: ninguna nueva.
 
+### Fase 10.1 — Primer principio: balances de energía y de entropía
+- **Versión**: `0.28.0` (2026-10-11). Rama `claude/water-state-analyzer-f4fiev`.
+  La primera mitad de la Fase 10 (el plan aprobado: 10.1 = balances, 10.2 =
+  segundo principio).
+- **Scope**:
+  - **`core/balances/substance.py`** (nuevo): fluido real (CoolProp), gas ideal
+    (los 15 de la Fase 9.1, c_p constante o variable) o incompresible (c y ρ de
+    Incropera o a elección) con la misma interfaz: `state(sub, par, a, b)` con 12,
+    9 o 4 pares (v–u, v–s y v–x con `AbstractState`) y h = u + p·v en los tres;
+    `balance_state` y `saturation_dome`.
+  - **`core/balances/closed.py`** (nuevo): siete procesos (v, p o T constantes,
+    politrópico, adiabático reversible, contra p_ext y estado final dado) con el
+    dato final que corresponda (T₂, p₂, v₂, V₂, x₂, Q o W), otro trabajo de
+    entrada, W_b por el camino, Q, ΔU, ΔS, S_gen y X_dest; contra p_ext
+    adiabático, la comparación con la expansión reversible; el equilibrio
+    térmico de dos incompresibles o uno con un reservorio.
+  - **`core/balances/steady_flow.py`** (nuevo): tobera, difusor, válvula,
+    turbina, compresor, bomba y calentador con ω, z y el rendimiento isoentrópico
+    (§10.4), el caudal por ṁ, V̇, A·ω o la potencia, q y w por kg o totales; la
+    cámara de mezcla y el intercambiador sin mezcla (dos sustancias).
+  - **`core/balances/transient.py`** (nuevo): el llenado de un tanque vacío o con
+    fluido (con el calor, 0 adiabático, o con T₂) y el vaciado adiabático o
+    isotérmico con ∫h·dm (Simpson), la aproximación de flujo uniforme y la
+    válvula en el volumen de control.
+  - `common.py` (el veredicto, la T* = Q/ΔS y Clausius) y `balances_procedure.py`
+    (los siete procedimientos en los tres sistemas).
+  - **`ui/balance_charts.py`** (nuevo): el p–v y el T–s con la campana, las
+    cascadas de los balances, el T–Q del intercambiador y la evolución del
+    tanque.
+  - **Página `/Primer_Principio` (⚖️)**, en el menú después de Isoentrópicos, con
+    la teoría (vademecum §3, §10 y §13), el procedimiento y el export.
+  - `CITATION.cff` y el README suman Çengel, Boles y Kanoğlu (2019, 9.ª ed.),
+    que la app citaba en casi todas las páginas y no estaba.
+- **Validación**, contra Çengel y Boles: W_b = 96,4 Btu (§4-1, con v₁ = 7,4863 y
+  v₂ = 8,3548 ft³/lb como la tabla); 199,5 °C con la resistencia (§4-2, el libro
+  200 °C); expansión libre, p₂ = 3,170 kPa y Q = 0,34 kJ (el libro 3,169 y 0,25 con
+  u₁ ≈ u_f); W_b = −55,45 kJ en la isoterma; ΔS = −1,1746 kJ/K del R-134a
+  (§7-3, −1,173); ΔS = −1,608 y S_gen = 0,404 kJ/K (§7-13); 662,8 K en el motor
+  (§7-9, 662,7); 25,6 °C y S_gen = 4,326 kJ/K con el bloque de hierro (§4-5 y
+  §7-13); difusor 78,7 kg/s y 303,1 K; tobera 42,1 m/s y 378,6 °C; turbina de
+  5 MW, w = 872,4 kJ/kg y 5,73 kg/s; η_s = 66,7 % y 3,64 kg/s (§7-12); x = 0,340 y
+  −22,31 °C en la válvula; 21,9 °C en el ducto; s_gen = 0,371 kJ/(kg·K) en la
+  laminación (§7-13, 0,369); ducha 2,0; cámara de mezcla 22,7 lbm/min y
+  Ṡ_gen = 8,65 Btu/(min·R); condensador 29,1 kg/min y 1218 kJ/min; tanque vacío
+  456,4 °C (§5-5, 456,1); 9,58 kg y −339,3 kJ (un problema del cap. 5: 9,58 kg y
+  339 kJ). Los balances cierran a 10⁻⁹; el gas ideal contra el aire de CoolProp,
+  el incompresible contra el agua líquida, el vaciado contra la integral cerrada
+  del gas ideal.
+- **Detectado**:
+  - El compresor de Çengel §5-4 (aire de 280 a 400 K y 6 bar, 16 kJ/kg de
+    pérdida, 2,74 kW) cierra la energía pero **viola el segundo principio**: con
+    tan poco calor el aire no puede salir tan frío (haría falta cederlo a menos de
+    103 K). Queda como ejemplo, con el veredicto «imposible».
+  - El primer borrador de los ejemplos tenía un vapor que «termina como mezcla»
+    y terminaba sobrecalentado, un R-134a politrópico con calor hacia un ambiente
+    más caliente en parte del camino y un aire que pasaba bajo los 200 K de los
+    polinomios: se reemplazaron por el vapor desde 300 °C (x₂ = 0,96), el aire con
+    n = 1,3 y la expansión desde 3 bar.
+  - Una S_gen total positiva no alcanza: calentar un tanque que se llena desde una
+    fuente más fría da S_gen > 0 (la mezcla la tapa); ahora es «imposible» por
+    Clausius.
+  - En las capturas del smoke test: los ejes logarítmicos del p–v rotulaban 20 o
+    0,2 con un «2» suelto, las barras en SI salían con notación exponencial
+    («1,563e+05») y el Q de un llenado adiabático como −9,9·10⁻¹⁰ J, los rótulos
+    de 2 y 2s se pisaban y la leyenda del T–Q decía «El r-134a»
+    (`str.capitalize`). Se corrigieron y se repitieron esos casos.
+  - Dudoso, en la Fase 9.1: los compresores en etapas citan «§7-12»; en la 9.ª
+    edición minimizar el trabajo del compresor es §7-11 (§7-12 son los
+    rendimientos isoentrópicos). No se cambió (es para confirmar con la edición de
+    la cátedra).
+- **Mensajes al alumno**: un dato final que el proceso no admite, el incompresible
+  fuera de v constante, otro trabajo en un proceso reversible, una válvula que
+  comprime, una tobera que frena, una turbina que no entrega trabajo, una bomba
+  con vapor, un caudal que sale negativo en la mezcla o el intercambiador, una
+  presión final fuera de rango en el tanque, un balance que da un estado
+  imposible, y la S_gen < 0 con la temperatura límite de la fuente.
+- **Tests**: de 5548 a TOTAL_TESTS passed (10 skipped), sin warnings.
+  - `tests/test_balances_substance.py` (44), `tests/test_balances_closed.py`
+    (70), `tests/test_balances_steady_flow.py` (84),
+    `tests/test_balances_transient.py` (29), `tests/test_balances_procedure.py`
+    (111), `tests/test_balance_charts.py` (11) y
+    `tests/test_page_primer_principio.py` (66, AppTest).
+  - LaTeX: 15 110 expresiones distintas del procedimiento y 14 de la teoría
+    validan con KaTeX estricto y entran en 319 y 291 px como máximo en los tres
+    sistemas.
+  - SMOKE_SUMMARY
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
@@ -1653,6 +1741,14 @@
     modelo; el título no coincide con la palanca a T constante), y justo
     en el borde los clasifica como líquido comprimido / vapor
     sobrecalentado. Con p ya está resuelto; con T es un caso de borde raro.
+- **Fase 10.2 — Segundo principio** (página `/Segundo_Principio`, 0.29.0):
+  máquinas térmicas, refrigeradores y bombas de calor contra Carnot con el
+  veredicto, la desigualdad de Clausius con N fuentes, el ciclo de Carnot con un
+  fluido real o un gas ideal y la entropía generada por transferencia de calor.
+- **Balances (continuación)**: un pistón con resorte (p lineal en V), el trabajo
+  de eje en un sistema cerrado, varias entradas y salidas en un volumen de
+  control, el tanque con mezcla líquido–vapor que descarga vapor (olla a
+  presión) y la exergía de flujo en cada estado.
 - **Gases reales (continuación)**: las funciones de discrepancia (Δh, Δu y Δs
   de un gas real con la carta generalizada, Çengel §12-6), la ecuación virial,
   Beattie–Bridgeman y Benedict–Webb–Rubin (Çengel §3-8), Soave–Redlich–Kwong,

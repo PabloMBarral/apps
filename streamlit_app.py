@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.27.0"
+PAGE_VERSION = "0.28.0"
 
 
 def _home_page() -> None:
@@ -66,6 +66,16 @@ def _home_page() -> None:
           multietapa con intercooler, en modo directo (calcular el
           estado real dado η_s) o inverso (calcular η_s dados los dos
           estados). Con **diagramas T–s / log p–h / h–s** del proceso.
+        - ⚖️ **Primer principio** — los **balances de energía y de entropía**
+          de un **sistema cerrado** (volumen, presión o temperatura constante,
+          politrópico, adiabático reversible, contra una presión exterior o con
+          el estado final dado, y el equilibrio térmico), de los
+          **dispositivos de flujo estacionario** (tobera, difusor, válvula,
+          turbina, compresor, bomba, calentador, cámara de mezcla e
+          intercambiador) y del **llenado y el vaciado de un tanque**, con un
+          fluido real, un gas ideal o un incompresible: el trabajo, el calor, la
+          entropía generada, la exergía destruida y si el proceso es posible
+          (ejemplos de Cengel cap. 4, 5 y 7).
         - 🔥 **ISO 6976** — poder calorífico (bruto y neto), densidad,
           densidad relativa al aire e índice de Wobbe de mezclas
           gaseosas combustibles, con propagación de incertidumbre y los
@@ -228,8 +238,8 @@ def _home_page() -> None:
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
         Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado,
         Exergía, Transferencia de calor, Radiación, Intercambiadores, Gases
-        ideales y Gases reales. Interpolación respeta las unidades del CSV original; ISO 6976 usa
-        las unidades de la norma.
+        ideales, Gases reales y Primer principio. Interpolación respeta las
+        unidades del CSV original; ISO 6976 usa las unidades de la norma.
         """
     )
 

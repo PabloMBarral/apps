@@ -2,7 +2,7 @@
 
 Que cada paso esté bien formado en los tres sistemas de unidades y que los números que se
 muestran sean los del resultado (el ancho y KaTeX se verifican aparte, con un navegador:
-15 077 expresiones, máx. 319 px).
+15 110 expresiones, máx. 319 px).
 """
 
 from __future__ import annotations
