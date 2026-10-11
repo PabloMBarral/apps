@@ -9,6 +9,7 @@ import pickle
 import pytest
 
 from core.balances import closed as cl
+from core.balances import common as cm
 from core.balances import substance as sb
 
 C = 273.15
@@ -342,10 +343,10 @@ def test_adiabatic_entropy_decrease_is_impossible() -> None:
 
 
 def test_verdicts() -> None:
-    assert cl.verdict(0.0) == "reversible"
-    assert cl.verdict(1e-3) == "irreversible"
-    assert cl.verdict(-1e-3) == "imposible"
-    assert cl.snap_sgen(1e-15, 1.0) == 0.0 and cl.snap_sgen(1e-6, 1.0) == 1e-6
+    assert cm.verdict(0.0) == "reversible"
+    assert cm.verdict(1e-3) == "irreversible"
+    assert cm.verdict(-1e-3) == "imposible"
+    assert cm.snap_sgen(1e-15, 1.0) == 0.0 and cm.snap_sgen(1e-6, 1.0) == 1e-6
 
 
 # ---------------------------------------------------------------------

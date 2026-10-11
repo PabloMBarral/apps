@@ -36,6 +36,15 @@ from typing import Any, Literal
 import numpy as np
 from scipy.optimize import brentq
 
+from core.balances.common import (
+    S_FLOOR,
+    Verdict,
+    deg_c,
+    num,
+    snap_sgen,
+    verdict,
+    violation_message,
+)
 from core.balances.substance import (
     PairCode,
     Substance,
@@ -62,16 +71,12 @@ __all__ = [
     "EquilibriumInputs",
     "EquilibriumResult",
     "ProcessKind",
-    "VERDICTS",
-    "Verdict",
     "allowed_ends",
     "allowed_processes",
     "closed_to_dict",
     "equilibrium_to_dict",
-    "snap_sgen",
     "solve_closed",
     "solve_equilibrium",
-    "verdict",
 ]
 
 ProcessKind = Literal[
@@ -129,36 +134,14 @@ def allowed_ends(process: ProcessKind, sub: Substance) -> tuple[EndKind, ...]:
     return ends if sub.kind == "fluid" else tuple(e for e in ends if e != "x")
 
 
-Verdict = Literal["reversible", "irreversible", "imposible"]
-VERDICTS: dict[Verdict, str] = {
-    "reversible": "Reversible (S_gen = 0)",
-    "irreversible": "Irreversible (S_gen > 0)",
-    "imposible": "Imposible (S_gen < 0)",
-}
-
-
-def snap_sgen(S_gen: float, scale: float) -> float:
-    """S_gen = 0 si es ruido de redondeo frente a ``scale`` (los términos del balance)."""
-    return 0.0 if abs(S_gen) <= 1e-9 * (abs(scale) + 1e-12) else S_gen
-
-
-def verdict(S_gen: float) -> Verdict:
-    """Vademecum §10.2: S_gen > 0 irreversible, = 0 reversible y < 0 imposible."""
-    if S_gen == 0.0:
-        return "reversible"
-    return "irreversible" if S_gen > 0.0 else "imposible"
-
-
-def _num(x: float, fmt: str = ".4g") -> str:
-    return f"{x:{fmt}}".replace(".", ",").replace("-", "−")
+_num = num
 
 
 def _kJ(x: float) -> str:
     return f"{_num(x / 1e3)} kJ"
 
 
-def _degC(T: float) -> str:
-    return f"{_num(T - 273.15)} °C"
+_degC = deg_c
 
 
 # ---------------------------------------------------------------------
@@ -465,8 +448,8 @@ def solve_closed(inputs: ClosedInputs) -> ClosedResult:
     if proc == "T_const" and inputs.T_b_K is None:
         T_b = s1.T  # el calor reversible entra a la temperatura del sistema
     dS = m * (s2.s - s1.s)
-    S_gen = snap_sgen(dS - Q / T_b, abs(dS) + abs(Q / T_b))
-    violation = _violation(Q, T_b, s1, s2, S_gen) if S_gen < 0.0 else None
+    S_gen = snap_sgen(dS - Q / T_b, m * (abs(s1.s) + abs(s2.s) + S_FLOOR) + abs(Q / T_b))
+    violation = _violation(Q, dS, T_b, s1, s2, S_gen) if S_gen < 0.0 else None
     result = ClosedResult(
         inputs=inputs,
         state1=s1,
@@ -518,28 +501,12 @@ def _polytropic_to_T(sub: Substance, s1: ThermoState, n: float, T2: float) -> Th
     )
 
 
-def _violation(Q: float, T_b: float, s1: ThermoState, s2: ThermoState, S_gen: float) -> str:
-    base = (
-        f"S_gen = {_num(S_gen)} J/K < 0: el proceso es imposible. El balance de energía cierra, "
-        "pero viola el segundo principio (vademecum §10.2)."
+def _violation(
+    Q: float, dS: float, T_b: float, s1: ThermoState, s2: ThermoState, S_gen: float
+) -> str:
+    return violation_message(
+        f"S_gen = {_num(S_gen)} J/K", Q, dS, T_b, min(s1.T, s2.T), max(s1.T, s2.T)
     )
-    if Q > 0 and T_b < max(s1.T, s2.T):
-        return (
-            f"{base} El calor entra desde una fuente a {_degC(T_b)}, más fría que el sistema "
-            f"(llega a {_degC(max(s1.T, s2.T))}): el calor no pasa solo de frío a caliente. "
-            "Subí la temperatura de la fuente T_b."
-        )
-    if Q < 0 and T_b > min(s1.T, s2.T):
-        return (
-            f"{base} El calor sale hacia un medio a {_degC(T_b)}, más caliente que el sistema "
-            f"(baja a {_degC(min(s1.T, s2.T))}). Bajá la temperatura del medio T_b."
-        )
-    if Q == 0.0:
-        return (
-            f"{base} Sin calor, la entropía no puede bajar: un sistema aislado (o adiabático) "
-            "solo genera entropía."
-        )
-    return f"{base} Revisá los datos."
 
 
 def _notes(r: ClosedResult) -> tuple[str, ...]:
