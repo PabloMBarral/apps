@@ -40,6 +40,7 @@ from core.balances.common import (
     S_FLOOR,
     Verdict,
     deg_c,
+    heat_direction_message,
     num,
     snap_sgen,
     verdict,
@@ -224,7 +225,7 @@ class ClosedResult:
 
     @property
     def verdict(self) -> Verdict:
-        return verdict(self.S_gen)
+        return "imposible" if self.violation else verdict(self.S_gen)
 
     @property
     def energy_residual(self) -> float:
@@ -449,7 +450,10 @@ def solve_closed(inputs: ClosedInputs) -> ClosedResult:
         T_b = s1.T  # el calor reversible entra a la temperatura del sistema
     dS = m * (s2.s - s1.s)
     S_gen = snap_sgen(dS - Q / T_b, m * (abs(s1.s) + abs(s2.s) + S_FLOOR) + abs(Q / T_b))
-    violation = _violation(Q, dS, T_b, s1, s2, S_gen) if S_gen < 0.0 else None
+    temps = [s.T for s in (path or (s1, s2))] + [s1.T, s2.T]
+    violation = heat_direction_message(Q, T_b, min(temps), max(temps)) or (
+        _violation(Q, dS, T_b, s1, s2, S_gen) if S_gen < 0.0 else None
+    )
     result = ClosedResult(
         inputs=inputs,
         state1=s1,
@@ -546,9 +550,11 @@ def _notes(r: ClosedResult) -> tuple[str, ...]:
             "uno es dato y el otro sale del balance. En los diagramas, la recta rayada solo "
             "une los dos estados."
         )
-    if r.S_gen == 0.0:
+    if r.violation is not None:
+        pass
+    elif r.S_gen == 0.0:
         notes.append("S_gen = 0: el proceso es reversible (internamente y con la fuente).")
-    elif r.S_gen > 0.0 and r.W_in > 0.0:
+    elif r.W_in > 0.0:
         notes.append(
             "El trabajo de una resistencia o una paleta siempre genera entropía: se disipa "
             "en el sistema."

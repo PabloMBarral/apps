@@ -30,6 +30,7 @@ from core.balances.common import (
     G,
     Verdict,
     deg_c,
+    heat_direction_message,
     num,
     snap_sgen,
     verdict,
@@ -515,7 +516,8 @@ def solve_device(inputs: DeviceInputs) -> DeviceResult:
     T_b = inputs.T_b_K if inputs.T_b_K is not None else inputs.T0_K
     ds = s2.s - s1.s
     s_gen = snap_sgen(ds - q / T_b, abs(s1.s) + abs(s2.s) + S_FLOOR + abs(q / T_b))
-    violation = (
+    T_lo, T_hi = min(s1.T, s2.T), max(s1.T, s2.T)
+    violation = heat_direction_message(q, T_b, T_lo, T_hi, "el fluido") or (
         violation_message(
             f"s_gen = {num(s_gen * 1e-3)} kJ/(kg·K)",
             q,
@@ -788,7 +790,7 @@ def solve_mixing(inputs: MixingInputs) -> MixingResult:
     scale = sum(m * (abs(x.s) + abs(c.s) + S_FLOOR) for m, x in ((m1, a), (m2, b)))
     S_gen = snap_sgen(sum(flows) - Q / T_b, scale + abs(Q / T_b))
     temps = (a.T, b.T, c.T)
-    violation = (
+    violation = heat_direction_message(Q, T_b, min(temps), max(temps), "el fluido") or (
         violation_message(
             f"Ṡ_gen = {num(S_gen)} W/K", Q, sum(flows), T_b, min(temps), max(temps), "el fluido"
         )
@@ -1013,6 +1015,12 @@ def _exchanger_violation(r: ExchangerResult) -> str | None:
             f"{base}{names[hot]} saldría a {deg_c(r.outlets[hot].T)}, más fría que la entrada "
             f"de {names[cold]} ({deg_c(t_cold_in)}): ningún intercambiador lo logra."
         )
+    temps = [s.T for s in r.inlets + r.outlets]
+    direction = heat_direction_message(
+        r.inputs.Q_dot_W, r.T_b, min(temps), max(temps), "las corrientes"
+    )
+    if direction is not None:
+        return direction
     if r.S_gen_dot < 0.0:
         return violation_message(
             f"Ṡ_gen = {num(r.S_gen_dot)} W/K",

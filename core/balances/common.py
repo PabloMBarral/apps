@@ -15,6 +15,7 @@ __all__ = [
     "VERDICTS",
     "Verdict",
     "deg_c",
+    "heat_direction_message",
     "num",
     "snap_sgen",
     "verdict",
@@ -107,3 +108,30 @@ def violation_message(
         f"{base} {hint} Bajá la temperatura del medio T_b, o revisá el estado final: con ese "
         "calor no se llega."
     )
+
+
+def heat_direction_message(
+    Q: float, T_b: float, T_min: float, T_max: float, who: str = "el sistema"
+) -> str | None:
+    """Clausius (vademecum §9.1): el calor no pasa solo de frío a caliente.
+
+    Si ``who`` está siempre más caliente que la fuente de la que recibe calor (o siempre más
+    frío que el medio al que lo cede), el proceso es imposible aunque la S_gen total salga
+    positiva: la irreversibilidad interna (una mezcla, un estrangulamiento) no compensa el
+    calor que va al revés.
+    """
+    if Q > 0.0 and T_b < T_min:
+        return (
+            f"El proceso es imposible (vademecum §9.1): el calor entra desde una fuente a "
+            f"{deg_c(T_b)} y {who} está siempre más caliente (entre {deg_c(T_min)} y "
+            f"{deg_c(T_max)}): el calor no pasa solo de frío a caliente. Subí la temperatura "
+            "de la fuente T_b."
+        )
+    if Q < 0.0 and T_b > T_max:
+        return (
+            f"El proceso es imposible (vademecum §9.1): el calor sale hacia un medio a "
+            f"{deg_c(T_b)} y {who} está siempre más frío (entre {deg_c(T_min)} y "
+            f"{deg_c(T_max)}): el calor no pasa solo de frío a caliente. Bajá la temperatura "
+            "del medio T_b."
+        )
+    return None
