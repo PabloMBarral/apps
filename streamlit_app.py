@@ -84,10 +84,10 @@ def _home_page() -> None:
           al pasar de una temperatura a otra (ejemplos de Cengel cap. 6 y 7).
         - 🔥 **ISO 6976** — poder calorífico (bruto y neto), densidad,
           densidad relativa al aire e índice de Wobbe de mezclas
-          gaseosas combustibles, con propagación de incertidumbre y los
-          ejemplos del Annex D precargados (matriz identidad; matriz
-          de normalización deferida a fase futura por requerir
-          ISO 14912:2003).
+          gaseosas combustibles, con propagación de incertidumbre con la
+          matriz identidad o la de **normalización** (ISO 14912:2003: las
+          fracciones correlacionadas, desde las u del análisis crudo) y los
+          ejemplos del Annex D precargados.
         - ♨️ **Rankine** — ciclo de potencia de vapor simple, con
           recalentamiento o con regeneración (calentadores abiertos y
           cerrados, con subenfriador de drenaje y desrecalentador), ideal

@@ -75,7 +75,9 @@ apps/
 │   │                          # Channiwala–Parikh; Parikh, Cordero) en cualquier
 │   │                          # base, PCI y W*, comparación contra el medido o el
 │   │                          # exacto, validación con 536 biomasas y 5 carbones.
-│   ├── 4_ISO6976.py           # ✅ Fase 2.3 (matriz identidad; teoría y export 1.7)
+│   ├── 4_ISO6976.py           # ✅ Fase 2.3 (teoría y export 1.7; matriz de
+│   │                          # normalización, análisis crudo y comparación
+│   │                          # con la identidad en la 0.30.0)
 │   ├── 10_HRSG.py             # ✅ Fase 3.3 — HRSG de una presión: diagrama T–Q
 │   │                          # (plotly) con vapor sobrecalentado o saturado,
 │   │                          # composición con λ o cargada, secciones, estados,
@@ -431,9 +433,10 @@ apps/
 │   │   ├── heating_value_procedure.py # ✅ Fase 6 — heating_value_steps y
 │   │   │                      # correlation_latex (tabla de aportes).
 │   │   └── iso6976.py         # ✅ Fase 2.3 — ISO 6976:2016 (matriz identidad;
-│   │                          # iso6976_to_dict, Fase 1.7)
-│   │                          # Normalization matrix: pendiente, requiere
-│   │                          # ISO 14912:2003 Formula (69) — deferido.
+│   │                          # iso6976_to_dict, Fase 1.7). 0.30.0: matriz de
+│   │                          # normalización (normalization_fit: las u del
+│   │                          # análisis crudo, reconstruidas por NNLS o
+│   │                          # dadas; NormalizationFit, UNCERTAINTY_LATEX).
 │   ├── cycles/
 │   │   ├── tespy_utils.py     # ✅ Fase 3.1a — new_network() en SI y
 │   │   │                      # solve() (status de TESPy → ValueError en castellano).
@@ -1840,6 +1843,43 @@ Notas de la Fase 11.1 (conducción transitoria):
   (va arriba de la línea) y los dos ceros del contacto pegados
   (`horizontal_spacing` 0,08); se repitieron las corridas afectadas con el
   servidor reiniciado.
+
+Notas de la matriz de normalización de ISO 6976 (0.30.0):
+
+- Pedido del autor al terminar la 11.1 (la página decía «prevista para una fase
+  futura»). ISO 6976:2016 calcula la matriz con ISO 14912:2003 desde las
+  incertidumbres del análisis crudo y el Anexo D publica solo las u(x) ya
+  normalizadas. Las dos derivaciones de la Fase 2.3 aplicaban fórmulas a las u(x)
+  como si fueran las crudas; la que vale es la propagación de xᵢ = yᵢ/Σyₖ desde
+  las u(y), Cov = J·diag(u²(y))·Jᵀ con Jᵢⱼ = δᵢⱼ − xᵢ (filas que suman 0,
+  semidefinida positiva).
+- Con las u(x) normalizadas, las u²(y) salen de invertir la diagonal,
+  u²(xᵢ) = (1 − xᵢ)²·u²(yᵢ) + xᵢ²·Σₖ≠ᵢ u²(yₖ), con `scipy.optimize.nnls` (u² ≥ 0).
+  Con el D.4 la reconstrucción es exacta (6·10⁻¹⁵) y los casos D.4.3.2 y D.4.4.2
+  salen dentro de las tolerancias de la fixture y a ≤ 0,3 % de las u publicadas
+  (u_Hv_G = 0,0163122 contra 0,016316). D.2 y D.3 también son compatibles.
+- No toda u(x) sale de una normalización: ninguna fracción puede tener menos
+  incertidumbre que xᵢ·√(Σₖ≠ᵢ u²(yₖ)), con dos componentes las dos u(x) son
+  iguales y con uno, 0. Con u inventadas no cumple el 83 % (3000 composiciones al
+  azar): `normalization_fit` da un `ValueError` que nombra el componente (con 1 %
+  más 10⁻³ de la mayor u de tolerancia, por el redondeo de los datos publicados).
+  Por eso la página también acepta las u del análisis crudo
+  (`uncertainty_basis="raw"`, keys `iso_corr` e `iso_basis`), con las que
+  cualquier u ≥ 0 vale.
+- Lo didáctico: la u del componente principal normalizado sale casi toda de la de
+  los demás ((1 − x)² ≈ 0,006 en el metano del D.4); el metano se anticorrelaciona
+  con los de más incertidumbre (r = −0,66 con el etano) y se correlaciona
+  levemente con las trazas (se escalan con el mismo Σy); la incertidumbre baja
+  39 % en H_v,G y 53 % en ρ respecto de la identidad (§D.4.3.2: la identidad es la
+  sobre-estimación segura).
+- AppTest no edita el `st.data_editor`: el error de la página se prueba
+  reemplazando `normalization_fit` con `monkeypatch`.
+- LaTeX: 13 expresiones de la página (teoría y procedimiento, con los cuatro
+  ejemplos y las dos matrices), KaTeX estricto, máx. 291 px (la covarianza en tres
+  renglones: en dos llegaba a 332). Smoke test a 390 y 1280 px: los cuatro casos
+  (identidad, caso B, análisis crudo y D.3), sin errores ni desbordes; la tabla de
+  la comparación lleva el cambio en la segunda columna y la unidad con la
+  magnitud (en el celular la última columna quedaba afuera).
 
 ### Citas y licencias
 

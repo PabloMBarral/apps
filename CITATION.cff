@@ -162,6 +162,16 @@ references:
       name: "International Organization for Standardization"
     number: "ISO 6976:2016"
     year: 2016
+  - type: standard
+    scope: "Matriz de normalización de la composición (incertidumbre de ISO 6976)"
+    authors:
+      - name: "International Organization for Standardization"
+    title: >-
+      Gas analysis — Conversion of gas mixture composition data
+    institution:
+      name: "International Organization for Standardization"
+    number: "ISO 14912:2003"
+    year: 2003
   - type: book
     scope: "Entropías absolutas de los gases a 25 °C y 1 bar (turbina de gas)"
     authors:

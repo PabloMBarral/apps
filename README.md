@@ -124,14 +124,19 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
 - ✅ **ISO 6976:2016 — Poder calorífico de gases combustibles**:
   poder calorífico bruto y neto (molar, másico, volumétrico), densidad,
   densidad relativa al aire e índices de Wobbe G y N, con propagación
-  de incertidumbre estándar (matriz identidad; la matriz de normalización
-  queda deferida a fase futura por requerir ISO 14912:2003). Composición
-  editable in-place con autocompletado de los 60 componentes de la norma.
-  Ejemplos del Annex D (D.2, D.3, D.4) precargados y verificados contra
-  los valores tabulados de la norma. Expansor con la relación PCS − PCI
-  del vademecum (§16.9) y las fórmulas de la norma; descarga CSV/JSON con
-  u (k = 1) y U (k = 2) de cada magnitud. _Fase 2.3 cerrada; teoría y
-  export en la 1.7._
+  de incertidumbre estándar con la matriz identidad o, desde la 0.30.0, la
+  de **normalización** (ISO 14912:2003): con las u de la composición
+  normalizada (como las publica el Anexo D) la app reconstruye las del
+  análisis crudo, exactas en el D.4, y reproduce los casos D.4.3.2 y
+  D.4.4.2; o se cargan directamente las del análisis crudo. Muestra las u
+  crudas, la correlación con el componente principal y cuánto baja la
+  incertidumbre respecto de la identidad (−39 % la de H_v,G en el D.4).
+  Composición editable in-place con autocompletado de los 60 componentes de
+  la norma. Ejemplos del Annex D (D.2, D.3, D.4 casos A y B) precargados y
+  verificados contra los valores tabulados de la norma. Expansor con la
+  relación PCS − PCI del vademecum (§16.9) y las fórmulas de la norma;
+  descarga CSV/JSON con u (k = 1) y U (k = 2) de cada magnitud. _Fase 2.3
+  cerrada; teoría y export en la 1.7; matriz de normalización en la 0.30.0._
 - ✅ **Diagramas de propiedades** (log p–h, T–s, h–s, p–log v) con
   [fluprodia](https://github.com/fwitte/fluprodia) + plotly. La página de
   **Propiedades** dibuja el estado calculado sobre el diagrama elegido
@@ -847,6 +852,10 @@ estándar, entalpía del hielo y bulbo húmedo termodinámico. ASHRAE, Atlanta.
 **ISO 6976:2016** — *Natural gas — Calculation of calorific values, density,
 relative density and Wobbe indices from composition*. International
 Organization for Standardization, 2016.
+
+**ISO 14912:2003** — *Gas analysis — Conversion of gas mixture composition
+data*. International Organization for Standardization, 2003 (la matriz de
+normalización de ISO 6976).
 
 **Ciclo de Rankine orgánico (ORC)** — clasificación de los fluidos de trabajo
 (seco, húmedo, isoentrópico) y estado del arte:

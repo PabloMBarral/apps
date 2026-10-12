@@ -5,7 +5,8 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.30.0` — Fase 11.1, conducción transitoria (2026-10-12).
+> **Versión actual**: `0.30.0` — Fase 11.1, conducción transitoria, y la matriz de
+> normalización de ISO 6976 (2026-10-12).
 
 ---
 
@@ -54,10 +55,10 @@
   editable in-place con autocompletado de los 60 componentes de la
   norma. Ejemplos del Annex D (D.2, D.3, D.4) verificados contra los
   valores tabulados.
-- **Deferido**: matriz de normalización completa — requiere
-  implementar ISO 14912:2003 Formula (69). Pseudocódigo de dos
-  formulaciones (`Cov_proj` y `Cov_renorm`) documentado al pie de
-  `core/combustion/iso6976.py` para retomar en fase futura.
+- **Deferido** (resuelto en la 0.30.0, ver abajo): matriz de normalización
+  completa — ISO 14912:2003. Las dos formulaciones que se probaron
+  (`Cov_proj` y `Cov_renorm`) quedan documentadas al pie de
+  `core/combustion/iso6976.py`.
 
 ### Fase 1.4 — Multifluido + selector global de unidades
 - **Commit**: `b0f25c9` (2026-05-21) — `feat: multifluido + selector global de unidades (Fase 1.4)`
@@ -1884,7 +1885,8 @@
   inicial igual a la del fluido (no hay transitorio), una temperatura buscada
   fuera del rango entre T_i y T∞, un tiempo negativo, una posición fuera de 0 a 1
   y una temperatura que la superficie todavía no alcanzó.
-- **Tests**: 276 nuevos, sin warnings.
+- **Tests**: de 6218 a 6551 passed (con la matriz de normalización de abajo, de 10
+  skipped a ninguno), sin warnings. 276 de la conducción transitoria:
   - `tests/test_transient.py` (108), `tests/test_transient_procedure.py` (93),
     `tests/test_transient_charts.py` (15) y `tests/test_page_conduccion_transitoria.py`
     (60, AppTest).
@@ -1900,6 +1902,41 @@
     tocaban (más separación). Después de los arreglos se repitieron las 18 corridas
     afectadas con el servidor reiniciado.
 - **Dependencias**: ninguna nueva (scipy ya trae erf, erfcx, j0 y j1).
+
+### ISO 6976 — Matriz de normalización
+- **Versión**: `0.30.0` (2026-10-12), en el mismo PR que la Fase 11.1. Pedido del
+  autor al terminar la 11.1: la página decía que la matriz de normalización
+  (ISO 14912:2003) estaba «prevista para una fase futura».
+- **Scope**:
+  - **`core/combustion/iso6976.py`**: `normalization_fit` (las u del análisis
+    crudo, reconstruidas de las u(x) normalizadas con mínimos cuadrados no
+    negativos o dadas), la covarianza de la normalización
+    (Cov = J·diag(u²(y))·Jᵀ, Jᵢⱼ = δᵢⱼ − xᵢ), `NormalizationFit` en el resultado,
+    `ISO6976Inputs.uncertainty_basis` (`"normalized"` o `"raw"`), la propagación
+    en LaTeX (`UNCERTAINTY_LATEX`) y la narrativa en castellano. Sin
+    `NotImplementedError`; las notas al pie explican por qué las dos derivaciones
+    de la Fase 2.3 no daban.
+  - **Página `/ISO6976`** (0.30.0): las dos matrices, de qué son las u (de la
+    composición normalizada o del análisis crudo), el ejemplo del caso B del D.4,
+    la tabla del análisis crudo con la correlación con el componente principal,
+    la comparación con la identidad y la teoría con las fórmulas.
+- **Validación**: con el ejemplo D.4 la reconstrucción de las u crudas es exacta
+  (6·10⁻¹⁵) y los casos D.4.3.2 y D.4.4.2 (los dos de normalización) salen
+  dentro de las tolerancias de la fixture y a ≤ 0,3 % de las u publicadas
+  (u_Hv_G = 0,0163122 MJ/m³ contra 0,016316; u_ρ = 0,0002762 kg/m³ contra
+  0,000277). La identidad sobre-estima: 39 % en H_v,G y 53 % en ρ.
+- **Errores al alumno**: u(x) que no pueden salir de una normalización (un
+  componente con menos incertidumbre que la que le pasan los demás, dos
+  componentes con u distintas o uno con u > 0) explican la condición y nombran el
+  componente; con las u del análisis crudo cualquier u ≥ 0 vale.
+- **Tests**: los 10 de los casos B y D que estaban salteados pasan a ser 33 (las
+  seis salidas de cada caso contra la fixture, y a 0,5 % de la u publicada), más
+  16 nuevos en `tests/test_iso6976.py` (propiedades de la covarianza, las dos
+  bases, los errores, el export; el del `NotImplementedError` se fue) y 5 en
+  `tests/test_page_iso6976.py` (AppTest). La suite ya no saltea ningún test.
+  LaTeX: 13 expresiones, KaTeX estricto, máx. 291 px; smoke test a 390 y 1280 px
+  sin errores ni desbordes.
+- **Referencia nueva** en el `CITATION.cff` y el README: ISO 14912:2003.
 
 ---
 
@@ -1933,8 +1970,6 @@
   de un gas real con la carta generalizada, Çengel §12-6), la ecuación virial,
   Beattie–Bridgeman y Benedict–Webb–Rubin (Çengel §3-8), Soave–Redlich–Kwong,
   mezclas de gases reales (regla de Kay, Amagat con Z) y la fugacidad.
-- **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
-  cuando se incorpore ISO 14912:2003 Formula (69).
 - **HRSG (continuación)**: secciones intercaladas o en paralelo
   (economizadores partidos), quemadores suplementarios, pérdidas de carga y
   purga, diseño de las superficies (UA, NTU), condensación ácida.
