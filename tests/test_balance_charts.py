@@ -104,6 +104,16 @@ def test_waterfall_total_is_the_sum() -> None:
     assert list(wf.x) == ["Q", "−W", "ΔU"]
 
 
+@pytest.mark.parametrize(
+    ("value", "fmt"),
+    [(80_000.0, "none"), (911_200.0, "none"), (2.5, "none"), (8e7, "power"), (3e-4, "power")],
+)
+def test_waterfall_axis_has_no_plotly_prefixes(value: float, fmt: str) -> None:
+    """«80k» junto a «kW» se leía como 80 000 kW: números enteros o potencias de 10."""
+    fig = bc.waterfall_figure("Balance", [("Q", value), ("−W", -value / 4)], "ΔU", "energy", "SI")
+    assert fig.layout.yaxis.exponentformat == fmt
+
+
 def test_evolution_shares_the_mass() -> None:
     r = tr.solve_discharging(
         tr.DISCHARGING_EXAMPLES["Tanque de aire que se vacía sin calor"].inputs

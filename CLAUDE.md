@@ -141,6 +141,14 @@ apps/
 │   │                          # estacionario (dispositivo, mezcla, intercambiador)
 │   │                          # y régimen transitorio (llenado y vaciado), con el
 │   │                          # veredicto del segundo principio.
+│   ├── 20_Segundo_Principio.py # ✅ Fase 10.2 — El segundo principio (vademecum
+│   │                          # §9, §10 y §11): máquina térmica, refrigerador o
+│   │                          # bomba de calor contra Carnot (veredicto, S_gen,
+│   │                          # trabajo perdido, η_ex y la zona imposible),
+│   │                          # Clausius con dos a seis fuentes, el ciclo de
+│   │                          # Carnot (fluido real o gas ideal, cilindro o flujo
+│   │                          # estacionario) y la entropía de un calor (entre dos
+│   │                          # fuentes o por una pared, con la exergía).
 │   └── 99_Acerca.py           # ✅ 0.25.1 — Créditos, cómo citar la app (APA y
 │                              # BibTeX), las fuentes del CITATION.cff por tipo
 │                              # (con búsqueda y la bibliografía .bib), las
@@ -338,9 +346,18 @@ apps/
 │   │   │                      # T₂) y solve_discharging (∫h·dm por Simpson sobre la
 │   │   │                      # isoentrópica o la isoterma, flujo uniforme, válvula),
 │   │   │                      # ejemplos y export.
-│   │   └── balances_procedure.py # closed_steps, equilibrium_steps, device_steps,
-│   │                          # mixing_steps, exchanger_steps, charging_steps,
-│   │                          # discharging_steps y ke_factor.
+│   │   ├── balances_procedure.py # closed_steps, equilibrium_steps, device_steps,
+│   │   │                      # mixing_steps, exchanger_steps, charging_steps,
+│   │   │                      # discharging_steps y ke_factor.
+│   │   ├── second_law.py      # ✅ Fase 10.2 — solve_machine (dos datos de Q_H,
+│   │   │                      # Q_C, W y η o COP, o uno y reversible; veredicto
+│   │   │                      # con las T límite y Kelvin–Planck), solve_clausius
+│   │   │                      # (N fuentes), solve_carnot (los cuatro procesos con
+│   │   │                      # su camino, cerrado o en flujo), solve_heat_path
+│   │   │                      # (tramos y exergía del calor), carnot_performance,
+│   │   │                      # ejemplos y export.
+│   │   └── second_law_procedure.py # machine_steps, clausius_steps,
+│   │                          # carnot_steps y heat_path_steps.
 │   ├── exergy/                # ✅ Fase 7 (reemplaza al placeholder exergy.py)
 │   │   ├── physical.py        # Ambient (T₀, p₀), PhysicalExergy /
 │   │   │                      # physical_exergy (ψ, φ, térmica y mecánica, V²/2,
@@ -529,7 +546,12 @@ apps/
 │   └── balance_charts.py      # ✅ Fase 10.1 — state_diagram (p–v log–log o T–s
 │                              # con la campana), waterfall_figure (los balances
 │                              # en cascada), evolution_figure (p(m) y T(m) en dos
-│                              # paneles) y exchanger_tq_figure.
+│                              # paneles) y exchanger_tq_figure. Fase 10.2:
+│                              # value_axis (el eje sin «80k» ni «0,8M»).
+│   └── second_law_charts.py   # ✅ Fase 10.2 — limit_figure (η o COP de Carnot
+│                              # contra T, la zona imposible y la máquina) y
+│                              # heat_exergy_figure (la exergía del calor a cada
+│                              # temperatura).
 │   └── real_gas_charts.py     # ✅ Fase 9.2 — generalized_chart_figure,
 │                              # z_isotherm_figure, fluid_isotherm_figure,
 │                              # vdw_isotherms_figure (las áreas de Maxwell),
@@ -1637,6 +1659,83 @@ Notas de la Fase 10.1 (balances de energía y de entropía):
   se cortó en la 71).
 - CITATION.cff y el README suman Çengel, Boles y Kanoğlu (2019), 9.ª ed., que la
   app cita en casi todas las páginas y no estaba.
+
+Notas de la Fase 10.2 (segundo principio):
+
+- Página /Segundo_Principio (🔁, en el menú después de /Primer_Principio), keys
+  `sp_mode` y por modo `sm_{e}_…` (máquinas: `…_kind`, `…_{kind}_data`,
+  `…_{kind}_perf`, `…_{kind}_{r|c}_{QH|QC|W}`, `…_hasT0`), `sc_{e}_…` (Clausius:
+  `…_n`, `…_T{k}`, `…_{r|c}_Q{k}`), `sk_{e}_…` (Carnot; los datos que dependen de
+  la sustancia llevan `_tag(sub)`) y `sq_{e}_…` (calor: `…_n`, `…_T{k}`). El
+  ambiente es `…_Tamb`: con `…_T0` chocaba con la primera temperatura de la lista
+  (`StreamlitDuplicateElementKey`). Recalcula sola (`st.cache_data`).
+- **Secciones del vademecum, verificadas contra `vademecum.tex`**: §9.1 Clausius
+  (Q > 0 el que el ciclo recibe de la fuente, T absoluta), §9.2 la máquina
+  térmica, §9.2.1 el teorema de Carnot, §9.3 los COP (COP_B = COP_R + 1), §10.1 y
+  §10.2 la entropía y S_gen = ΔS_sist + ΔS_med, §11.5 la exergía de un calor,
+  §11.8 X_dest = T₀·S_gen y §11.10 el η_ex de cada máquina. Çengel y Boles (9.ª
+  ed.): §6-3 y §6-4 las máquinas, §6-7 el ciclo de Carnot, §6-10 y §6-11 las
+  máquinas de Carnot, §7-2 y §7-13 la entropía de un calor, §9-2 y §9-8 el gas
+  ideal y la relación de trabajos, §10-1 y §11-2 el Carnot de vapor.
+- Máquinas: exactamente dos datos de Q_H, Q_C, W y η (o el COP), o uno y
+  «reversible» (cuenta como dato); 0 < η ≤ 1, COP_R > 0 y COP_B ≥ 1 (COP_B = 1 es
+  una resistencia: nota). Las magnitudes son positivas (§9.2): S_gen = −ΣQ/T =
+  Q_C/T_C − Q_H/T_H en la máquina térmica y al revés en las otras dos, y pasa a 0
+  frente a Q_H/T_H + Q_C/T_C. El trabajo perdido es T_amb·S_gen con la fuente de
+  afuera (la fría de la máquina y de la bomba, la caliente del refrigerador); con
+  el T₀ por defecto, η_ex = rendimiento/rendimiento_rev y X_dest = trabajo perdido
+  (test). Una máquina imposible dice a qué temperatura tendría que estar cada
+  fuente, y con Q_C = 0, Kelvin–Planck. Los ejemplos de §6-3 y §6-4 no dan todas
+  las temperaturas: la central entre 600 y 15 °C y la cocina a 25 °C (la
+  descripción lo dice). El libro trabaja con 273 K: COP_B,rev = 11,3 y 3,32 kW
+  en §6-11 (con 273,15 K, 3,31) y 0,191 W/K en la pared de §7-13 (0,190).
+- Valores por defecto al cambiar de máquina: los del ejemplo si es la misma; si
+  no, una máquina posible con el mismo W y el rendimiento a mitad de camino del
+  reversible (COP_B = 1 + (COP_B,rev − 1)/2). Con los calores del ejemplo, una
+  bomba de calor entre las fuentes de la central (600 y 15 °C) era imposible: lo
+  encontró un AppTest.
+- Clausius: W = ΣQ y S_gen = −ΣQ/T; si entrega trabajo, η = W/ΣQ_entra contra
+  1 − T_mín/T_máx; la exergía de los calores es W + X_dest. ΣQ/T = −S_gen se suma
+  0,0 (si no, el export de un ciclo reversible decía −0.0).
+- Ciclo de Carnot: los estados 1 y 2 con T_H y un dato cada uno (p, x o v; x solo
+  en un fluido real), s₂ > s₁ (con un gas, p₂ < p₁), y 3 y 4 con el par (T_C, s).
+  Q_H = m·T_H·(s₂ − s₁), Q_C = m·T_C·(s₂ − s₁) y cada W = Q − ΔU (cilindro) o
+  Q − ΔH (flujo): η = 1 − T_C/T_H con cualquier fluido (test). W pasa a 0 frente a
+  1e-9·max(|Q|, |ΔE|) (CoolProp dejaba −7·10⁻¹⁰ J). Notas: el compresor de una
+  mezcla y la humedad de la turbina (por qué el vapor usa Rankine y la
+  refrigeración, la compresión de vapor), las isotermas del gas ideal y la
+  relación de trabajos. El incompresible no tiene ciclo de Carnot (error).
+- Calor y entropía: cada tramo, S_gen = Q·(1/T_sale − 1/T_entra); la exergía del
+  calor baja tramo a tramo y la diferencia es T₀·S_gen (test). Un calor que sube
+  de temperatura es imposible (Clausius). En la pared de §7-13, T₀ = 0 °C (el
+  aire de afuera).
+- Gráficos (`ui/second_law_charts.py`): la curva del reversible contra la
+  temperatura de la fuente que se mueve (T_H en la máquina térmica, T_C en las
+  otras), la zona imposible en gris (`fill="tonexty"` hasta el tope del eje) y la
+  máquina como un punto azul, o naranja si es imposible; la exergía del calor en
+  barras. Las cascadas y el T–s y el p–v del ciclo de Carnot salen de
+  `ui/balance_charts.py`.
+- LaTeX: 5787 expresiones distintas del procedimiento (los ejemplos y variantes
+  de cada par de datos, máquina, temperaturas, escala y caudal; el Carnot con
+  fluidos y gases; los caminos del calor) y 17 de la teoría, KaTeX estricto,
+  máx. 305 y 221 px. Lo que hizo falta: la temperatura absoluta en su renglón
+  (+ 273,15 o + 459,67); las sumas de Q/T de más de dos términos apiladas; los
+  balances con ×10ⁿ de a un término por renglón (`_rows`); en la teoría, los COP
+  y los calores del Carnot en un `aligned` (con `\qquad` llegaban a 330 y 385 px).
+- Lo que encontraron las capturas del smoke test:
+  - «esta máquina» se cortaba en el borde derecho (la bomba de calor en el
+    Inglés): ahora el rótulo va hacia el lado con lugar;
+  - los nombres de la exergía del calor, en dos renglones y girados, se
+    mezclaban a 390 px: ahora van en renglones de ~11 caracteres, horizontales;
+  - los ejes de las cascadas tenían los prefijos de plotly («80k» junto a kW,
+    «0,8M» junto a J). `value_axis` deja números enteros hasta 10⁶ y potencias de
+    10 fuera de eso; vale también en /Primer_Principio.
+- Smoke test a 390 y 1280 px: los 21 casos (los cuatro modos, todos los ejemplos y
+  el cambio de máquina, en los tres sistemas) con la teoría y el procedimiento
+  abiertos, sin errores ni desbordes. Los tres ejemplos imposibles muestran solo
+  su «Imposible». Después de los arreglos de los gráficos se repitieron las 42
+  corridas con el servidor reiniciado (~17 min, con el pytest completo corriendo
+  en paralelo).
 
 ### Citas y licencias
 

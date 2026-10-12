@@ -24,7 +24,10 @@ abstract: >-
   transformaciones politrópicas, gases reales (factor de compresibilidad,
   Van der Waals, Peng–Robinson, relaciones de Maxwell, Clapeyron y
   Joule–Thomson), balances de energía y de entropía (sistemas cerrados,
-  flujo estacionario y régimen transitorio) y diagramas de fluidos.
+  flujo estacionario y régimen transitorio), el segundo principio (máquinas
+  térmicas, refrigeradores y bombas de calor contra Carnot, la desigualdad
+  de Clausius, el ciclo de Carnot y la entropía generada por un calor) y
+  diagramas de fluidos.
 keywords:
   - thermal-engineering
   - thermodynamics
@@ -58,8 +61,11 @@ keywords:
   - first-law
   - entropy-balance
   - control-volume
+  - second-law
+  - carnot-cycle
+  - clausius-inequality
 license: MIT
-version: "0.28.0"
+version: "0.29.0"
 date-released: "2026-10-11"
 references:
   - type: article

@@ -88,6 +88,28 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   compresor de §5-4 (2,74 kW) cierra la energía pero viola el segundo
   principio: queda como ejemplo. Procedimiento en los tres sistemas (con los
   factores de p·v y de ω²/2 a la vista) y export. _Fase 10.1 cerrada._
+- ✅ **Segundo principio: máquinas, Clausius, Carnot y la entropía del calor**
+  (página `/Segundo_Principio`, vademecum §9, §10 y §11; Çengel y Boles caps. 6
+  y 7). **Máquinas**: una máquina térmica, un refrigerador o una bomba de calor
+  entre dos fuentes, con dos datos (Q_H, Q_C, W y η o el COP) o uno y la máquina
+  reversible: el primer principio da lo que falta y el segundo, el **veredicto**
+  (reversible, irreversible o imposible), con el rendimiento contra el de Carnot,
+  la desigualdad de Clausius, S_gen, el trabajo perdido, X_dest = T₀·S_gen y el
+  rendimiento exergético (§11.10). Un gráfico la ubica contra la curva de la
+  máquina reversible, con la zona imposible. Si la máquina es imposible, dice a
+  qué temperatura tendría que estar cada fuente. **Clausius**: un ciclo con dos a
+  seis fuentes (ΣQ/T ≤ 0). **Ciclo de Carnot** de un fluido real o un gas ideal,
+  en un cilindro o en flujo estacionario (caldera, turbina, condensador y
+  compresor), proceso por proceso, en el T–s y el p–v: η = 1 − T_C/T_H con
+  cualquier fluido. **Calor y entropía**: un calor entre dos fuentes o a través de
+  una pared con sus capas de aire, con la entropía de cada tramo y la exergía del
+  calor a cada temperatura. Reproduce Çengel (η = 37,5 % en la central de 30 MW;
+  COP_R = 3 en la heladera; 8,89 kW en la bomba de calor; η = 67,2 % y
+  Q_C = 163,8 kJ en la máquina de Carnot; COP_R,rev = 12,4 contra los 13,5 del
+  inventor; COP_B,rev = 11,3 y 3,31 kW, el libro 3,32 con 273 K; S_gen = 1,5 y
+  0,167 kJ/K entre dos fuentes; 0,190 W/K en la pared de ladrillo, el libro 0,191
+  con 273 K, y 0,341 W/K con las capas de aire). Procedimiento en los tres sistemas
+  (con las temperaturas absolutas a la vista) y export. _Fase 10.2 cerrada._
 - ✅ **Multifluido + selector global de unidades**: la página de
   Propiedades trabaja con cualquier fluido de `core.fluids.SUPPORTED_FLUIDS`
   (Water, R134a, R410A, R1234yf, NH₃, CO₂, Air y, para el ORC, R-245fa,
@@ -605,7 +627,9 @@ apps/
 │   │   ├── steady_flow.py # dispositivos, cámara de mezcla e intercambiador
 │   │   ├── transient.py   # llenado y vaciado de tanques (∫h·dm)
 │   │   ├── common.py      # el veredicto del segundo principio
-│   │   └── balances_procedure.py  # su procedimiento «como en el pizarrón»
+│   │   ├── balances_procedure.py  # su procedimiento «como en el pizarrón»
+│   │   ├── second_law.py  # máquinas contra Carnot, Clausius, ciclo de Carnot, calor y entropía
+│   │   └── second_law_procedure.py  # su procedimiento «como en el pizarrón»
 │   ├── gases/
 │   │   ├── ideal.py       # gas ideal entre dos estados: c_p constante, medio o NASA; p_r, v_r
 │   │   ├── mixture.py     # mezclas: fracciones, Dalton, Amagat, entropía; mezcla adiabática
@@ -662,7 +686,8 @@ apps/
 │                          # gráficos de la combustión, del poder calorífico, de la
 │                          # exergía (Grassmann), de la transferencia de calor, de la
 │                          # radiación, de los intercambiadores, de los gases
-│                          # ideales y reales y de los balances, créditos
+│                          # ideales y reales, de los balances y del segundo
+│                          # principio, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── data/                  # tablas: ISO 6976, polinomios NASA-9, biomasas (Ghugare),
 │                          # carbones de Argonne con el PCS medido y exergías
@@ -682,7 +707,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.28.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.29.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 La página **ℹ️ Acerca de** de la app arma esta cita y la de todas las fuentes
@@ -1033,8 +1058,9 @@ componente (combustible, producto, destrucción y pérdida):
 ```
 
 **Termodinámica** — el texto de la cátedra: los ejemplos de los ciclos, la
-psicrometría, la combustión, la exergía y los balances de energía y de entropía,
-y la numeración de las secciones que cita la app (9.ª edición):
+psicrometría, la combustión, la exergía, los balances de energía y de entropía y
+el segundo principio, y la numeración de las secciones que cita la app (9.ª
+edición):
 
 ```bibtex
 @book{cengel2019thermodynamics,
