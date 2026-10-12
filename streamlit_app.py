@@ -272,6 +272,7 @@ pages = [
     st.Page("app_pages/12_Ciclo_Combinado.py", title="Ciclo combinado", icon="⚡"),
     st.Page("app_pages/11_Exergia.py", title="Exergía", icon="🔋"),
     st.Page("app_pages/14_Transferencia_de_Calor.py", title="Transferencia de calor", icon="🧱"),
+    st.Page("app_pages/21_Conduccion_Transitoria.py", title="Conducción transitoria", icon="⏱️"),
     st.Page("app_pages/15_Radiacion.py", title="Radiación", icon="☀️"),
     st.Page("app_pages/16_Intercambiadores.py", title="Intercambiadores", icon="🔄"),
     st.Page("app_pages/17_Gases_Ideales.py", title="Gases ideales", icon="🎈"),

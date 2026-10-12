@@ -159,6 +159,37 @@ def test_time_constant_is_63_percent() -> None:
     assert all(b <= a for a, b in zip(Ts, Ts[1:], strict=False))  # se enfría
 
 
+def test_lumped_exact_curve() -> None:
+    """La solución exacta junto a la capacidad concentrada: con Bi chico coinciden; con
+    Bi = 0,89 (la hora de la muerte) el centro queda más caliente que la media."""
+    small = tr.solve_lumped(
+        tr.LumpedInputs("sphere", (0.01,), tr.SOLIDS["copper"], 50.0, 400.0, 300.0, time_s=60.0)
+    )
+    curve = tr.lumped_exact_curve(small)
+    assert curve is not None
+    ts, means, centers = curve
+    assert ts == tr.lumped_curve(small, 80)[0]
+    lumped = tr.lumped_curve(small, 80)[1]
+    assert max(abs(a - b) for a, b in zip(means, lumped, strict=True)) < 0.05
+    big = _lumped("La hora de la muerte (Çengel y Ghajar §4-1)")
+    ts, means, centers = tr.lumped_exact_curve(big) or ([], [], [])
+    assert means[0] == centers[0] == big.inputs.T_i
+    assert all(c >= m - 1e-9 for c, m in zip(centers, means, strict=True))  # se enfría
+    custom = tr.solve_lumped(
+        tr.LumpedInputs("custom", (1e-5, 0.006), tr.SOLIDS["iron"], 20.0, 400.0, 300.0, time_s=5.0)
+    )
+    assert tr.lumped_exact_curve(custom) is None
+
+
+def test_series_terms_are_rounded_up() -> None:
+    """La serie suma una potencia de 2 de términos (las raíces se reusan del cache)."""
+    for tau in (1e-6, 1e-3, 0.05, 0.2, 1.0, 50.0):
+        N = tr._n_terms(tau)
+        assert N == tr._SERIES_MAX or N & (N - 1) == 0
+        lam_N = (N - 1) * math.pi
+        assert N == tr._SERIES_MAX or math.exp(-(lam_N**2) * tau) < 1e-12
+
+
 @pytest.mark.parametrize(
     ("body", "dims", "Lc"),
     [
@@ -316,6 +347,24 @@ def test_contact_temperature() -> None:
     assert 30.0 < wood.T_contact_K - C < 34.0  # cerca de la piel
     same = tr.solve_contact(tr.ContactInputs(tr.SOLIDS["iron"], 400.0, tr.SOLIDS["iron"], 300.0))
     assert same.T_contact_K == pytest.approx(350.0)
+
+
+def test_contact_profiles() -> None:
+    r = tr.solve_contact(tr.CONTACT_EXAMPLES["La mano en aluminio (ejemplo propio)"].inputs)
+    profiles = tr.contact_profiles(r, count=3)
+    assert [p[0] for p in profiles] == pytest.approx([1 / 3, 2 / 3, 1.0])
+    for _t, xa, Ta, xb, Tb in profiles:
+        assert xa[0] == 0.0 and xb[0] == 0.0 and xa[-1] < 0.0 < xb[-1]
+        assert Ta[0] == pytest.approx(r.T_contact_K) and Tb[0] == pytest.approx(r.T_contact_K)
+    _t, xa, Ta, xb, Tb = profiles[-1]
+    # lejos del contacto cada sólido sigue a su temperatura
+    assert Ta[-1] == pytest.approx(r.inputs.T_a, abs=0.05)
+    assert Tb[-1] == pytest.approx(r.inputs.T_b, abs=0.05)
+    # el calor llega mucho más lejos en el aluminio que en la piel
+    assert xb[-1] > 20.0 * abs(xa[-1])
+    # sin tiempo dado, 1 s
+    no_time = tr.solve_contact(tr.ContactInputs(tr.SOLIDS["oak"], 310.0, tr.SOLIDS["iron"], 290.0))
+    assert tr.contact_profiles(no_time, count=1)[0][0] == 1.0
 
 
 # ---------------------------------------------------------------------

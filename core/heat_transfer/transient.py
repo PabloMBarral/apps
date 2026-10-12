@@ -69,10 +69,12 @@ __all__ = [
     "body_volume_area",
     "center_history",
     "coefficient",
+    "contact_profiles",
     "contact_to_dict",
     "eigenvalues",
     "heat_ratio",
     "lumped_curve",
+    "lumped_exact_curve",
     "lumped_to_dict",
     "one_dim_to_dict",
     "product_factors",
@@ -305,11 +307,15 @@ def _heat_weight(geometry: Geometry1D, lam: float) -> float:
 
 
 def _n_terms(tau: float) -> int:
-    """Cuántos términos hacen falta: e^(−λ_N²·τ) < 10⁻¹² con λ_N ≈ (N − 1)·π."""
+    """Cuántos términos hacen falta: e^(−λ_N²·τ) < 10⁻¹² con λ_N ≈ (N − 1)·π.
+
+    Se redondea hacia arriba a una potencia de 2 (como mucho ``_SERIES_MAX``): así una curva
+    en el tiempo reusa las raíces que ya calculó :func:`eigenvalues` (cacheadas por N).
+    """
     if tau <= 0.0:
         return _SERIES_MAX
     need = math.sqrt(-math.log(_SERIES_TOL) / tau) / math.pi + 2.0
-    return int(min(max(need, 1.0), _SERIES_MAX))
+    return int(min(2 ** math.ceil(math.log2(max(need, 1.0))), _SERIES_MAX))
 
 
 def theta(
@@ -585,6 +591,25 @@ def lumped_curve(r: LumpedResult, points: int = 160) -> tuple[list[float], list[
     ts = [t_end * k / (points - 1) for k in range(points)]
     i = r.inputs
     return ts, [i.T_inf + (i.T_i - i.T_inf) * math.exp(-r.b * t) for t in ts]
+
+
+def lumped_exact_curve(
+    r: LumpedResult, points: int = 80
+) -> tuple[list[float], list[float], list[float]] | None:
+    """(t, T media, T del centro) con la solución exacta (§4-2 y §4-4) en los tiempos de
+    :func:`lumped_curve`, para compararla con la capacidad concentrada; ``None`` si el
+    cuerpo no la tiene (V y A a elección)."""
+    if r.inputs.body == "custom":
+        return None
+    ts, _ = lumped_curve(r, points)
+    means, centers = [], []
+    for t in ts:
+        exact = _exact_for_lumped(r.inputs, t)
+        if exact is None:  # pragma: no cover - todos los cuerpos menos «custom» la tienen
+            return None
+        means.append(exact[0])
+        centers.append(exact[1])
+    return ts, means, centers
 
 
 # ---------------------------------------------------------------------
@@ -1142,6 +1167,33 @@ def solve_contact(inputs: ContactInputs) -> ContactResult:
     if inputs.time_s is not None and not inputs.time_s > 0.0:
         raise ValueError("El tiempo tiene que ser positivo.")
     return ContactResult(inputs)
+
+
+def contact_profiles(
+    r: ContactResult, count: int = 3, points: int = 61
+) -> list[tuple[float, list[float], list[float], list[float], list[float]]]:
+    """Los perfiles a los dos lados del contacto a ``count`` tiempos hasta el pedido (1 s si
+    no se dio): [(t, x_A, T_A, x_B, T_B)], con x_A ≤ 0 en A y x_B ≥ 0 en B (en m).
+
+    Cada lado es un semi-infinito con la superficie a T_s:
+    T = T_s + (T_lejos − T_s)·erf(|x|/(2·√(α·t))). Cada uno llega hasta 1,2 veces su
+    penetración al último tiempo (la de un metal es mucho más larga que la de la piel).
+    """
+    i = r.inputs
+    t_end = i.time_s or 1.0
+    Ts = r.T_contact_K
+    reach_a = 1.2 * 2.0 * _ETA_1PCT * math.sqrt(i.solid_a.alpha * t_end)
+    reach_b = 1.2 * 2.0 * _ETA_1PCT * math.sqrt(i.solid_b.alpha * t_end)
+    out = []
+    for k in range(1, count + 1):
+        t = t_end * k / count
+        xa = [-reach_a * j / (points - 1) for j in range(points)]
+        xb = [reach_b * j / (points - 1) for j in range(points)]
+        sa, sb = 2.0 * math.sqrt(i.solid_a.alpha * t), 2.0 * math.sqrt(i.solid_b.alpha * t)
+        Ta = [Ts + (i.T_a - Ts) * float(1.0 - erfc(-x / sa)) for x in xa]
+        Tb = [Ts + (i.T_b - Ts) * float(1.0 - erfc(x / sb)) for x in xb]
+        out.append((t, xa, Ta, xb, Tb))
+    return out
 
 
 # ---------------------------------------------------------------------
