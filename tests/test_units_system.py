@@ -675,3 +675,34 @@ def test_joule_thomson_of_air_in_each_system() -> None:
     assert convert_from_si(mu, "temperature_per_pressure", "Inglés") == pytest.approx(
         0.0273, rel=1e-3
     )
+
+
+@pytest.mark.parametrize("system", ["SI", "Técnico", "Inglés"])
+def test_transient_conduction_units_are_coherent(system: str) -> None:
+    """Fase 11.1: Fo = α·t/L² y h·√(α·t)/k cierran sin factores (el tiempo va en s en los
+    tres sistemas); α = k/(ρ·c) y b = h/(ρ·c·L_c) llevan 1000 en el Técnico (c en
+    kJ/(kg·K)) y 3600 en el Inglés (k y h por hora); Q/A = ρ·c·L·ΔT y Q/L = ρ·c·A·ΔT cierran."""
+
+    def si(value: float, kind: str) -> float:
+        return convert_to_si(value, kind, system)  # type: ignore[arg-type]
+
+    def back(value: float, kind: str) -> float:
+        return convert_from_si(value, kind, system)  # type: ignore[arg-type]
+
+    factor = {"SI": 1.0, "Técnico": 1000.0, "Inglés": 3600.0}[system]
+    k, rho, c = si(1.0, "thermal_conductivity"), si(1.0, "density"), si(1.0, "specific_heat")
+    h, L, t = si(1.0, "heat_transfer_coefficient"), si(1.0, "length"), si(1.0, "time")
+    dT = si(1.0, "temperature_difference")
+    # α = k/(ρ·c): el número que sale de las unidades del sistema, dividido por el factor
+    assert back(k / (rho * c), "diffusivity") == pytest.approx(1.0 / factor, rel=1e-6)
+    # b = h/(ρ·c·L_c) en 1/s
+    assert h / (rho * c * L) * t == pytest.approx(1.0 / factor, rel=1e-6)
+    # Fo y el número de h·√(α·t)/k de la convección en el semi-infinito: adimensionales
+    alpha = si(1.0, "diffusivity")
+    assert alpha * t / L**2 == pytest.approx(1.0)
+    assert h * math.sqrt(alpha * t) / k == pytest.approx(1.0)
+    # Q/A = ρ·c·L·ΔT y Q/L = ρ·c·A·ΔT, y q̇·√(α·t)/k da una diferencia de temperatura
+    assert back(rho * c * L * dT, "energy_per_area") == pytest.approx(1.0)
+    assert back(rho * c * si(1.0, "area") * dT, "energy_per_length") == pytest.approx(1.0)
+    q = si(1.0, "heat_flux")
+    assert back(q * math.sqrt(alpha * t) / k, "temperature_difference") == pytest.approx(1.0)

@@ -52,6 +52,9 @@ temperature_per_press. K/Pa        K/bar          °F/psia
 pressure_per_temp.     Pa/K        bar/K          psia/°R
 volume_per_temperature m³/(kg·K)   m³/(kg·K)      ft³/(lb·°R)
 temperature_per_volume K·kg/m³     K·kg/m³        °R·lb/ft³
+time                   s           s              s
+energy_per_area        J/m²        kJ/m²          Btu/ft²
+energy_per_length      J/m         kJ/m           Btu/ft
 ====================== =========== ============== ============================
 
 ``specific_enthalpy`` también se usa para energía interna, calor latente
@@ -133,6 +136,9 @@ QuantityKind = Literal[
     "pressure_per_temperature",
     "volume_per_temperature",
     "temperature_per_volume",
+    "time",
+    "energy_per_area",
+    "energy_per_length",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -443,6 +449,24 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "K·kg/m³"),
         "Técnico": (1.0, 0.0, "K·kg/m³"),
         "Inglés": (9.0 / 5.0 * _FT3_PER_LB_TO_M3_PER_KG, 0.0, "°R·lb/ft³"),
+    },
+    # Fase 11.1 (conducción transitoria): el tiempo va en s en los tres sistemas, así
+    # Fo = α·t/L² cierra sin factores con α en m²/s o ft²/s; la energía que entra o sale
+    # por unidad de área (una pared, el sólido semi-infinito) o de largo (un cilindro).
+    "time": {
+        "SI": (1.0, 0.0, "s"),
+        "Técnico": (1.0, 0.0, "s"),
+        "Inglés": (1.0, 0.0, "s"),
+    },
+    "energy_per_area": {
+        "SI": (1.0, 0.0, "J/m²"),
+        "Técnico": (1.0e-3, 0.0, "kJ/m²"),
+        "Inglés": (_FT_PER_M**2 / _BTU_IT_J, 0.0, "Btu/ft²"),
+    },
+    "energy_per_length": {
+        "SI": (1.0, 0.0, "J/m"),
+        "Técnico": (1.0e-3, 0.0, "kJ/m"),
+        "Inglés": (_FT_PER_M / _BTU_IT_J, 0.0, "Btu/ft"),
     },
 }
 
