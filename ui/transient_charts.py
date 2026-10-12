@@ -204,7 +204,7 @@ def lumped_figure(r: LumpedResult, *, t_scale: float, t_offset: float, t_unit: s
                 mode="lines+text",
                 name="constante de tiempo 1/b",
                 line={"color": _INK, "width": 1, "dash": "dot"},
-                text=["", "1/b"],
+                text=["1/b", ""],
                 textposition="middle right",
                 showlegend=False,
                 hoverinfo="skip",
@@ -388,7 +388,7 @@ def contact_figure(
         rows=1,
         cols=2,
         shared_yaxes=True,
-        horizontal_spacing=0.04,
+        horizontal_spacing=0.08,
         subplot_titles=(f"A: {i.solid_a.name}", f"B: {i.solid_b.name}"),
     )
     fig.update_annotations(font_size=12)  # los títulos de los paneles
@@ -456,11 +456,17 @@ def contact_figure(
 # ---------------------------------------------------------------------
 
 
-def _axis_title(f: Factor) -> str:
+def _axis_title(factors: tuple[Factor, ...], k: int) -> str:
+    """El rótulo del eje del factor k: x, y o z en las paredes (en orden) y la cara 1, 2 o 3
+    si hay más de un factor semi-infinito (la arista y la esquina)."""
+    f = factors[k]
     if f.kind == "cylinder":
         return "r (desde el eje)"
+    nth = sum(1 for g in factors[:k] if g.kind == f.kind)
     if f.kind == "wall":
-        return "x (desde el plano medio)"
+        return f"{'xyz'[nth]} (desde el plano medio)"
+    if sum(1 for g in factors if g.kind == "semi") > 1:
+        return f"profundidad desde la cara {nth + 1}"
     return "profundidad (desde la cara)"
 
 
@@ -508,7 +514,7 @@ def product_map_figure(
     _layout(
         fig,
         height=400,
-        x_title=f"{_axis_title(f1)} [{x_unit}]",
-        y_title=f"{_axis_title(f2)} [{x_unit}]",
+        x_title=f"{_axis_title(r.inputs.factors, 0)} [{x_unit}]",
+        y_title=f"{_axis_title(r.inputs.factors, 1)} [{x_unit}]",
     )
     return fig

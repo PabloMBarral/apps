@@ -74,6 +74,9 @@ _OTHER = "Otro (k, ρ y c a elección)"
 _T: QuantityKind = "temperature"
 _DT: QuantityKind = "temperature_difference"
 _X: QuantityKind = "small_length"
+#: El semi-infinito va en m o ft: los caños enterrados están a casi un metro y δ llega a
+#: varios metros en meses (en mm se leía «4000»).
+_XL: QuantityKind = "length"
 _H: QuantityKind = "heat_transfer_coefficient"
 _FLUX: QuantityKind = "heat_flux"
 
@@ -166,14 +169,14 @@ def _t_scale(system: UnitSystem) -> tuple[float, float]:
     return convert_from_si(1.0, _T, system) - offset, offset
 
 
-def _chart_units(system: UnitSystem) -> dict[str, Any]:
+def _chart_units(system: UnitSystem, x_kind: QuantityKind = _X) -> dict[str, Any]:
     t_scale, t_offset = _t_scale(system)
     return {
         "t_scale": t_scale,
         "t_offset": t_offset,
         "t_unit": _u(_T, system),
-        "x_scale": convert_from_si(1.0, _X, system),
-        "x_unit": _u(_X, system),
+        "x_scale": convert_from_si(1.0, x_kind, system),
+        "x_unit": _u(x_kind, system),
     }
 
 
@@ -293,9 +296,9 @@ def _temperature(label: str, default_K: float, key: str, help_text: str | None =
     )
 
 
-def _length(label: str, default_m: float, key: str) -> float:
+def _length(label: str, default_m: float, key: str, kind: QuantityKind = _X) -> float:
     return number_input_si(
-        label=label, kind=_X, default_si=default_m, key=key, format="%.5g", min_value_si=0.0
+        label=label, kind=kind, default_si=default_m, key=key, format="%.5g", min_value_si=0.0
     )
 
 
@@ -691,7 +694,8 @@ def _semi(system: UnitSystem) -> None:
         depth = _length(
             "Profundidad x (desde la superficie)",
             0.02 if inp.depth_m is None else inp.depth_m,
-            f"{key}_x",
+            f"{key}_depth",
+            _XL,
         )
     if unknown != _U_t:
         time_s = _time_input("Tiempo t", inp.time_s or 3600.0, f"{key}_t")
@@ -716,7 +720,7 @@ def _render_semi(r: tr.SemiInfiniteResult, system: UnitSystem) -> None:
     i = r.inputs
     items: list[tuple[str, str]] = []
     if i.T_target_K is not None and i.depth_m is None:
-        items.append((f"Profundidad x [{_u(_X, system)}]", _val(r.depth_m, _X, system)))
+        items.append((f"Profundidad x [{_u(_XL, system)}]", _val(r.depth_m, _XL, system)))
     elif i.T_target_K is not None:
         items.append(("Tiempo t", time_label(r.time_s)))
     else:
@@ -729,13 +733,13 @@ def _render_semi(r: tr.SemiInfiniteResult, system: UnitSystem) -> None:
             f"Energía que entró Q/A [{_u('energy_per_area', system)}]",
             _val(r.energy_per_area, "energy_per_area", system),
         ),
-        (f"Penetración δ [{_u(_X, system)}]", _val(r.penetration_m, _X, system)),
+        (f"Penetración δ [{_u(_XL, system)}]", _val(r.penetration_m, _XL, system)),
     ]
     _metric_rows(items)
     _notes(r.notes)
     st.markdown("#### Perfiles de temperatura")
     _chart(
-        semi_infinite_figure(r, **_chart_units(system)),
+        semi_infinite_figure(r, **_chart_units(system, _XL)),
         "ti_profiles",
         "Del más claro al más oscuro, cuatro tiempos hasta el pedido; la línea punteada es la "
         "penetración δ al último.",
@@ -921,7 +925,10 @@ def _render_theory() -> None:
             r"\begin{aligned}\frac{T - T_\infty}{T_i - T_\infty} &= e^{-b\,t} \\ "
             r"b &= \frac{h\,A}{\rho\,V\,c}\end{aligned}"
         )
-        st.latex(r"Q = m\,c\,(T_i - T) \qquad Q_{\text{máx}} = m\,c\,(T_i - T_\infty)")
+        st.latex(
+            r"\begin{aligned}Q &= m\,c\,(T_i - T) \\ "
+            r"Q_{\text{máx}} &= m\,c\,(T_i - T_\infty)\end{aligned}"
+        )
         st.markdown(
             "**Pared, cilindro largo y esfera** (§4-2): con θ = (T − T∞)/(T_i − T∞), "
             "ξ = x/L (o r/r₀), Bi = h·L/k y el número de Fourier τ = α·t/L², la solución es una "
@@ -950,11 +957,11 @@ def _render_theory() -> None:
         )
         st.markdown("El calor, como fracción del máximo (con θ₀ de un término):")
         st.latex(
-            r"\begin{aligned}\text{pared: } &\frac{Q}{Q_{\text{máx}}} = "
+            r"\begin{aligned}&\text{pared:} \\ &\frac{Q}{Q_{\text{máx}}} = "
             r"1 - \theta_0\,\frac{\sin\lambda_1}{\lambda_1} \\ "
-            r"\text{cilindro: } &\frac{Q}{Q_{\text{máx}}} = "
+            r"&\text{cilindro:} \\ &\frac{Q}{Q_{\text{máx}}} = "
             r"1 - 2\,\theta_0\,\frac{J_1(\lambda_1)}{\lambda_1} \\ "
-            r"\text{esfera: } &\frac{Q}{Q_{\text{máx}}} = "
+            r"&\text{esfera:} \\ &\frac{Q}{Q_{\text{máx}}} = "
             r"1 - 3\,\theta_0\,\frac{\sin\lambda_1 - \lambda_1\cos\lambda_1}{\lambda_1^3}"
             r"\end{aligned}"
         )
@@ -969,7 +976,7 @@ def _render_theory() -> None:
             r"\end{aligned}"
         )
         st.latex(
-            r"\begin{aligned}\frac{T - T_i}{T_\infty - T_i} &= \operatorname{erfc}(\eta) \\ "
+            r"\begin{aligned}&\frac{T - T_i}{T_\infty - T_i} = \operatorname{erfc}(\eta) \\ "
             r"&\quad - e^{\frac{h\,x}{k} + \frac{h^2 \alpha t}{k^2}}\,"
             r"\operatorname{erfc}\left(\eta + \frac{h\sqrt{\alpha t}}{k}\right)\end{aligned}"
         )

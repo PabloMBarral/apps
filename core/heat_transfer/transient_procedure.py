@@ -1500,7 +1500,9 @@ def _langston(ratios: list[str]) -> tuple[str, _Pack]:
     terms = [("+", rf"{q2} \cdot (1 - {q1})")]
     formula = r"q_1 + q_2\,(1 - q_1)"
     if len(ratios) == 3:
-        terms.append(("+", rf"{ratios[2]} \cdot (1 - {q1}) \cdot (1 - {q2})"))
+        # el tercer término en dos piezas: el último factor pasa al renglón siguiente si no
+        # entra
+        terms += [("+", rf"{ratios[2]} \cdot (1 - {q1})"), (r"\cdot", f"(1 - {q2})")]
         formula += r" \\ &\quad + q_3\,(1 - q_1)(1 - q_2)"
     return formula, _Pack(q1, tuple(terms))
 

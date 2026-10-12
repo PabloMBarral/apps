@@ -208,10 +208,28 @@ def test_every_semi_infinite_example(name: str) -> None:
     _no_problems(at)
     r = tr.solve_semi_infinite(tr.SEMI_INFINITE_EXAMPLES[name].inputs)
     if r.inputs.T_target_K is not None and r.inputs.depth_m is None:
-        assert _metric(at, "Profundidad x") == pytest.approx(r.depth_m * 1000.0, rel=1e-4)
+        assert _metric(at, "Profundidad x [m]") == pytest.approx(r.depth_m, rel=1e-4)
     else:
         assert _metric(at, "T en x y t") == pytest.approx(r.T_K - C, abs=0.01)
     assert len(at.get("plotly_chart")) == 1
+
+
+def test_semi_infinite_lengths_in_m_or_ft() -> None:
+    """El semi-infinito va en m o ft (δ llega a metros en meses); el contacto, en mm o in."""
+    at = _mode(_app(), M_SEMI)
+    name = "Caños de agua enterrados (Çengel y Ghajar §4-3)"
+    at.selectbox(key="ti_example").set_value(name).run()
+    r = tr.solve_semi_infinite(tr.SEMI_INFINITE_EXAMPLES[name].inputs)
+    assert _metric(at, "Profundidad x [m]") == pytest.approx(0.80, abs=0.005)
+    assert _metric(at, "Penetración δ [m]") == pytest.approx(r.penetration_m, rel=1e-4)
+    fig = at.get("plotly_chart")[0].proto.spec
+    assert "[m]" in fig and "[mm]" not in fig
+    _system(at, "Inglés")
+    _no_problems(at)
+    assert _metric(at, "Penetración δ [ft]") == pytest.approx(r.penetration_m / 0.3048, rel=1e-4)
+    at.radio(key="ti_what").set_value(W_CONTACT).run()
+    _no_problems(at)
+    assert "[in]" in at.get("plotly_chart")[0].proto.spec
 
 
 @pytest.mark.parametrize("boundary", list(tr.SEMI_BOUNDARIES))

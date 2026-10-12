@@ -19,8 +19,9 @@ abstract: >-
   propiedades termofísicas, interpolación lineal y doble, rendimientos
   isoentrópicos, ciclos termodinámicos, estequiometría y combustión,
   poder calorífico por composición última/próxima y por ISO 6976,
-  exergía, psicrometría, transferencia de calor (conducción, aletas,
-  convección, radiación e intercambiadores), gases ideales y sus mezclas,
+  exergía, psicrometría, transferencia de calor (conducción estacionaria y
+  transitoria, aletas, convección, radiación e intercambiadores), gases
+  ideales y sus mezclas,
   transformaciones politrópicas, gases reales (factor de compresibilidad,
   Van der Waals, Peng–Robinson, relaciones de Maxwell, Clapeyron y
   Joule–Thomson), balances de energía y de entropía (sistemas cerrados,
@@ -64,9 +65,11 @@ keywords:
   - second-law
   - carnot-cycle
   - clausius-inequality
+  - transient-conduction
+  - lumped-capacitance
 license: MIT
-version: "0.29.0"
-date-released: "2026-10-11"
+version: "0.30.0"
+date-released: "2026-10-12"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"
@@ -824,6 +827,44 @@ references:
     publisher:
       name: "McGraw-Hill"
     year: 1967
+  - type: article
+    scope: "Conducción transitoria: la solución de un término (los gráficos de Heisler)"
+    authors:
+      - family-names: "Heisler"
+        given-names: "M. P."
+    title: "Temperature charts for induction and constant-temperature heating"
+    journal: "Transactions of the ASME"
+    year: 1947
+    volume: 69
+    start: 227
+    end: 236
+  - type: book
+    scope: "Conducción transitoria: el sólido semi-infinito y el contacto de dos sólidos"
+    authors:
+      - family-names: "Carslaw"
+        given-names: "H. S."
+      - family-names: "Jaeger"
+        given-names: "J. C."
+    title: "Conduction of Heat in Solids"
+    edition: "2"
+    publisher:
+      name: "Clarendon Press"
+      city: "Oxford"
+    year: 1959
+  - type: article
+    scope: "Conducción transitoria: Q/Q_máx de un cuerpo de varias dimensiones (regla de Langston)"
+    authors:
+      - family-names: "Langston"
+        given-names: "L. S."
+    title: >-
+      Heat transfer from multidimensional objects using one-dimensional
+      solutions for heat loss
+    journal: "International Journal of Heat and Mass Transfer"
+    year: 1982
+    volume: 25
+    issue: 1
+    start: 149
+    end: 150
   - type: article
     scope: "Intercambiadores: el factor de corrección F de la ΔT media logarítmica"
     authors:

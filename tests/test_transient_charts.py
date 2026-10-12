@@ -137,3 +137,34 @@ def test_product_map_with_a_semi_infinite_factor() -> None:
     assert fig is not None
     assert fig.layout.yaxis.title.text == "profundidad (desde la cara) [mm]"
     assert fig.data[1].y[0] == pytest.approx(150.0)
+
+
+def test_product_map_axis_names() -> None:
+    """La barra y el ladrillo van en x e y; la arista, en la cara 1 y la cara 2."""
+    r = tr.solve_product(tr.PRODUCT_EXAMPLES["Ladrillo que se enfría (ejemplo propio)"].inputs)
+    fig = tc.product_map_figure(r, **ENG_X)
+    assert fig is not None
+    assert fig.layout.xaxis.title.text == "x (desde el plano medio) [in]"
+    assert fig.layout.yaxis.title.text == "y (desde el plano medio) [in]"
+    edge = tr.ProductInputs(
+        "quarter",
+        (tr.Factor("semi", None, 0.01), tr.Factor("semi", None, 0.02)),
+        tr.SOLIDS["iron"],
+        50.0,
+        300.0 + C,
+        20.0 + C,
+        600.0,
+    )
+    fig = tc.product_map_figure(tr.solve_product(edge), **TEC_X)
+    assert fig is not None
+    assert fig.layout.xaxis.title.text == "profundidad desde la cara 1 [mm]"
+    assert fig.layout.yaxis.title.text == "profundidad desde la cara 2 [mm]"
+    assert (fig.data[1].x[0], fig.data[1].y[0]) == pytest.approx((10.0, 20.0))
+
+
+def test_lumped_time_constant_label_is_at_the_top() -> None:
+    """El rótulo 1/b va arriba de la línea punteada (abajo pisaba la curva)."""
+    r = tr.solve_lumped(tr.LUMPED_EXAMPLES["La hora de la muerte (Çengel y Ghajar §4-1)"].inputs)
+    line = next(t for t in tc.lumped_figure(r, **TEC).data if t.name == "constante de tiempo 1/b")
+    assert list(line.text) == ["1/b", ""]
+    assert line.y[0] == pytest.approx(r.inputs.T_i - C)

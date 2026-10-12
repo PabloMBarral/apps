@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.29.0` — Fase 10.2, segundo principio (2026-10-11).
+> **Versión actual**: `0.30.0` — Fase 11.1, conducción transitoria (2026-10-12).
 
 ---
 
@@ -1818,6 +1818,89 @@
     reiniciado.
 - **Dependencias**: ninguna nueva.
 
+### Fase 11.1 — Conducción transitoria
+- **Versión**: `0.30.0` (2026-10-12). Rama `claude/water-state-analyzer-f4fiev`.
+  La primera mitad de la Fase 11 (el plan aprobado: 11.1 = conducción
+  transitoria; 11.2 = ebullición y condensación).
+- **Scope**:
+  - **Unidades nuevas**: el tiempo (s en los tres sistemas), la energía por
+    unidad de área (J/m² | kJ/m² | Btu/ft²) y por unidad de largo (J/m | kJ/m |
+    Btu/ft).
+  - **`core/heat_transfer/transient.py`** (nuevo):
+    - la tabla de sólidos a 300 K (Incropera, tablas A.1 y A.3);
+    - `solve_lumped`: la capacidad concentrada con siete cuerpos, la temperatura
+      a un tiempo o el tiempo hasta una temperatura, el calor y la solución
+      exacta al lado (`lumped_exact_curve`);
+    - `eigenvalues`, `coefficient`, `theta`, `heat_ratio` y
+      `solve_one_dimensional`: la serie de la pared, el cilindro y la esfera
+      (los términos que hagan falta, redondeados a una potencia de 2 para reusar
+      las raíces) y la solución de un término; el tiempo hasta una temperatura
+      del centro;
+    - `solve_semi_infinite` con la superficie a T_s, un flujo o convección, y la
+      temperatura, la profundidad o el tiempo como incógnita (`brentq` para las
+      inversas); `solve_contact` y `contact_profiles`;
+    - `solve_product` con siete formas y la regla de Langston; `product_map`;
+    - ejemplos y export.
+  - `transient_procedure.py`: los cuatro procedimientos en los tres sistemas, con
+    los factores 1000 y 3600 de α y de b a la vista. Los renglones con números se
+    parten con un estimador del ancho que tiene en cuenta el lado izquierdo
+    (`_vis`, `_Pack`, `_chain`).
+  - **`ui/transient_charts.py`** (nuevo): T(t) con la constante de tiempo y la
+    solución exacta, los perfiles a varios tiempos, la historia del centro con
+    τ = 0,2 marcado, el semi-infinito con la penetración, el contacto en dos
+    paneles y el mapa de temperatura del producto.
+  - **Página `/Conduccion_Transitoria` (⏱️)**, en el menú después de
+    Transferencia de calor: la teoría (el vademecum no tiene el capítulo), el
+    procedimiento, el export y el tiempo en s, min, h o días.
+- **Validación**, contra Çengel y Ghajar (2015, cap. 4) e Incropera (2007,
+  cap. 5):
+  - §4-1: la termocupla, 9,94 s (el libro, 10 s); la hora de la muerte, 12,2 h.
+    Con Bi = 0,89 la solución exacta da 27,4 °C de media y 30,9 °C en el centro.
+  - §4-2: el huevo, 927,5 s con la serie y 928,8 s con un término (el libro,
+    933 s: redondea θ₀); las placas de latón, 279,8 °C (279 °C); el eje, 364,1 °C
+    y 30 124 kJ/m (364 °C y 30 120 kJ); los bifes, 2166 s, con la superficie a
+    35,0 °F cuando el centro llega a 45 °F.
+  - §4-3: los caños a 0,80 m; la madera al sol, 148,6 °C, y el aluminio, 22,0 °C.
+  - §4-4: el cilindro corto de latón, 62,7 °C en el centro y 176,5 kJ.
+  - Incropera: la termocupla de 1 s, D = 0,706 mm y 5,2 s; el caño a 0,68 m.
+  - Identidades: las raíces y A₁ de la tabla 4-2; θ = 1 al principio; Q/Q_máx
+    contra la integral del perfil; la capacidad concentrada contra la exacta con
+    Bi chico; la pared gruesa contra el semi-infinito a tiempos cortos; la
+    convección con h → ∞ contra la superficie a T_s; las inversas de ida y
+    vuelta; la regla de Langston con un factor.
+- **Detectado**:
+  - La primera versión del procedimiento tenía 1899 ecuaciones de más de 324 px
+    (de 11 496): los números ×10ⁿ de los tiempos largos (θ de 10⁻²⁰⁰) y las
+    raíces chicas. La teoría tenía 3.
+  - Los términos de la serie que caen por debajo del menor float se muestran con
+    su exponente (10⁻⁶¹⁵) en vez de 0.
+  - En la esfera, la resta s₁ = sin λ₁ − λ₁·cos λ₁ pierde cifras con λ chico:
+    sale de la serie de Taylor.
+  - Una curva en el tiempo recalculaba las raíces con cada N distinto (0,48 s);
+    con N redondeado a una potencia de 2, 0,06 s.
+  - La profundidad 0 (la superficie) del ejemplo de la madera se reemplazaba por
+    2 cm (un `or` en la página; lo encontró un AppTest).
+- **Mensajes al alumno**: propiedades o h que no son positivos, la temperatura
+  inicial igual a la del fluido (no hay transitorio), una temperatura buscada
+  fuera del rango entre T_i y T∞, un tiempo negativo, una posición fuera de 0 a 1
+  y una temperatura que la superficie todavía no alcanzó.
+- **Tests**: 276 nuevos, sin warnings.
+  - `tests/test_transient.py` (108), `tests/test_transient_procedure.py` (93),
+    `tests/test_transient_charts.py` (15) y `tests/test_page_conduccion_transitoria.py`
+    (60, AppTest).
+  - LaTeX: 11 546 expresiones distintas del procedimiento y 15 de la teoría validan
+    con KaTeX estricto y entran en 321 y 283 px como máximo en los tres sistemas.
+  - Smoke test en Chromium a 390 y 1280 px de los 18 casos (los cuatro modos y sus
+    ejemplos, en los tres sistemas), con la teoría y el procedimiento abiertos: sin
+    errores, sin desbordes y sin ecuaciones que se pasen de su expansor. Las capturas
+    encontraron cuatro detalles de los gráficos: el semi-infinito en mm llegaba a
+    «4000» (pasó a m o ft, como el procedimiento), los dos ejes del mapa de la barra
+    decían «x» (ahora x e y; la arista y la esquina, cara 1 y cara 2), el rótulo
+    «1/b» pisaba la curva (va arriba) y los dos ceros de los paneles del contacto se
+    tocaban (más separación). Después de los arreglos se repitieron las 18 corridas
+    afectadas con el servidor reiniciado.
+- **Dependencias**: ninguna nueva (scipy ya trae erf, erfcx, j0 y j1).
+
 ---
 
 ## Pendientes / próximas fases
@@ -1886,10 +1969,11 @@
   cada componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Transferencia de calor (continuación)**: conducción transitoria (capacidad
-  concentrada, solución de un término), conducción bidimensional (factores de
-  forma), generación interna, bancos de tubos, ebullición y condensación,
-  aletas de perfil variable; radiación de gases (CO₂ y H₂O, gráficos de Hottel)
+- **Transferencia de calor (continuación)**: ebullición y condensación (Fase
+  11.2, con el plan aprobado), conducción bidimensional (factores de forma) y
+  transitoria por diferencias finitas (generación interna, bordes que cambian
+  en el tiempo, cuerpos de dos materiales), bancos de tubos, aletas de perfil
+  variable; radiación de gases (CO₂ y H₂O, gráficos de Hottel)
   e intensidad direccional; intercambiadores compactos (j de Colburn), la caída
   de presión del casco (Kern, Bell–Delaware), el U armado con las
   correlaciones de la 8.1 y la selección económica.
