@@ -344,7 +344,7 @@ def h_cascade_figure(
         step = h * (J - 1.0)
         h *= J
         peak = max(peak, h)
-        labels.append(name)
+        labels.append(name.replace(" (", "<br>("))  # en dos renglones: a 390 px se giraban
         values.append(step * h_scale)
         texts.append(f"×{_comma(J, '.3g')}")
         hovers.append(f"{name} = {_comma(J, '.4g')}: {_bar_text(step * h_scale)} {h_unit}")

@@ -158,7 +158,7 @@ def test_h_cascade_goes_from_the_ideal_bank_to_h_o() -> None:
     fig = h_cascade_figure(bd.h_ideal_W_per_m2K, factors, h_scale=1.0, h_unit="W/(m²·K)")
     w = fig.data[0]
     # J_s y J_r valen 1 (extremos iguales, turbulento): no aparecen
-    assert list(w.x) == ["h ideal", "J_c", "J_l", "J_b", "h_o"]
+    assert list(w.x) == ["h ideal", "J_c", "J_l", "J_b", "h_o"]  # sin paréntesis: un renglón
     assert list(w.measure) == ["absolute", "relative", "relative", "relative", "total"]
     assert w.y[0] == pytest.approx(bd.h_ideal_W_per_m2K)
     assert w.y[-1] == pytest.approx(bd.h_W_per_m2K)
@@ -171,6 +171,10 @@ def test_h_cascade_goes_from_the_ideal_bank_to_h_o() -> None:
     # en otro sistema: la escala
     fig = h_cascade_figure(bd.h_ideal_W_per_m2K, factors, h_scale=0.1761, h_unit="Btu")
     assert fig.data[0].y[-1] == pytest.approx(0.1761 * bd.h_W_per_m2K)
+    # los nombres con su explicación van en dos renglones (a 390 px se giraban)
+    fig = h_cascade_figure(1000.0, [("J_l (fugas)", 0.5)], h_scale=1.0, h_unit="W/(m²·K)")
+    assert list(fig.data[0].x) == ["h ideal", "J_l<br>(fugas)", "h_o"]
+    assert fig.data[0].hovertext[1].startswith("J_l (fugas) = 0,5:")
 
 
 def test_dp_zones_ideal_next_to_real() -> None:

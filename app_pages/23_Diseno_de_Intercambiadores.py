@@ -1657,7 +1657,9 @@ def _render_bell_delaware(r: stt.ShellTubeResult, system: UnitSystem) -> None:
         "ik_baffles",
         "De D_s/5 a D_s, con N_b = L/B − 1 y los extremos como en los datos. Los dos métodos "
         "ven el mismo compromiso (bafles más juntos: más h_o y mucho más Δp), pero Kern no "
-        "descuenta las fugas ni el bypass.",
+        "descuenta las fugas ni el bypass. Los quiebres de Bell–Delaware vienen de las tablas: "
+        "la de Taborek salta en Re = 10⁴ a 90° y en 10³ a 45°, y TEMA achica L_tb cuando el "
+        "tramo sin apoyo de un tubo (2·B) pasa de 36″ (914 mm).",
     )
     st.markdown("#### h_o y Δp contra el corte de los bafles")
     pts = _cut_sweep_cached(i)
