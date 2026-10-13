@@ -157,8 +157,10 @@ def _ctp(passes: int) -> float:
 def estimate_tube_count(D_s_m: float, P_T_m: float, layout: Layout, passes: int) -> int:
     """N_t = 0,785·(CTP/CL)·D_s²/P_T² (Kakaç y Liu, 2002, cap. 8): CTP = 0,93, 0,90 o 0,85
     con 1, 2 o más pasos por los tubos (lo que ocupan las divisiones de los pasos), CL = 0,87
-    triangular y 1 cuadrado (el área de la celda del arreglo es CL·P_T²)."""
-    return int(0.785 * (_ctp(passes) / _CL[layout]) * D_s_m**2 / P_T_m**2)
+    triangular y 1 cuadrado (el área de la celda del arreglo es CL·P_T²). Se redondea hacia
+    abajo a un múltiplo de los pasos, para que cada paso lleve los mismos tubos."""
+    n = int(0.785 * (_ctp(passes) / _CL[layout]) * D_s_m**2 / P_T_m**2)
+    return n - n % passes
 
 
 def kern_equivalent_diameter(d_o_m: float, P_T_m: float, layout: Layout) -> float:
@@ -497,8 +499,8 @@ def solve_shell_tube(inputs: ShellTubeInputs) -> ShellTubeResult:
             "en el casco",
         )
         U_D = u.UA_W_per_K / (math.pi * i.d_o_m)
-        hot = Stream("caliente", i.hot.T_in_K, i.hot.m_dot_kg_s, props_h.cp_J_per_kgK)
-        cold = Stream("frío", i.cold.T_in_K, i.cold.m_dot_kg_s, props_c.cp_J_per_kgK)
+        hot = Stream(stream_name(i.hot), i.hot.T_in_K, i.hot.m_dot_kg_s, props_h.cp_J_per_kgK)
+        cold = Stream(stream_name(i.cold), i.cold.T_in_K, i.cold.m_dot_kg_s, props_c.cp_J_per_kgK)
         if check:
             result = solve_sizing(
                 SizingInputs(arrangement, hot, cold, U_D, i.target, i.target_value, T0_K=i.T0_K)
@@ -615,6 +617,13 @@ def shell_tube_notes(r: ShellTubeResult) -> list[str]:
         notes.append(
             f"N_t = {r.N_t} sale de D_s con la estimación de Kakaç y Liu "
             "(CTP y CL: lo que ocupan las divisiones de los pasos y el arreglo)."
+        )
+    elif r.N_t % i.tube_passes:
+        per_pass = r.N_t // i.tube_passes
+        notes.append(
+            f"{r.N_t} tubos no se reparten igual entre {i.tube_passes} pasos: unos llevan "
+            f"{per_pass} y otros {per_pass + 1}. El cálculo usa el promedio, "
+            f"{_num(r.N_t / i.tube_passes)} tubos por paso."
         )
     if i.problem == "check":
         Rd, Rreq = r.R_d_available, r.R_d_required

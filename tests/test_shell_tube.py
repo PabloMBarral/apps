@@ -52,9 +52,12 @@ def test_equivalent_diameters() -> None:
 
 
 def test_tube_count_estimate() -> None:
-    # N_t = 0,785·(CTP/CL)·D_s²/P_T² (Kakaç y Liu)
+    # N_t = 0,785·(CTP/CL)·D_s²/P_T² (Kakaç y Liu), hacia abajo a un múltiplo de los pasos
     n = estimate_tube_count(0.584, 0.0254, "square", 2)
-    assert n == int(0.785 * 0.90 / 1.0 * 0.584**2 / 0.0254**2)
+    raw = int(0.785 * 0.90 / 1.0 * 0.584**2 / 0.0254**2)
+    assert raw % 2 == 1 and n == raw - 1
+    for passes in (1, 2, 4, 6, 8):
+        assert estimate_tube_count(0.584, 0.0254, "triangular", passes) % passes == 0
     assert estimate_tube_count(0.584, 0.0254, "square", 1) > n
     assert estimate_tube_count(0.584, 0.0254, "triangular", 2) > n
     assert estimate_tube_count(0.584, 0.0254, "square", 4) < n
@@ -140,6 +143,13 @@ def test_rating_after_check_gives_the_target() -> None:
     L_req = r.length_required_m
     rated = solve_shell_tube(replace(KEROSENE, problem="rating", L_m=L_req))
     assert rated.T_hot_out_K == pytest.approx(50.0 + C, abs=1e-4)
+
+
+def test_uneven_tubes_per_pass_note() -> None:
+    r = solve_shell_tube(replace(WATER, tube_count=301, tube_passes=2))
+    assert any("no se reparten igual" in n for n in shell_tube_notes(r))
+    r = solve_shell_tube(replace(WATER, tube_count=300, tube_passes=2))
+    assert not any("no se reparten igual" in n for n in shell_tube_notes(r))
 
 
 def test_one_tube_pass_is_counterflow() -> None:

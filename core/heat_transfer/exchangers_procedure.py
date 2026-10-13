@@ -22,7 +22,13 @@ from core.latex import latex_chain, latex_is_wide, latex_number, latex_paren
 from core.state_report import ProcedureStep
 from core.units_system import UnitSystem, convert_from_si, unit_label
 
-__all__ = ["EPS_FORMULAS", "NTU_FORMULAS", "exchanger_steps", "overall_u_steps"]
+__all__ = [
+    "EPS_FORMULAS",
+    "NTU_FORMULAS",
+    "effectiveness_steps",
+    "exchanger_steps",
+    "overall_u_steps",
+]
 
 _T = "temperature"
 _TA = "absolute_temperature"
@@ -897,14 +903,19 @@ def _test_steps(r: ExchangerResult, system: UnitSystem) -> list[ProcedureStep]:
     ]
 
 
+def effectiveness_steps(result: ExchangerResult, system: UnitSystem) -> list[ProcedureStep]:
+    """Los pasos de ε-NTU y la LMTD, sin numerar y sin la exergía (los usa el diseño de los
+    intercambiadores de la Fase 12.1, que antepone el cálculo del U)."""
+    if isinstance(result.inputs, RatingInputs):
+        return _rating_steps(result, system)
+    if isinstance(result.inputs, SizingInputs):
+        return _sizing_steps(result, system)
+    return _test_steps(result, system)
+
+
 def exchanger_steps(result: ExchangerResult, system: UnitSystem) -> list[ProcedureStep]:
     """Los pasos del problema resuelto (verificación, dimensionamiento o ensayo)."""
-    if isinstance(result.inputs, RatingInputs):
-        steps = _rating_steps(result, system)
-    elif isinstance(result.inputs, SizingInputs):
-        steps = _sizing_steps(result, system)
-    else:
-        steps = _test_steps(result, system)
+    steps = effectiveness_steps(result, system)
     ex_lines, ex_text = _exergy_lines(result, system)
     steps.append(ProcedureStep("Exergía", ex_text, tuple(ex_lines)))
     return numbered([s for s in steps if s.latex or s.text])

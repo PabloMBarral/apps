@@ -199,10 +199,16 @@ def test_notes() -> None:
 def test_pressure_drops() -> None:
     r = solve_double_pipe(PROCESS)
     t, p = r.tube, r.tube_props
+    # con el largo instalado, las horquillas enteras (Kern), no con el necesario
+    assert r.L_installed_m > r.L_m
     assert r.dp_tube_Pa == pytest.approx(
-        darcy_f(t.Re) * r.L_m / PROCESS.d_i_m * p.rho_kg_per_m3 * t.velocity_m_s**2 / 2
+        darcy_f(t.Re) * r.L_installed_m / PROCESS.d_i_m * p.rho_kg_per_m3 * t.velocity_m_s**2 / 2
     )
-    assert r.dp_annulus_Pa > 0 and r.dp_returns_Pa > 0
+    a, pa = r.annulus, r.annulus_props
+    assert r.dp_annulus_Pa == pytest.approx(
+        a.f * r.L_installed_m / a.D_h_m * pa.rho_kg_per_m3 * a.velocity_m_s**2 / 2
+    )
+    assert r.dp_returns_Pa == pytest.approx(r.hairpins * pa.rho_kg_per_m3 * a.velocity_m_s**2 / 2)
 
 
 # ---------------------------------------------------------------------

@@ -325,13 +325,15 @@ class DoublePipeResult:
 
     @property
     def dp_tube_Pa(self) -> float:
+        """Por fricción en el largo instalado (Kern, 1950, cap. 6: el equipo que se pone)."""
         t, p = self.tube, self.tube_props
-        return t.f * (self.L_m / t.D_h_m) * p.rho_kg_per_m3 * t.velocity_m_s**2 / 2.0
+        return t.f * (self.L_installed_m / t.D_h_m) * p.rho_kg_per_m3 * t.velocity_m_s**2 / 2.0
 
     @property
     def dp_annulus_Pa(self) -> float:
+        """Por fricción en el largo instalado, como el del tubo."""
         a, p = self.annulus, self.annulus_props
-        return a.f * (self.L_m / a.D_h_m) * p.rho_kg_per_m3 * a.velocity_m_s**2 / 2.0
+        return a.f * (self.L_installed_m / a.D_h_m) * p.rho_kg_per_m3 * a.velocity_m_s**2 / 2.0
 
     @property
     def dp_returns_Pa(self) -> float:
@@ -446,8 +448,8 @@ def solve_double_pipe(inputs: DoublePipeInputs) -> DoublePipeResult:
             "en el anular",
         )
         U_o = u.UA_W_per_K / (math.pi * i.d_o_m)
-        hot = Stream("caliente", i.hot.T_in_K, i.hot.m_dot_kg_s, props_h.cp_J_per_kgK)
-        cold = Stream("frío", i.cold.T_in_K, i.cold.m_dot_kg_s, props_c.cp_J_per_kgK)
+        hot = Stream(stream_name(i.hot), i.hot.T_in_K, i.hot.m_dot_kg_s, props_h.cp_J_per_kgK)
+        cold = Stream(stream_name(i.cold), i.cold.T_in_K, i.cold.m_dot_kg_s, props_c.cp_J_per_kgK)
         if i.problem == "sizing":
             result = solve_sizing(
                 SizingInputs(arrangement, hot, cold, U_o, i.target, i.target_value, T0_K=i.T0_K)
