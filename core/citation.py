@@ -257,6 +257,12 @@ DATA_SOURCES: tuple[DataSource, ...] = (
         "(data/ChemEx) y la tabla A-26 de Moran y Shapiro",
         "MIT (TESPy)",
     ),
+    DataSource(
+        "data/zukauskas_tube_bank_friction.csv",
+        "Gráficos de f y χ del banco de tubos de Zukauskas (1972), digitalizados en la "
+        "biblioteca ht 1.2.0 (scripts/sample_zukauskas.py)",
+        "MIT (data/LICENSE-ht.txt)",
+    ),
 )
 
 #: Las librerías de ``requirements.txt`` (sin las de desarrollo) y para qué se usan.

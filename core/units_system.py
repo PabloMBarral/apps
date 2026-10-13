@@ -55,6 +55,9 @@ temperature_per_volume K·kg/m³     K·kg/m³        °R·lb/ft³
 time                   s           s              s
 energy_per_area        J/m²        kJ/m²          Btu/ft²
 energy_per_length      J/m         kJ/m           Btu/ft
+surface_tension        N/m         N/m            lbf/ft
+mass_flux              kg/(m²·s)   kg/(m²·s)      lb/(s·ft²)
+pressure_loss          Pa          kPa            psi
 ====================== =========== ============== ============================
 
 ``specific_enthalpy`` también se usa para energía interna, calor latente
@@ -140,6 +143,8 @@ QuantityKind = Literal[
     "energy_per_area",
     "energy_per_length",
     "surface_tension",
+    "mass_flux",
+    "pressure_loss",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -477,6 +482,20 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "N/m"),
         "Técnico": (1.0, 0.0, "N/m"),
         "Inglés": (_FT_PER_M / _LBF_N, 0.0, "lbf/ft"),
+    },
+    # Fase 12.1 (diseño de intercambiadores). G = ṁ/A en lb/(s·ft²) en el Inglés
+    # (Kern usa lb/(h·ft²)): con μ en lb/(ft·s), Re = G·D/μ cierra sin factores. La
+    # caída de presión de un intercambiador en kPa o psi, como Kern (el banco de
+    # tubos, con el aire, sigue en ``pressure_drop``).
+    "mass_flux": {
+        "SI": (1.0, 0.0, "kg/(m²·s)"),
+        "Técnico": (1.0, 0.0, "kg/(m²·s)"),
+        "Inglés": (_FT_PER_M**2 / _LB_PER_KG, 0.0, "lb/(s·ft²)"),
+    },
+    "pressure_loss": {
+        "SI": (1.0, 0.0, "Pa"),
+        "Técnico": (1.0e-3, 0.0, "kPa"),
+        "Inglés": (1.0 / _PSI_PER_PA, 0.0, "psi"),
     },
 }
 

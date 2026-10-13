@@ -63,6 +63,8 @@ _KINDS = (
     "entropy_flow",
     "molar_mass",
     "amount",
+    "mass_flux",
+    "pressure_loss",
 )
 
 
@@ -171,6 +173,12 @@ class TestUnitLabels:
             ("molar_mass", "Inglés", "lb/lbmol"),
             ("amount", "Técnico", "kmol"),
             ("amount", "Inglés", "lbmol"),
+            ("mass_flux", "SI", "kg/(m²·s)"),
+            ("mass_flux", "Inglés", "lb/(s·ft²)"),
+            ("pressure_loss", "SI", "Pa"),
+            ("pressure_loss", "Técnico", "kPa"),
+            ("pressure_loss", "Inglés", "psi"),
+            ("surface_tension", "Inglés", "lbf/ft"),
         ],
     )
     def test_label(self, kind: str, system: str, expected: str) -> None:
@@ -220,6 +228,8 @@ class TestRoundTrip:
         "entropy_flow": (0.0, 1.0, 950.0, 1.0e6),
         "molar_mass": (2.016e-3, 0.028966, 0.18),
         "amount": (0.0, 1.0, 361.6, 8000.0),
+        "mass_flux": (0.0, 1.0, 490.5, 5000.0),
+        "pressure_loss": (0.0, 21.0, 1.87e4, 7.0e5),
     }
 
     @pytest.mark.parametrize("kind", _KINDS)
@@ -755,3 +765,32 @@ def test_phase_change_units_are_coherent(system: str) -> None:
     # 1 lbf/ft = 14,5939 N/m
     if system == "Inglés":
         assert sigma == pytest.approx(14.5939, rel=1e-5)
+
+
+@pytest.mark.parametrize("system", ["SI", "Técnico", "Inglés"])
+def test_exchanger_design_units_are_coherent(system: str) -> None:
+    """Fase 12.1: Re = G·D/μ y la velocidad G/ρ cierran sin factores en los tres
+    sistemas (G en lb/(s·ft²) en el Inglés); ρ·V²/2 y G²/(2·ρ) dan la caída de presión
+    en Pa, o en lbf/ft² en el Inglés (÷ g_c = 32,174; ÷ 144 para psi), y en el Técnico,
+    ÷ 1000 para kPa."""
+
+    def si(value: float, kind: str) -> float:
+        return convert_to_si(value, kind, system)  # type: ignore[arg-type]
+
+    def back(value: float, kind: str) -> float:
+        return convert_from_si(value, kind, system)  # type: ignore[arg-type]
+
+    G, mu, rho = si(1.0, "mass_flux"), si(1.0, "dynamic_viscosity"), si(1.0, "density")
+    D, V, m = si(1.0, "length"), si(1.0, "speed"), si(1.0, "mass_flow")
+    assert G * D / mu == pytest.approx(1.0)
+    assert back(G / rho, "speed") == pytest.approx(1.0)
+    assert back(m / si(1.0, "area"), "mass_flux") == pytest.approx(1.0)
+    g_c = 32.17404855643 if system == "Inglés" else 1.0
+    psi = {"SI": 1.0, "Técnico": 1000.0, "Inglés": 144.0}[system]
+    assert back(rho * V**2, "pressure_loss") == pytest.approx(1.0 / (g_c * psi), rel=1e-9)
+    assert back(G**2 / rho, "pressure_loss") == pytest.approx(1.0 / (g_c * psi), rel=1e-9)
+    # el banco de tubos sigue en Pa | Pa | lbf/ft²
+    assert back(rho * V**2, "pressure_drop") == pytest.approx(1.0 / g_c, rel=1e-9)
+    if system == "Inglés":
+        assert si(1.0, "pressure_loss") == pytest.approx(6894.757, rel=1e-6)
+        assert G == pytest.approx(4.882428, rel=1e-6)
