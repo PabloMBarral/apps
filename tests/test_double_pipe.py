@@ -8,12 +8,14 @@ from dataclasses import replace
 
 import pytest
 
+from core.heat_transfer.convection import convection_fluids
 from core.heat_transfer.design_common import (
     DesignStream,
     FluidProperties,
     darcy_f,
     overall_u_per_length,
     stream_props,
+    suggested_pressure,
     tube_flow,
 )
 from core.heat_transfer.double_pipe import (
@@ -285,6 +287,25 @@ def test_stream_errors() -> None:
 # ---------------------------------------------------------------------
 # Export
 # ---------------------------------------------------------------------
+
+
+def test_suggested_pressure_keeps_one_phase() -> None:
+    # la que se da, si sirve (el aire a 1 atm, el agua a 3 bar entre 20 y 90 °C)
+    assert suggested_pressure("Air", 280.0, 380.0, 101_325.0) == 101_325.0
+    assert suggested_pressure("Water", 20.0 + C, 90.0 + C, 3.0e5) == 3.0e5
+    # el agua a 1 atm hierve entre 30 y 100 °C: el doble de p_sat a 110 °C
+    p = suggested_pressure("Water", 30.0 + C, 100.0 + C, 101_325.0)
+    assert p == pytest.approx(2.0 * 143_376.0, rel=2e-3)
+    # con todos los fluidos, ninguna corriente del Incropera 11.1 cambia de fase
+    for fluid in convection_fluids():
+        for side in ("hot", "cold"):
+            s = getattr(INCROPERA, side)
+            p = suggested_pressure(fluid, INCROPERA.cold.T_in_K, INCROPERA.hot.T_in_K, s.p_Pa)
+            new = replace(s, fluid=fluid, properties=None, p_Pa=p)
+            try:
+                solve_double_pipe(replace(INCROPERA, **{side: new}))
+            except ValueError as exc:
+                assert "cambia de fase" not in str(exc), (fluid, side, exc)
 
 
 @pytest.mark.parametrize("system", ["SI", "Técnico", "Inglés"])

@@ -299,6 +299,11 @@ pages = [
     ),
     st.Page("app_pages/15_Radiacion.py", title="Radiación", icon="☀️"),
     st.Page("app_pages/16_Intercambiadores.py", title="Intercambiadores", icon="🔄"),
+    st.Page(
+        "app_pages/23_Diseno_de_Intercambiadores.py",
+        title="Diseño de intercambiadores",
+        icon="🛠️",
+    ),
     st.Page("app_pages/17_Gases_Ideales.py", title="Gases ideales", icon="🎈"),
     st.Page("app_pages/18_Gases_Reales.py", title="Gases reales", icon="🫧"),
     st.Page("app_pages/99_Acerca.py", title="Acerca de", icon="ℹ️"),

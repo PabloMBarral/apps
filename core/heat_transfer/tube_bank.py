@@ -48,6 +48,7 @@ __all__ = [
     "Arrangement",
     "BankProperties",
     "ConstantSource",
+    "Curve",
     "FrictionReading",
     "SweepPoint",
     "TubeBankExample",

@@ -20,7 +20,12 @@ import math
 from dataclasses import dataclass
 from typing import Literal
 
-from core.fluids import fluid_limits, fluid_with_article, saturation_at_pressure
+from core.fluids import (
+    fluid_limits,
+    fluid_with_article,
+    saturation_at_pressure,
+    saturation_at_temperature,
+)
 from core.heat_transfer.convection import (
     RE_LAMINAR_TUBE,
     RE_TURBULENT_TUBE,
@@ -46,6 +51,7 @@ __all__ = [
     "overall_u_per_length",
     "stream_name",
     "stream_props",
+    "suggested_pressure",
     "tube_flow",
     "wall_viscosity",
 ]
@@ -176,6 +182,23 @@ def check_single_phase(s: DesignStream, T_out_K: float, label: str) -> None:
             f"intercambiador, y estas correlaciones son de una sola fase. "
             f"{'Subí' if boils else 'Bajá'} la presión."
         )
+
+
+def suggested_pressure(fluid: str, T_low_K: float, T_high_K: float, p_Pa: float) -> float:
+    """Una presión con la que ``fluid`` no cambia de fase entre T_low y T_high: la dada si
+    sirve; si no, el doble de la de saturación a T_high (queda líquido) o, si T_high pasa la
+    crítica, 1,2 veces la crítica. Para los valores por defecto de una página cuando el
+    alumno cambia de fluido."""
+    limits = fluid_limits(fluid)
+    if not (limits.P_triple_Pa <= p_Pa < limits.P_crit_Pa):
+        return p_Pa
+    T_sat = saturation_at_pressure(fluid, p_Pa).T_sat_K
+    if not (T_low_K - 5.0 <= T_sat <= T_high_K + 5.0):
+        return p_Pa
+    T_top = T_high_K + 10.0
+    if T_top >= 0.97 * limits.T_crit_K:
+        return 1.2 * limits.P_crit_Pa
+    return min(2.0 * saturation_at_temperature(fluid, T_top).P_sat_Pa, 0.9 * limits.P_crit_Pa)
 
 
 def darcy_f(Re: float) -> float:
