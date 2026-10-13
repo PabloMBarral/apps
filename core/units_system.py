@@ -139,6 +139,7 @@ QuantityKind = Literal[
     "time",
     "energy_per_area",
     "energy_per_length",
+    "surface_tension",
 ]
 
 DEFAULT_SYSTEM: UnitSystem = "Técnico"
@@ -162,6 +163,7 @@ _BTU_PER_H_FT_F_TO_W_PER_M_K: float = _BTU_IT_J / (3600.0 * _FT_PER_M * 5.0 / 9.
 # ≈ 1.730734666 W/(m·K) por Btu/(h·ft·°F)
 _IN_PER_M: float = 0.0254  # exacto
 _BTU_PER_H_W: float = _BTU_IT_J / 3600.0  # 1 Btu/h ≈ 0.29307107 W
+_LBF_N: float = _LB_PER_KG * 9.80665  # 1 lbf = 4,4482216152605 N, exacto
 
 # ---------------------------------------------------------------------
 # Tabla central (kind, system) → (factor, offset, label)
@@ -467,6 +469,14 @@ _UNIT_TABLE: dict[QuantityKind, dict[UnitSystem, tuple[float, float, str]]] = {
         "SI": (1.0, 0.0, "J/m"),
         "Técnico": (1.0e-3, 0.0, "kJ/m"),
         "Inglés": (_FT_PER_M / _BTU_IT_J, 0.0, "Btu/ft"),
+    },
+    # Fase 11.2 (ebullición y condensación): la tensión superficial, en lbf/ft en el
+    # Inglés como las tablas de Çengel y Ghajar; ahí g·Δρ/σ lleva g_c = 32,174
+    # lbm·ft/(lbf·s²) para dar 1/ft² (en el SI y el Técnico, N/m = kg/s²).
+    "surface_tension": {
+        "SI": (1.0, 0.0, "N/m"),
+        "Técnico": (1.0, 0.0, "N/m"),
+        "Inglés": (_FT_PER_M / _LBF_N, 0.0, "lbf/ft"),
     },
 }
 
