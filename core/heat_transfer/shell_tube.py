@@ -1,9 +1,10 @@
-"""Intercambiador de casco y tubos con el método de Kern (Fase 12.1).
+"""Intercambiador de casco y tubos con el método de Kern (Fase 12.1) o de Bell–Delaware
+(Fase 12.2).
 
 Kern (1950), cap. 7; Kakaç y Liu (2002), cap. 8. Un casco de diámetro interior D_s con N_t
 tubos (diámetro exterior d_o y calibre BWG, que da d_i; largo L) en arreglo triangular
-(30°) o cuadrado (90°) de paso P_T, con N_p pasos por los tubos y bafles segmentados del
-25 % de corte (el de Kern) separados B, N_b bafles.
+(30°), cuadrado (90°) o cuadrado rotado (45°) de paso P_T, con N_p pasos por los tubos y
+bafles segmentados separados B, N_b bafles (Kern supone el 25 % de corte).
 
 - **Lado del casco (Kern)**: el área de flujo cruzado a_s = D_s·(P_T − d_o)·B/P_T, la
   velocidad másica G_s = ṁ/a_s, el diámetro equivalente D_e (con el área libre de la celda
@@ -20,6 +21,10 @@ tubos (diámetro exterior d_o y calibre BWG, que da d_i; largo L) en arreglo tri
 - **El criterio de Kern** para un servicio dado: el U que hace falta,
   U_req = Q̇/(A_o·F·ΔT_ml), y el ensuciamiento que el equipo tolera,
   R_d = (U_C − U_req)/(U_C·U_req), contra el pedido R_d,req = R''_f,o + R''_f,i·d_o/d_i.
+- **Bell–Delaware** (:mod:`core.heat_transfer.bell_delaware`): con ``shell_method``
+  "bell_delaware", el h_o y el Δp del casco salen de ese método (el corte, las holguras,
+  el bypass y las tiras van en ``bell_delaware``); el resto no cambia. Kern se calcula igual,
+  para comparar.
 
 Las propiedades van a la temperatura media de cada corriente y μ_p a la de la pared (se
 itera).
@@ -31,6 +36,12 @@ import math
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
+from core.heat_transfer.bell_delaware import (
+    LAYOUT_ANGLE,
+    BellDelawareGeometry,
+    BellDelawareSide,
+    solve_bell_delaware,
+)
 from core.heat_transfer.design_common import (
     TUBE_SIDE_CORRELATIONS,
     DesignStream,
@@ -62,16 +73,21 @@ from core.units_system import UnitSystem, convert_from_si, unit_label
 __all__ = [
     "BWG_WALL_IN",
     "LAYOUTS",
+    "SHELL_METHODS",
     "SHELL_PROBLEMS",
     "SHELL_TUBE_EXAMPLES",
     "TUBE_PASSES",
+    "BaffleCutSweepPoint",
     "BaffleSweepPoint",
     "Layout",
+    "ShellMethod",
     "ShellSide",
     "ShellTubeExample",
     "ShellTubeInputs",
     "ShellTubeResult",
+    "baffle_cut_sweep",
     "baffle_sweep",
+    "compare_shell_methods",
     "estimate_tube_count",
     "kern_equivalent_diameter",
     "kern_friction",
@@ -82,12 +98,18 @@ __all__ = [
     "tube_inner_diameter",
 ]
 
-Layout = Literal["triangular", "square"]
+Layout = Literal["triangular", "square", "rotated_square"]
 ShellProblem = Literal["rating", "check"]
+ShellMethod = Literal["kern", "bell_delaware"]
 
 LAYOUTS: dict[Layout, str] = {
     "triangular": "Triangular (30°)",
     "square": "Cuadrado (90°)",
+    "rotated_square": "Cuadrado rotado (45°)",
+}
+SHELL_METHODS: dict[ShellMethod, str] = {
+    "kern": "Kern",
+    "bell_delaware": "Bell–Delaware",
 }
 SHELL_PROBLEMS: dict[ShellProblem, str] = {
     "rating": "Verificación (las salidas de un equipo dado)",
@@ -113,7 +135,7 @@ BWG_WALL_IN: dict[int, float] = {
 #: CTP y CL de la estimación de la cantidad de tubos (Kakaç y Liu, 2002, cap. 8).
 _CTP: dict[int, float] = {1: 0.93, 2: 0.90}
 _CTP_MANY = 0.85
-_CL: dict[Layout, float] = {"triangular": 0.87, "square": 1.0}
+_CL: dict[Layout, float] = {"triangular": 0.87, "square": 1.0, "rotated_square": 1.0}
 
 #: Rangos de Kern: el h_o (2·10³ < Re < 10⁶) y el ajuste de f (400 < Re ≤ 10⁶).
 RE_KERN_H = (2.0e3, 1.0e6)
@@ -166,8 +188,9 @@ def estimate_tube_count(D_s_m: float, P_T_m: float, layout: Layout, passes: int)
 def kern_equivalent_diameter(d_o_m: float, P_T_m: float, layout: Layout) -> float:
     """El diámetro equivalente del lado del casco (Kern, 1950, fig. 28):
     cuadrado, D_e = 4·(P_T² − π·d_o²/4)/(π·d_o); triangular,
-    D_e = 4·(√3/4·P_T² − π·d_o²/8)/(π·d_o/2) (la mitad de un tubo en cada celda)."""
-    if layout == "square":
+    D_e = 4·(√3/4·P_T² − π·d_o²/8)/(π·d_o/2) (la mitad de un tubo en cada celda). Kern no
+    distingue el cuadrado rotado (45°): lleva la celda del cuadrado."""
+    if layout in ("square", "rotated_square"):
         return 4.0 * (P_T_m**2 - math.pi * d_o_m**2 / 4.0) / (math.pi * d_o_m)
     return (
         4.0 * (math.sqrt(3.0) / 4.0 * P_T_m**2 - math.pi * d_o_m**2 / 8.0) / (math.pi * d_o_m / 2.0)
@@ -239,7 +262,8 @@ class ShellTubeInputs:
 
     ``shell_side`` es la corriente que va por el casco. ``tube_count`` = None estima N_t con
     D_s (Kakaç y Liu). Con ``problem="check"``, ``target`` y ``target_value`` fijan el
-    servicio pedido (una salida o Q̇).
+    servicio pedido (una salida o Q̇). ``shell_method`` elige Kern o Bell–Delaware para el
+    lado del casco; Bell–Delaware pide la geometría de ``bell_delaware``.
     """
 
     hot: DesignStream
@@ -261,6 +285,8 @@ class ShellTubeInputs:
     target_value: float = 0.0
     tube_correlation: str = "auto"
     T0_K: float = 298.15
+    shell_method: ShellMethod = "kern"
+    bell_delaware: BellDelawareGeometry | None = None
 
 
 @dataclass(frozen=True)
@@ -280,6 +306,30 @@ class ShellTubeResult:
     exchanger: ExchangerResult
     warnings: tuple[str, ...]
     iterations: int
+    bell_delaware: BellDelawareSide | None = None
+
+    @property
+    def method_label(self) -> str:
+        return SHELL_METHODS[self.inputs.shell_method]
+
+    @property
+    def h_shell_W_per_m2K(self) -> float:
+        """El h_o del método elegido (``shell`` es siempre el de Kern)."""
+        bd = self.bell_delaware
+        return bd.h_W_per_m2K if bd is not None else self.shell.h_W_per_m2K
+
+    @property
+    def dp_shell_Pa(self) -> float:
+        """El Δp del casco con el método elegido."""
+        bd = self.bell_delaware
+        return bd.dp_Pa if bd is not None else self.shell.dp_Pa
+
+    @property
+    def Re_shell(self) -> float:
+        """El Re del casco del método elegido (Kern con D_e y a_s; Bell–Delaware con d_o y
+        S_m)."""
+        bd = self.bell_delaware
+        return bd.Re if bd is not None else self.shell.Re
 
     @property
     def tube_stream(self) -> Side:
@@ -389,6 +439,13 @@ def _validate(i: ShellTubeInputs) -> int:
         raise ValueError(f"Arreglo desconocido: {i.layout!r}.")
     if i.problem not in SHELL_PROBLEMS:
         raise ValueError(f"Problema desconocido: {i.problem!r}.")
+    if i.shell_method not in SHELL_METHODS:
+        raise ValueError(f"Método del lado del casco desconocido: {i.shell_method!r}.")
+    if i.shell_method == "bell_delaware" and i.bell_delaware is None:
+        raise ValueError(
+            "Bell–Delaware necesita la geometría de los bafles y las holguras (al menos la "
+            "holgura entre el haz y el casco, L_bb)."
+        )
     if i.tube_passes not in TUBE_PASSES:
         raise ValueError("Los pasos por los tubos son 1, 2, 4, 6 u 8.")
     if i.tube_correlation not in TUBE_SIDE_CORRELATIONS:
@@ -410,7 +467,10 @@ def _validate(i: ShellTubeInputs) -> int:
             f"({_num(i.d_o_m * 1e3)} mm): los tubos se tocan."
         )
     if i.baffles < 1:
-        raise ValueError("Hace falta al menos un bafle (el método de Kern es con bafles).")
+        raise ValueError(
+            f"Hace falta al menos un bafle (el método de {SHELL_METHODS[i.shell_method]} es con "
+            "bafles)."
+        )
     if not i.k_wall_W_per_mK > 0.0:
         raise ValueError("La conductividad de la pared de los tubos tiene que ser positiva.")
     N_max = int(0.785 / _CL[i.layout] * i.D_s_m**2 / i.P_T_m**2)
@@ -442,8 +502,8 @@ def _arrangement(i: ShellTubeInputs) -> Arrangement:
 
 
 def solve_shell_tube(inputs: ShellTubeInputs) -> ShellTubeResult:
-    """El casco y tubos con Kern: los h de cada lado, el U, Q̇ y las salidas (verificación) o
-    el R_d de Kern (servicio pedido).
+    """El casco y tubos con Kern o con Bell–Delaware en el casco: los h de cada lado, el U, Q̇
+    y las salidas (verificación) o el R_d de Kern (servicio pedido).
 
     Raises
     ------
@@ -462,6 +522,7 @@ def solve_shell_tube(inputs: ShellTubeInputs) -> ShellTubeResult:
     A_o = N_t * math.pi * i.d_o_m * i.L_m
     per_tube = tube_s.m_dot_kg_s / (N_t / i.tube_passes)
     result: ExchangerResult | None = None
+    bd: BellDelawareSide | None = None
     iterations = 0
     for iterations in range(1, 201):  # noqa: B007 — se informa cuántas hicieron falta
         props_h = stream_props(i.hot, 0.5 * (i.hot.T_in_K + T_h_out), "caliente")
@@ -478,6 +539,22 @@ def solve_shell_tube(inputs: ShellTubeInputs) -> ShellTubeResult:
             i.baffles,
             wall_viscosity(shell_s, T_w_shell),
         )
+        if i.shell_method == "bell_delaware":
+            assert i.bell_delaware is not None
+            bd = solve_bell_delaware(
+                props_s,
+                shell_s.m_dot_kg_s,
+                i.D_s_m,
+                i.d_o_m,
+                i.P_T_m,
+                LAYOUT_ANGLE[i.layout],
+                i.B_m,
+                i.baffles,
+                N_t,
+                i.bell_delaware,
+                wall_viscosity(shell_s, T_w_shell),
+            )
+        h_o = bd.h_W_per_m2K if bd is not None else shell.h_W_per_m2K
         tube = tube_flow(
             props_t,
             per_tube,
@@ -489,7 +566,7 @@ def solve_shell_tube(inputs: ShellTubeInputs) -> ShellTubeResult:
         )
         u = overall_u_per_length(
             tube.h_W_per_m2K,
-            shell.h_W_per_m2K,
+            h_o,
             i.d_i_m,
             i.d_o_m,
             i.k_wall_W_per_mK,
@@ -511,7 +588,7 @@ def solve_shell_tube(inputs: ShellTubeInputs) -> ShellTubeResult:
         T_s = props_s.T_K
         R_total = u.R_total_K_per_W
         new_w_tube = T_t + (T_s - T_t) * (1.0 / (tube.h_W_per_m2K * u.A_i_m2)) / R_total
-        new_w_shell = T_s - (T_s - T_t) * (1.0 / (shell.h_W_per_m2K * u.A_o_m2)) / R_total
+        new_w_shell = T_s - (T_s - T_t) * (1.0 / (h_o * u.A_o_m2)) / R_total
         new_h, new_c = result.hot.T_out_K, result.cold.T_out_K
         done = (
             abs(new_h - T_h_out) < 1e-9
@@ -529,7 +606,7 @@ def solve_shell_tube(inputs: ShellTubeInputs) -> ShellTubeResult:
     check_single_phase(i.cold, T_c_out, "frío")
     u_clean = overall_u_per_length(
         tube.h_W_per_m2K,
-        shell.h_W_per_m2K,
+        h_o,
         i.d_i_m,
         i.d_o_m,
         i.k_wall_W_per_mK,
@@ -538,7 +615,7 @@ def solve_shell_tube(inputs: ShellTubeInputs) -> ShellTubeResult:
         "en los tubos",
         "en el casco",
     )
-    warnings = [f"Casco: {w}" for w in shell.warnings]
+    warnings = [f"Casco: {w}" for w in (bd.warnings if bd is not None else shell.warnings)]
     warnings += [f"Tubos: {w}" for w in tube.warnings]
     if not i.D_s_m / 5.0 <= i.B_m <= i.D_s_m:
         warnings.append(
@@ -560,7 +637,16 @@ def solve_shell_tube(inputs: ShellTubeInputs) -> ShellTubeResult:
         exchanger=result,
         warnings=tuple(warnings),
         iterations=iterations,
+        bell_delaware=bd,
     )
+
+
+def compare_shell_methods(inputs: ShellTubeInputs) -> dict[ShellMethod, ShellTubeResult]:
+    """El mismo equipo resuelto con Kern y con Bell–Delaware en el casco (cada uno con sus
+    temperaturas de salida y de pared)."""
+    return {
+        method: solve_shell_tube(replace(inputs, shell_method=method)) for method in SHELL_METHODS
+    }
 
 
 # ---------------------------------------------------------------------
@@ -579,7 +665,8 @@ class BaffleSweepPoint:
 
 def baffle_sweep(inputs: ShellTubeInputs, n: int = 15) -> list[BaffleSweepPoint]:
     """h_o, Δp del casco y U contra la separación de los bafles, de D_s/5 a D_s, con
-    N_b = L/B − 1: el compromiso del diseño (más bafles, más h_o y mucho más Δp)."""
+    N_b = L/B − 1 y el método del casco de los datos: el compromiso del diseño (más bafles,
+    más h_o y mucho más Δp)."""
     points: list[BaffleSweepPoint] = []
     lo, hi = inputs.D_s_m / 5.0, inputs.D_s_m
     for j in range(n):
@@ -590,7 +677,49 @@ def baffle_sweep(inputs: ShellTubeInputs, n: int = 15) -> list[BaffleSweepPoint]
         except ValueError:
             continue
         points.append(
-            BaffleSweepPoint(B, baffles, r.shell.h_W_per_m2K, r.shell.dp_Pa, r.U_D_W_per_m2K)
+            BaffleSweepPoint(B, baffles, r.h_shell_W_per_m2K, r.dp_shell_Pa, r.U_D_W_per_m2K)
+        )
+    return points
+
+
+@dataclass(frozen=True)
+class BaffleCutSweepPoint:
+    baffle_cut: float
+    h_o_W_per_m2K: float
+    dp_shell_Pa: float
+    U_D_W_per_m2K: float
+    J_c: float
+    J_l: float
+    J_b: float
+
+
+def baffle_cut_sweep(inputs: ShellTubeInputs, n: int = 13) -> list[BaffleCutSweepPoint]:
+    """h_o, Δp del casco y U con Bell–Delaware contra el corte de los bafles, del 15 al 45 %
+    de D_s (el rango de las correlaciones; Taborek, 1983): un corte chico acelera el fluido
+    en las ventanas (más h_o y más Δp) y uno grande deja más tubos fuera del flujo cruzado."""
+    geo = inputs.bell_delaware
+    if geo is None:
+        raise ValueError("El barrido del corte es con Bell–Delaware: falta su geometría.")
+    points: list[BaffleCutSweepPoint] = []
+    for j in range(n):
+        cut = 0.15 + 0.30 * j / (n - 1)
+        try:
+            r = solve_shell_tube(
+                replace(
+                    inputs,
+                    shell_method="bell_delaware",
+                    bell_delaware=replace(geo, baffle_cut=cut),
+                )
+            )
+        except ValueError:
+            continue
+        bd = r.bell_delaware
+        assert bd is not None
+        fc = bd.factors
+        points.append(
+            BaffleCutSweepPoint(
+                cut, bd.h_W_per_m2K, bd.dp_Pa, r.U_D_W_per_m2K, fc.J_c, fc.J_l, fc.J_b
+            )
         )
     return points
 
@@ -650,13 +779,82 @@ def shell_tube_notes(r: ShellTubeResult) -> list[str]:
                 f"de los {_fmt(r.area_m2)} m² que hay ({'+' if over >= 0 else ''}"
                 f"{_num(100.0 * over, 2)} % de sobrediseño)."
             )
-    for where, dp in (("el casco", r.shell.dp_Pa), ("los tubos", r.dp_tube_Pa)):
+    if r.bell_delaware is not None:
+        notes += _bell_delaware_notes(r)
+    elif i.layout == "rotated_square":
+        notes.append(
+            "Kern no distingue el cuadrado rotado (45°): usa la celda del cuadrado. "
+            "Bell–Delaware sí lo tiene en cuenta (el paso en la dirección del flujo es 0,707·P_T)."
+        )
+    for where, dp in (("el casco", r.dp_shell_Pa), ("los tubos", r.dp_tube_Pa)):
         if dp > DP_LIQUID_KERN_PA:
             notes.append(
                 f"La caída de presión en {where} es de {_fmt(dp / 1e3)} kPa: más que los "
                 "10 psi (69 kPa) que Kern suele admitir por corriente en los líquidos."
             )
     return notes
+
+
+_J_MEANING: dict[str, str] = {
+    "J_c": "por el corte de los bafles (los tubos de las ventanas no ven flujo cruzado)",
+    "J_l": "por las fugas entre los tubos y los bafles y entre los bafles y el casco",
+    "J_b": "por el bypass entre el haz y el casco",
+    "J_s": "por las separaciones de la entrada y de la salida, mayores que la central",
+    "J_r": "por el gradiente de temperatura del flujo laminar",
+}
+
+
+def _bell_delaware_notes(r: ShellTubeResult) -> list[str]:
+    """Qué corriente pesa más en Bell–Delaware y cómo se compara con Kern."""
+    i, bd = r.inputs, r.bell_delaware
+    assert bd is not None
+    fc, a = bd.factors, bd.areas
+    notes: list[str] = []
+    factors = {"J_c": fc.J_c, "J_l": fc.J_l, "J_b": fc.J_b, "J_s": fc.J_s, "J_r": fc.J_r}
+    worst = min(factors, key=lambda k: factors[k])
+    if factors[worst] < 1.0:
+        notes.append(
+            f"El factor que más baja el h_o es {worst} = {_num(factors[worst])}, "
+            f"{_J_MEANING[worst]}. En total, h_o = {_num(fc.J_total)}·h_ideal (en un equipo "
+            "bien diseñado, el producto ronda 0,6; Taborek)."
+        )
+    geo = bd.geometry
+    if worst == "J_b" and geo.sealing_strips == 0 and fc.J_b < 0.9:
+        notes.append(
+            f"No hay tiras de sellado y el bypass se lleva {_num(100.0 * a.F_sbp, 2)} % del "
+            "área de flujo cruzado: probá con 1 o 2 pares de tiras (las tiras cortan el bypass)."
+        )
+    if fc.J_l < 0.6:
+        notes.append(
+            f"Las fugas son grandes: las holguras suman {_num(100.0 * a.r_lm, 2)} % del área de "
+            "flujo cruzado (r_lm). Con holguras más chicas suben el h_o y el Δp."
+        )
+    notes.append(
+        f"Las fugas y el bypass también bajan el Δp: el flujo cruzado da "
+        f"{_num(100.0 * fc.R_l * fc.R_b, 2)} % del ideal (R_l·R_b) y las ventanas, "
+        f"{_num(100.0 * fc.R_l, 2)} % (R_l)."
+    )
+    k = r.shell
+    notes.append(
+        f"Kern, con las mismas propiedades, da h_o = {_fmt(k.h_W_per_m2K)} W/(m²·K) "
+        f"({_signed_pct(k.h_W_per_m2K / bd.h_W_per_m2K - 1.0)}) y Δp = "
+        f"{_fmt(k.dp_Pa / 1e3)} kPa ({_signed_pct(k.dp_Pa / bd.dp_Pa - 1.0)}): Kern supone que "
+        "todo el fluido cruza el haz."
+    )
+    span = (i.baffles - 1) * i.B_m + a.B_in_m + a.B_out_m
+    if abs(span / i.L_m - 1.0) > 0.1:
+        notes.append(
+            f"Los bafles ocupan {_fmt(span)} m ((N_b − 1)·B más las dos separaciones de los "
+            f"extremos) y los tubos miden {_fmt(i.L_m)} m: revisá la cantidad de bafles o las "
+            "separaciones de la entrada y de la salida."
+        )
+    return notes
+
+
+def _signed_pct(x: float) -> str:
+    v = 100.0 * abs(x)
+    text = f"{v:.0f}" if v >= 10.0 else f"{v:.1f}".replace(".", ",")
+    return f"{'+' if x >= 0 else '−'}{text} %"
 
 
 # ---------------------------------------------------------------------
@@ -683,8 +881,11 @@ SHELL_TUBE_EXAMPLES: dict[str, ShellTubeExample] = {
         'cuadrado de 1" (25,4 mm), bafles cada 0,1524 m (22 bafles) y 3,66 m de largo. El '
         "libro compara los métodos del lado del casco con el agua a 30 °C y la pared a "
         "40 °C (esas propiedades van como dato): Kern da h_o = 3369 W/(m²·K) y Δp = 16,4 kPa "
-        "leyendo j_H y f de los gráficos; Bell–Delaware, 3080 W/(m²·K) y 9,48 kPa. Lo de los "
-        "tubos (agua caliente por un paso y la cantidad de tubos) es a elección.",
+        "leyendo j_H y f de los gráficos; Bell–Delaware, 3080 W/(m²·K) y 9,48 kPa. Con 405 "
+        "tubos, el corte del 25 %, el cabezal flotante de anillo partido (L_bb = 33,3 mm) y "
+        "2 pares de tiras salen las áreas de Bell–Delaware del libro (S_m = 0,0255 m² y "
+        "S_w = 0,03298 m²); el Δp no: el libro no muestra cómo lo arma. El agua caliente de "
+        "los tubos, por un paso, es a elección.",
         ShellTubeInputs(
             hot=DesignStream(45.0 + _C, 30.0, fluid="Water", p_Pa=3.0e5),
             cold=DesignStream(25.0 + _C, 11.0, properties=_WATER_30),
@@ -697,8 +898,10 @@ SHELL_TUBE_EXAMPLES: dict[str, ShellTubeExample] = {
             baffles=22,
             layout="square",
             tube_passes=1,
+            tube_count=405,
             shell_side="cold",
             problem="rating",
+            bell_delaware=BellDelawareGeometry(L_bb_m=0.0333, sealing_strips=2),
         ),
     ),
     "Enfriador de kerosene con agua de río": ShellTubeExample(
@@ -706,7 +909,9 @@ SHELL_TUBE_EXAMPLES: dict[str, ShellTubeExample] = {
         "90 °C y se tienen que enfriar a 50 °C con 4 kg/s de agua de río que entra a 25 °C por "
         'los tubos de 3/4" BWG 16 (triangular de 1", 4 pasos, 6,1 m), con 0,0002 m²·K/W de '
         "ensuciamiento en el agua y 0,0009 en el kerosene (TEMA). ¿Alcanza el equipo? Probá "
-        "acortar los tubos y mirá el R_d de Kern.",
+        "acortar los tubos y mirá el R_d de Kern. Con Bell–Delaware (cabezal flotante de "
+        "anillo partido, L_bb = 35 mm, sin tiras de sellado), mirá cuánto se lleva el bypass "
+        "y probá con un par de tiras.",
         ShellTubeInputs(
             hot=DesignStream(90.0 + _C, 5.0, properties=_KEROSENE, R_f_m2K_per_W=0.0009),
             cold=DesignStream(25.0 + _C, 4.0, fluid="Water", p_Pa=3.0e5, R_f_m2K_per_W=0.0002),
@@ -723,13 +928,14 @@ SHELL_TUBE_EXAMPLES: dict[str, ShellTubeExample] = {
             problem="check",
             target="T_hot_out",
             target_value=50.0 + _C,
+            bell_delaware=BellDelawareGeometry(L_bb_m=0.035),
         ),
     ),
     "Intercambiador agua–agua de 1 paso por el casco y 2 por los tubos": ShellTubeExample(
         "20 kg/s de agua de proceso entran al casco de 0,686 m a 60 °C y se enfrían con "
         '40 kg/s de agua que entra a 20 °C por los tubos de 1" BWG 14 en arreglo cuadrado de '
         '1¼", con bafles cada 0,3 m y 6 m de largo. Verificación: las salidas que da el '
-        "equipo con el ensuciamiento.",
+        "equipo con el ensuciamiento. Para Bell–Delaware, placas fijas (L_bb = 12 mm).",
         ShellTubeInputs(
             hot=DesignStream(60.0 + _C, 20.0, fluid="Water", p_Pa=3.0e5, R_f_m2K_per_W=0.0001),
             cold=DesignStream(20.0 + _C, 40.0, fluid="Water", p_Pa=3.0e5, R_f_m2K_per_W=0.0002),
@@ -744,6 +950,7 @@ SHELL_TUBE_EXAMPLES: dict[str, ShellTubeExample] = {
             tube_passes=2,
             shell_side="hot",
             problem="rating",
+            bell_delaware=BellDelawareGeometry(L_bb_m=0.012),
         ),
     ),
 }
@@ -772,17 +979,8 @@ def shell_tube_to_dict(r: ShellTubeResult, system: UnitSystem) -> dict[str, Any]
         "pasos_tubos": i.tube_passes,
         "B": _q(i.B_m, "small_length", system),
         "bafles": i.baffles,
-        "casco": {
-            "a_s": _q(s.a_s_m2, "area", system),
-            "G_s": _q(s.G_s, "mass_flux", system),
-            "D_e": _q(s.D_e_m, "small_length", system),
-            "Re": s.Re,
-            "phi": s.phi,
-            "Nu": s.Nu,
-            "h_o": _q(s.h_W_per_m2K, "heat_transfer_coefficient", system),
-            "f": s.f,
-            "Delta_p": _q(s.dp_Pa, "pressure_loss", system),
-        },
+        "metodo_casco": r.method_label,
+        "casco": _kern_dict(s, system),
         "tubos": {
             "velocidad": _q(t.velocity_m_s, "speed", system),
             "Re": t.Re,
@@ -803,9 +1001,74 @@ def shell_tube_to_dict(r: ShellTubeResult, system: UnitSystem) -> dict[str, Any]
         "avisos": list(r.warnings),
         "notas": shell_tube_notes(r),
     }
+    if r.bell_delaware is not None:
+        data["casco"] = _bell_delaware_dict(r.bell_delaware, system)
+        data["casco_kern"] = _kern_dict(s, system)
     if i.problem == "check":
         data["U_requerido"] = _q(r.U_required_W_per_m2K or 0.0, "heat_transfer_coefficient", system)
         data["R_d_disponible"] = _q(r.R_d_available or 0.0, "fouling_resistance", system)
         data["R_d_pedido"] = _q(r.R_d_required, "fouling_resistance", system)
         data["area_requerida"] = _q(r.area_required_m2 or 0.0, "area", system)
     return data
+
+
+def _kern_dict(s: ShellSide, system: UnitSystem) -> dict[str, Any]:
+    return {
+        "a_s": _q(s.a_s_m2, "area", system),
+        "G_s": _q(s.G_s, "mass_flux", system),
+        "D_e": _q(s.D_e_m, "small_length", system),
+        "Re": s.Re,
+        "phi": s.phi,
+        "Nu": s.Nu,
+        "h_o": _q(s.h_W_per_m2K, "heat_transfer_coefficient", system),
+        "f": s.f,
+        "Delta_p": _q(s.dp_Pa, "pressure_loss", system),
+    }
+
+
+def _bell_delaware_dict(bd: BellDelawareSide, system: UnitSystem) -> dict[str, Any]:
+    g, a, fc, ib = bd.geometry, bd.areas, bd.factors, bd.ideal
+    return {
+        "corte_bafles": g.baffle_cut,
+        "L_bb": _q(g.L_bb_m, "small_length", system),
+        "L_sb": _q(a.L_sb_m, "small_length", system),
+        "L_tb": _q(a.L_tb_m, "small_length", system),
+        "pares_de_tiras": g.sealing_strips,
+        "L_pl": _q(g.L_pl_m, "small_length", system),
+        "B_entrada": _q(a.B_in_m, "small_length", system),
+        "B_salida": _q(a.B_out_m, "small_length", system),
+        "S_m": _q(a.S_m_m2, "area", system),
+        "S_w": _q(a.S_w_m2, "area", system),
+        "S_sb": _q(a.S_sb_m2, "area", system),
+        "S_tb": _q(a.S_tb_m2, "area", system),
+        "S_b": _q(a.S_b_m2, "area", system),
+        "F_c": a.F_c,
+        "N_tcc": a.N_tcc,
+        "N_tcw": a.N_tcw,
+        "r_s": a.r_s,
+        "r_lm": a.r_lm,
+        "F_sbp": a.F_sbp,
+        "r_ss": a.r_ss,
+        "G_s": _q(bd.G_s, "mass_flux", system),
+        "Re": bd.Re,
+        "phi": bd.phi,
+        "j_i": ib.j,
+        "f_i": ib.f,
+        "h_ideal": _q(bd.h_ideal_W_per_m2K, "heat_transfer_coefficient", system),
+        "J_c": fc.J_c,
+        "J_l": fc.J_l,
+        "J_b": fc.J_b,
+        "J_s": fc.J_s,
+        "J_r": fc.J_r,
+        "h_o": _q(bd.h_W_per_m2K, "heat_transfer_coefficient", system),
+        "R_l": fc.R_l,
+        "R_b": fc.R_b,
+        "R_s_entrada": fc.R_s_in,
+        "R_s_salida": fc.R_s_out,
+        "Delta_p_compartimiento_ideal": _q(bd.dp_bi_Pa, "pressure_loss", system),
+        "Delta_p_ventana_ideal": _q(bd.dp_wi_Pa, "pressure_loss", system),
+        "Delta_p_flujo_cruzado": _q(bd.dp_cross_Pa, "pressure_loss", system),
+        "Delta_p_ventanas": _q(bd.dp_window_Pa, "pressure_loss", system),
+        "Delta_p_extremos": _q(bd.dp_ends_Pa, "pressure_loss", system),
+        "Delta_p": _q(bd.dp_Pa, "pressure_loss", system),
+    }
