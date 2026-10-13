@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.31.0"
+PAGE_VERSION = "0.32.0"
 
 
 def _home_page() -> None:
@@ -214,6 +214,13 @@ def _home_page() -> None:
           c_p de CoolProp o dado y una corriente que cambia de fase, la
           comparación de los tipos y la exergía destruida (ejemplos de Cengel
           y Ghajar cap. 11).
+        - 🛠️ **Diseño de intercambiadores** — un **banco de tubos** que
+          cruza un fluido (Zukauskas, con la caída de presión de sus gráficos),
+          un **doble tubo** dimensionado en horquillas (el h de cada lado, el U
+          con el ensuciamiento, el largo y las caídas de presión) y un **casco y
+          tubos** con el **método de Kern** (el lado del casco, U limpio y
+          sucio, el criterio del factor de ensuciamiento y h_o y Δp contra los
+          bafles) (ejemplos de Incropera, Çengel y Ghajar y Peters et al.).
         - 🎈 **Gases ideales** — un gas **entre dos estados** con c_p
           constante a 25 °C, a la temperatura media o variable (polinomios
           NASA) y cuánto te equivocás con c_p constante; las **mezclas**
@@ -248,7 +255,8 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        La exergoeconomía (el costo de la exergía en cada componente). Ver el
+        El método de Bell–Delaware y los intercambiadores compactos, y la
+        exergoeconomía (el costo de la exergía en cada componente). Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -264,7 +272,8 @@ def _home_page() -> None:
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
         Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado,
         Exergía, Transferencia de calor, Conducción transitoria, Ebullición
-        y condensación, Radiación, Intercambiadores, Gases ideales, Gases
+        y condensación, Radiación, Intercambiadores, Diseño de
+        intercambiadores, Gases ideales, Gases
         reales, Primer principio y Segundo principio.
         Interpolación respeta las
         unidades del CSV original; ISO 6976 usa las unidades de la norma.
@@ -299,6 +308,11 @@ pages = [
     ),
     st.Page("app_pages/15_Radiacion.py", title="Radiación", icon="☀️"),
     st.Page("app_pages/16_Intercambiadores.py", title="Intercambiadores", icon="🔄"),
+    st.Page(
+        "app_pages/23_Diseno_de_Intercambiadores.py",
+        title="Diseño de intercambiadores",
+        icon="🛠️",
+    ),
     st.Page("app_pages/17_Gases_Ideales.py", title="Gases ideales", icon="🎈"),
     st.Page("app_pages/18_Gases_Reales.py", title="Gases reales", icon="🫧"),
     st.Page("app_pages/99_Acerca.py", title="Acerca de", icon="ℹ️"),

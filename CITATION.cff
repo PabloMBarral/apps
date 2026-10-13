@@ -22,7 +22,9 @@ abstract: >-
   exergía, psicrometría, transferencia de calor (conducción estacionaria y
   transitoria, aletas, convección, radiación e intercambiadores), gases
   ideales y sus mezclas,
-  transformaciones politrópicas, gases reales (factor de compresibilidad,
+  transformaciones politrópicas, diseño de intercambiadores (banco de tubos,
+  doble tubo y casco y tubos con el método de Kern), gases reales (factor de
+  compresibilidad,
   Van der Waals, Peng–Robinson, relaciones de Maxwell, Clapeyron y
   Joule–Thomson), balances de energía y de entropía (sistemas cerrados,
   flujo estacionario y régimen transitorio), el segundo principio (máquinas
@@ -67,8 +69,11 @@ keywords:
   - clausius-inequality
   - transient-conduction
   - lumped-capacitance
+  - heat-exchanger-design
+  - tube-bank
+  - shell-and-tube
 license: MIT
-version: "0.31.0"
+version: "0.32.0"
 date-released: "2026-10-13"
 references:
   - type: article
@@ -1142,6 +1147,89 @@ references:
     start: 59
     end: 64
     doi: "10.1021/i160057a011"
+  - type: article
+    scope: "Diseño de intercambiadores: el Nu y los gráficos de f y χ de un banco de tubos"
+    authors:
+      - family-names: "Zukauskas"
+        given-names: "A."
+    title: "Heat transfer from tubes in crossflow"
+    journal: "Advances in Heat Transfer"
+    year: 1972
+    volume: 8
+    start: 93
+    end: 160
+    doi: "10.1016/S0065-2717(08)70038-8"
+  - type: software
+    scope: >-
+      Diseño de intercambiadores: la digitalización de los gráficos de f y χ de
+      Zukauskas (data/zukauskas_tube_bank_friction.csv; MIT)
+    authors:
+      - family-names: "Bell"
+        given-names: "Caleb"
+    title: "ht: Heat transfer component of the Chemical Engineering Design Library (ChEDL)"
+    license: MIT
+    repository-code: "https://github.com/CalebBell/ht"
+  - type: book
+    scope: "Diseño de intercambiadores: el Nu laminar de un anular (Incropera, tabla 8.2)"
+    authors:
+      - family-names: "Kays"
+        given-names: "W. M."
+      - family-names: "Perkins"
+        given-names: "H. C."
+    title: "Forced convection, internal flow in ducts"
+    collection-title: "Handbook of Heat Transfer (W. M. Rohsenow y J. P. Hartnett, eds.), sección 7"
+    publisher:
+      name: "McGraw-Hill"
+    year: 1973
+  - type: book
+    scope: "Diseño de intercambiadores: el factor de fricción laminar de un anular"
+    authors:
+      - family-names: "Shah"
+        given-names: "R. K."
+      - family-names: "London"
+        given-names: "A. L."
+    title: "Laminar Flow Forced Convection in Ducts"
+    collection-title: "Advances in Heat Transfer, Supplement 1"
+    publisher:
+      name: "Academic Press"
+    year: 1978
+  - type: book
+    scope: "Diseño de intercambiadores: el método de Kern (casco y tubos, doble tubo)"
+    authors:
+      - family-names: "Kern"
+        given-names: "Donald Q."
+    title: "Process Heat Transfer"
+    publisher:
+      name: "McGraw-Hill"
+    year: 1950
+  - type: book
+    scope: >-
+      Diseño de intercambiadores: el ajuste del f de Kern, la estimación de la
+      cantidad de tubos y el Δp de los tubos
+    authors:
+      - family-names: "Kakaç"
+        given-names: "Sadik"
+      - family-names: "Liu"
+        given-names: "Hongtan"
+    title: "Heat Exchangers: Selection, Rating, and Thermal Design"
+    edition: "2"
+    publisher:
+      name: "CRC Press"
+    year: 2002
+  - type: book
+    scope: "Diseño de intercambiadores: el ejemplo de control del lado del casco (ej. 14-6)"
+    authors:
+      - family-names: "Peters"
+        given-names: "Max S."
+      - family-names: "Timmerhaus"
+        given-names: "Klaus D."
+      - family-names: "West"
+        given-names: "Ronald E."
+    title: "Plant Design and Economics for Chemical Engineers"
+    edition: "5"
+    publisher:
+      name: "McGraw-Hill"
+    year: 2003
   - type: software
     scope: "Repositorio hermano: hoja de fórmulas teóricas"
     authors:
