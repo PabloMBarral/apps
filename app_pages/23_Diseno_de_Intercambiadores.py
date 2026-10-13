@@ -1,6 +1,6 @@
 """Página 23 — Diseño de intercambiadores.
 
-Fase 12.1. Tres modos:
+Fases 12.1 y 12.2. Tres modos:
 
 - **Banco de tubos** (Çengel y Ghajar, §7-4; Incropera, §7.6): Zukauskas con la corrección por
   filas, V_máx por el plano transversal o por la diagonal, la salida con las propiedades a la
@@ -8,9 +8,11 @@ Fase 12.1. Tres modos:
 - **Doble tubo** (Incropera, §8.7 y §11.3; Çengel y Ghajar, §11-2; Kern, cap. 6): el h de cada
   lado (las correlaciones de la 8.1 y la tabla del anular de Kays y Perkins), el U armado con
   el ensuciamiento, el largo y las horquillas (o las salidas de un equipo dado) y Δp.
-- **Casco y tubos con Kern** (Kern, 1950, cap. 7; Kakaç y Liu, 2002, cap. 8): el lado del casco
-  con Kern, el de los tubos con la 8.1, U_C y U_D, el ε-NTU de un paso por el casco, el
-  criterio de R_d y Δp de los dos lados.
+- **Casco y tubos** (Kern, 1950, cap. 7; Kakaç y Liu, 2002, cap. 8): el lado del casco con
+  Kern o con Bell–Delaware (Fase 12.2; Taborek, 1983; Thome, 2004; Serth, 2014: el corte, las
+  holguras, el bypass y las tiras, los cinco factores y el Δp por zonas, con Kern al lado),
+  el de los tubos con la 8.1, U_C y U_D, el ε-NTU de un paso por el casco, el criterio de R_d
+  y Δp de los dos lados.
 
 El cálculo vive en :mod:`core.heat_transfer.tube_bank`, :mod:`core.heat_transfer.double_pipe`
 y :mod:`core.heat_transfer.shell_tube`; los gráficos, en :mod:`ui.exchanger_design_charts`
@@ -20,6 +22,7 @@ y :mod:`core.heat_transfer.shell_tube`; los gráficos, en :mod:`ui.exchanger_des
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from typing import Any
 
 import pandas as pd
@@ -30,6 +33,13 @@ from core.fluids import FLUID_NAMES_ES
 from core.heat_transfer import double_pipe as dp
 from core.heat_transfer import shell_tube as stt
 from core.heat_transfer import tube_bank as tb
+from core.heat_transfer.bell_delaware import (
+    BAFFLE_CUT_RANGE,
+    BUNDLE_CLEARANCE_HINTS,
+    BellDelawareGeometry,
+    tema_shell_baffle_clearance,
+    tema_tube_hole_clearance,
+)
 from core.heat_transfer.design_common import (
     TUBE_SIDE_CORRELATIONS,
     DesignStream,
@@ -51,17 +61,20 @@ from ui.branding import SUBJECT, VADEMECUM_DOI_URL, VADEMECUM_PDF_URL, sidebar_c
 from ui.exchanger_charts import profile_figure, u_resistance_figure
 from ui.exchanger_design_charts import (
     baffle_sweep_figure,
+    dp_zones_figure,
     friction_chart_figure,
+    h_cascade_figure,
+    methods_sweep_figure,
     velocity_sweep_figure,
 )
 from ui.units_ui import get_current_system, number_input_si, render_units_selector
 
-PAGE_VERSION = "0.32.0"
+PAGE_VERSION = "0.33.0"
 
 # Opciones fijas de los radios: cambiarlas reiniciaría el widget.
 _M_BANK = "Banco de tubos"
 _M_DP = "Doble tubo"
-_M_ST = "Casco y tubos (Kern)"
+_M_ST = "Casco y tubos"
 _MODES = (_M_BANK, _M_DP, _M_ST)
 
 _GIVEN = "given"
@@ -70,6 +83,9 @@ _BWG_OTHER = 0
 _NT_ESTIMATE = "Estimada con el diámetro del casco"
 _NT_GIVEN = "La cuento (dato)"
 _NT_MODES = (_NT_ESTIMATE, _NT_GIVEN)
+_CLR_TEMA = "Las de TEMA"
+_CLR_GIVEN = "A elección"
+_CLR_MODES = (_CLR_TEMA, _CLR_GIVEN)
 
 _TARGETS: dict[str, str] = {
     "T_hot_out": "La T de salida del caliente",
@@ -123,6 +139,13 @@ def _u(kind: QuantityKind, system: UnitSystem) -> str:
 
 def _pct(x: float | None, digits: int = 1) -> str:
     return "—" if x is None else f"{100.0 * x:.{digits}f} %".replace(".", ",")
+
+
+def _signed(x: float) -> str:
+    """Una diferencia relativa con su signo: «+12 %», «−3,4 %»."""
+    v = 100.0 * abs(x)
+    text = f"{v:.0f}" if v >= 10.0 else f"{v:.1f}".replace(".", ",")
+    return f"{'+' if x >= 0 else '−'}{text} %"
 
 
 def _t_scale(system: UnitSystem) -> tuple[float, float]:
@@ -987,7 +1010,7 @@ def _render_double_pipe(r: dp.DoublePipeResult, system: UnitSystem) -> None:
 
 
 # ---------------------------------------------------------------------
-# Casco y tubos (Kern)
+# Casco y tubos (Kern o Bell–Delaware)
 # ---------------------------------------------------------------------
 
 
@@ -999,6 +1022,155 @@ def _st_cached(inputs: stt.ShellTubeInputs) -> stt.ShellTubeResult:
 @st.cache_data(show_spinner=False)
 def _baffle_sweep_cached(inputs: stt.ShellTubeInputs) -> list[stt.BaffleSweepPoint]:
     return stt.baffle_sweep(inputs)
+
+
+@st.cache_data(show_spinner=False)
+def _cut_sweep_cached(inputs: stt.ShellTubeInputs) -> list[stt.BaffleCutSweepPoint]:
+    return stt.baffle_cut_sweep(inputs)
+
+
+def _kern_of(inputs: stt.ShellTubeInputs) -> stt.ShellTubeInputs:
+    """El mismo equipo con Kern en el casco (para comparar)."""
+    return replace(inputs, shell_method="kern", bell_delaware=None)
+
+
+def _bd_geometry_inputs(
+    inp: stt.ShellTubeInputs, key: str, system: UnitSystem, D_s: float, d_o: float, B: float
+) -> BellDelawareGeometry:
+    """Lo que Bell–Delaware pide además de lo de Kern."""
+    geo = inp.bell_delaware or BellDelawareGeometry(L_bb_m=0.012)
+    st.markdown("**Bell–Delaware**")
+    lo, hi = BAFFLE_CUT_RANGE
+    c1, c2 = st.columns(2)
+    with c1:
+        cut = st.number_input(
+            "Corte de los bafles B_c [%]",
+            min_value=1.0,
+            max_value=49.0,
+            value=round(100.0 * geo.baffle_cut, 4),
+            step=1.0,
+            format="%.4g",
+            key=f"{key}_cut",
+            help=f"La altura de la ventana, en % de D_s. Las correlaciones van del "
+            f"{100 * lo:.0f} al {100 * hi:.0f} %; lo habitual, del 20 al 35 %.",
+        )
+    with c2:
+        L_bb = number_input_si(
+            label="Holgura haz–casco L_bb",
+            kind=_D,
+            default_si=geo.L_bb_m,
+            key=f"{key}_Lbb",
+            format="%.4g",
+            min_value_si=0.0,
+            help="Diametral: D_s menos el diámetro del haz. Es un dato del equipo (depende del "
+            "cabezal); por ella pasa el bypass.",
+        )
+    hints = "; ".join(
+        f"{name[0].lower()}{name[1:]}, {_val(a, _D, system, 2)} a {_val(b, _D, system, 2)} "
+        f"{_u(_D, system)}"
+        for name, (a, b) in BUNDLE_CLEARANCE_HINTS.items()
+    )
+    st.caption(f"L_bb según el cabezal: {hints}.")
+    clr = st.radio(
+        "Holguras casco–bafle y tubo–bafle",
+        _CLR_MODES,
+        index=0 if geo.L_sb_m is None and geo.L_tb_m is None else 1,
+        key=f"{key}_clr",
+        horizontal=True,
+    )
+    tema_sb = tema_shell_baffle_clearance(D_s)
+    tema_tb = tema_tube_hole_clearance(d_o, 2.0 * B)
+    L_sb = L_tb = None
+    if clr == _CLR_GIVEN:
+        c1, c2 = st.columns(2)
+        with c1:
+            L_sb = number_input_si(
+                label="Casco–bafle L_sb",
+                kind=_D,
+                default_si=geo.L_sb_m if geo.L_sb_m is not None else tema_sb,
+                key=f"{key}_Lsb",
+                format="%.4g",
+                min_value_si=0.0,
+                help="Diametral: el diámetro interior del casco menos el del bafle.",
+            )
+        with c2:
+            L_tb = number_input_si(
+                label="Tubo–bafle L_tb",
+                kind=_D,
+                default_si=geo.L_tb_m if geo.L_tb_m is not None else tema_tb,
+                key=f"{key}_Ltb",
+                format="%.4g",
+                min_value_si=0.0,
+                help="Diametral: el agujero del bafle menos d_o.",
+            )
+    else:
+        st.caption(
+            f"TEMA: L_sb = {_val(tema_sb, _D, system, 3)} {_u(_D, system)} (RCB-4.3, según "
+            f"D_s) y L_tb = {_val(tema_tb, _D, system, 3)} {_u(_D, system)} (RCB-4.2: el "
+            "tramo sin apoyo de un tubo es 2·B)."
+        )
+    c1, c2 = st.columns(2)
+    with c1:
+        strips = int(
+            st.number_input(
+                "Pares de tiras de sellado N_ss",
+                min_value=0,
+                value=int(geo.sealing_strips),
+                step=1,
+                key=f"{key}_Nss",
+                help="Cortan el bypass entre el haz y el casco; con la mitad de las hileras "
+                "que cruza el fluido (N_ss ≥ N_tcc/2) lo anulan.",
+            )
+        )
+    with c2:
+        L_pl = number_input_si(
+            label="Carril de los pasos L_pl",
+            kind=_D,
+            default_si=geo.L_pl_m,
+            key=f"{key}_Lpl",
+            format="%.4g",
+            min_value_si=0.0,
+            help="El ancho del carril que dejan las divisiones de los pasos, si va en la "
+            "dirección del flujo (0 si no hay o si va perpendicular).",
+        )
+    ends = st.checkbox(
+        "Separaciones de la entrada y de la salida distintas de B",
+        value=geo.B_in_m is not None or geo.B_out_m is not None,
+        key=f"{key}_ends",
+        help="Las toberas obligan a separar más los primeros y los últimos bafles: ahí el "
+        "fluido va más lento (J_s y R_s).",
+    )
+    B_in = B_out = None
+    if ends:
+        c1, c2 = st.columns(2)
+        with c1:
+            B_in = number_input_si(
+                label="B de la entrada",
+                kind=_L,
+                default_si=geo.B_in_m or 1.5 * B,
+                key=f"{key}_Bin",
+                format="%.5g",
+                min_value_si=0.0,
+            )
+        with c2:
+            B_out = number_input_si(
+                label="B de la salida",
+                kind=_L,
+                default_si=geo.B_out_m or 1.5 * B,
+                key=f"{key}_Bout",
+                format="%.5g",
+                min_value_si=0.0,
+            )
+    return BellDelawareGeometry(
+        L_bb_m=L_bb,
+        baffle_cut=cut / 100.0,
+        L_sb_m=L_sb,
+        L_tb_m=L_tb,
+        sealing_strips=strips,
+        L_pl_m=L_pl,
+        B_in_m=B_in,
+        B_out_m=B_out,
+    )
 
 
 def _bwg_of(d_o: float, d_i: float) -> int:
@@ -1015,6 +1187,19 @@ def _shell_tube(system: UnitSystem) -> None:
     )
     inp = stt.SHELL_TUBE_EXAMPLES[_name].inputs
     key = f"ik_{idx}"
+    methods = list(stt.SHELL_METHODS)
+    method = st.radio(
+        "Método del lado del casco",
+        methods,
+        index=methods.index(inp.shell_method),
+        format_func=lambda m: stt.SHELL_METHODS[m],
+        key=f"{key}_method",
+        horizontal=True,
+        help="Kern (1950) supone que todo el fluido cruza el haz. Bell–Delaware (Taborek, "
+        "1983) corrige el banco ideal por el corte de los bafles, las fugas por las holguras, "
+        "el bypass entre el haz y el casco, las separaciones de los extremos y el flujo "
+        "laminar.",
+    )
     T_range = (inp.cold.T_in_K, inp.hot.T_in_K)
     hot = _stream_inputs(f"Fluido caliente ({stream_name(inp.hot)})", inp.hot, f"{key}_h", T_range)
     cold = _stream_inputs(f"Fluido frío ({stream_name(inp.cold)})", inp.cold, f"{key}_c", T_range)
@@ -1048,8 +1233,8 @@ def _shell_tube(system: UnitSystem) -> None:
             key=f"{key}_B",
             format="%.5g",
             min_value_si=0.0,
-            help="Bafles segmentados con el 25 % de corte (los de Kern). Lo habitual: de D_s/5 "
-            "a D_s.",
+            help="Bafles segmentados (Kern los supone con el 25 % de corte). Lo habitual: de "
+            "D_s/5 a D_s.",
         )
     with c3:
         baffles = _int_input(
@@ -1153,6 +1338,9 @@ def _shell_tube(system: UnitSystem) -> None:
         tube_count = _int_input(
             "N_t", inp.tube_count or max(estimate, 1), f"{key}_nt", "Los tubos del haz, en total."
         )
+    geometry = (
+        _bd_geometry_inputs(inp, key, system, D_s, d_o, B) if method == "bell_delaware" else None
+    )
     problems = list(stt.SHELL_PROBLEMS)
     problem = st.radio(
         "Problema",
@@ -1201,6 +1389,8 @@ def _shell_tube(system: UnitSystem) -> None:
                 target=target,
                 target_value=target_value,
                 tube_correlation=tube_corr,
+                shell_method=method,
+                bell_delaware=geometry,
             )
         )
     except ValueError as exc:
@@ -1249,16 +1439,38 @@ def _render_shell_tube(r: stt.ShellTubeResult, system: UnitSystem) -> None:
             ("Factor F", _num(r.exchanger.F, 4)),
         ]
     items += [
-        (f"h_o (casco, Kern) [{_u(_H, system)}]", _val(r.shell.h_W_per_m2K, _H, system, 4)),
+        (
+            f"h_o (casco, {r.method_label}) [{_u(_H, system)}]",
+            _val(r.h_shell_W_per_m2K, _H, system, 4),
+        ),
         (f"h_i (tubos) [{_u(_H, system)}]", _val(r.tube.h_W_per_m2K, _H, system, 4)),
-        (f"Δp del casco [{_u(_PL, system)}]", _val(r.shell.dp_Pa, _PL, system, 4)),
+        (f"Δp del casco [{_u(_PL, system)}]", _val(r.dp_shell_Pa, _PL, system, 4)),
         (f"Δp de los tubos [{_u(_PL, system)}]", _val(r.dp_tube_Pa, _PL, system, 4)),
         ("Tubos N_t", str(r.N_t)),
         (f"Velocidad en los tubos [{_u(_V, system)}]", _val(r.tube.velocity_m_s, _V, system, 3)),
     ]
     _metric_rows(items)
     _messages(r.warnings, stt.shell_tube_notes(r))
-    s = r.shell
+    if r.bell_delaware is not None:
+        _render_bell_delaware(r, system)
+    else:
+        _render_kern_side(r, system)
+    _resistances(r.u_dirty, system, "ik_resist")
+    _profile(r.exchanger, system, "ik_profile")
+    st.markdown("#### Propiedades")
+    hot_props = r.shell_props if i.shell_side == "hot" else r.tube_props
+    cold_props = r.tube_props if i.shell_side == "hot" else r.shell_props
+    _props_table(
+        _stream_props_rows("caliente", hot_props, system)
+        + _stream_props_rows("frío", cold_props, system),
+        system,
+    )
+    _render_steps(shell_tube_steps(r, system))
+    _render_export(stt.shell_tube_to_dict(r, system), f"casco_y_tubos_{i.shell_method}", "ik_dl")
+
+
+def _render_kern_side(r: stt.ShellTubeResult, system: UnitSystem) -> None:
+    i, s = r.inputs, r.shell
     st.markdown("#### El lado del casco (Kern)")
     _props_table(
         [
@@ -1291,18 +1503,195 @@ def _render_shell_tube(r: stt.ShellTubeResult, system: UnitSystem) -> None:
         "De D_s/5 a D_s, con N_b = L/B − 1. Bafles más juntos: más velocidad y más h_o, pero "
         "la caída de presión crece mucho más rápido (más cruces y cada uno más rápido).",
     )
-    _resistances(r.u_dirty, system, "ik_resist")
-    _profile(r.exchanger, system, "ik_profile")
-    st.markdown("#### Propiedades")
-    hot_props = r.shell_props if i.shell_side == "hot" else r.tube_props
-    cold_props = r.tube_props if i.shell_side == "hot" else r.shell_props
+
+
+def _render_bell_delaware(r: stt.ShellTubeResult, system: UnitSystem) -> None:
+    i, bd = r.inputs, r.bell_delaware
+    assert bd is not None
+    a, fc, ib = bd.areas, bd.factors, bd.ideal
+    st.markdown("#### El lado del casco (Bell–Delaware)")
+    geometry_rows: list[tuple[str, float | None, QuantityKind | None]] = [
+        ("S_m (flujo cruzado)", a.S_m_m2, _A),
+        ("S_w (una ventana)", a.S_w_m2, _A),
+        ("S_sb (casco–bafle)", a.S_sb_m2, _A),
+        ("S_tb (tubos–bafle)", a.S_tb_m2, _A),
+        ("S_b (bypass)", a.S_b_m2, _A),
+        ("F_c (tubos entre puntas)", a.F_c, None),
+        ("N_tcc (hileras en el cruce)", a.N_tcc, None),
+        ("N_tcw (hileras en la ventana)", a.N_tcw, None),
+        ("r_s = S_sb/(S_sb + S_tb)", a.r_s, None),
+        ("r_lm = (S_sb + S_tb)/S_m", a.r_lm, None),
+        ("F_sbp = S_b/S_m", a.F_sbp, None),
+        ("r_ss = N_ss/N_tcc", a.r_ss, None),
+        ("L_sb (casco–bafle)", a.L_sb_m, _D),
+        ("L_tb (tubo–bafle)", a.L_tb_m, _D),
+    ]
+    if fc.laminar:
+        geometry_rows.append(("D_w (de la ventana)", a.D_w_m, _D))
+    _props_table(geometry_rows, system)
+    st.markdown("#### Del banco ideal al h_o")
+    factors = [
+        ("J_c (corte)", fc.J_c),
+        ("J_l (fugas)", fc.J_l),
+        ("J_b (bypass)", fc.J_b),
+        ("J_s (extremos)", fc.J_s),
+        ("J_r (laminar)", fc.J_r),
+    ]
+    _chart(
+        h_cascade_figure(
+            bd.h_ideal_W_per_m2K,
+            factors,
+            h_scale=convert_from_si(1.0, _H, system),
+            h_unit=_u(_H, system),
+        ),
+        "ik_cascade",
+        "Cada escalón es lo que cambia el h con ese factor (×J, sobre el h que llega). Los "
+        "que valen 1 no aparecen. J_c pasa de 1 con ventanas chicas (el fluido se acelera).",
+    )
     _props_table(
-        _stream_props_rows("caliente", hot_props, system)
-        + _stream_props_rows("frío", cold_props, system),
+        [
+            ("Re_s = d_o·ṁ/(μ·S_m)", bd.Re, None),
+            ("j_i (Taborek)", ib.j, None),
+            ("φ_s = (μ/μ_p)^0,14", bd.phi, None),
+            ("h_ideal", bd.h_ideal_W_per_m2K, _H),
+            *[(name, J, None) for name, J in factors],
+            ("J_c·J_l·J_b·J_s·J_r", fc.J_total, None),
+            ("h_o", bd.h_W_per_m2K, _H),
+        ],
         system,
     )
-    _render_steps(shell_tube_steps(r, system))
-    _render_export(stt.shell_tube_to_dict(r, system), "casco_y_tubos_kern", "ik_dl")
+    st.markdown("#### La caída de presión por zonas")
+    _chart(
+        dp_zones_figure(
+            [
+                ("Flujo cruzado", bd.dp_cross_ideal_Pa, bd.dp_cross_Pa),
+                ("Ventanas", bd.dp_window_ideal_Pa, bd.dp_window_Pa),
+                ("Extremos", bd.dp_ends_ideal_Pa, bd.dp_ends_Pa),
+            ],
+            dp_scale=convert_from_si(1.0, _PL, system),
+            dp_unit=_u(_PL, system),
+        ),
+        "ik_zones",
+        f"Los N_b − 1 = {i.baffles - 1} compartimientos centrales, las N_b = {i.baffles} "
+        "ventanas y los dos extremos. Las fugas (R_l) y el bypass (R_b) bajan el Δp: el fluido "
+        "que no cruza el haz casi no pierde presión.",
+    )
+    _props_table(
+        [
+            ("f_i (Taborek)", ib.f, None),
+            ("Δp_bi (un compartimiento ideal)", bd.dp_bi_Pa, _PL),
+            ("Δp_wi (una ventana ideal)", bd.dp_wi_Pa, _PL),
+            ("R_l (fugas)", fc.R_l, None),
+            ("R_b (bypass)", fc.R_b, None),
+            ("R_s (entrada)", fc.R_s_in, None),
+            ("R_s (salida)", fc.R_s_out, None),
+            ("Δp del flujo cruzado", bd.dp_cross_Pa, _PL),
+            ("Δp de las ventanas", bd.dp_window_Pa, _PL),
+            ("Δp de los extremos", bd.dp_ends_Pa, _PL),
+            ("Δp del casco", bd.dp_Pa, _PL),
+        ],
+        system,
+    )
+    st.markdown("#### Kern y Bell–Delaware")
+    try:
+        kern = _st_cached(_kern_of(i))
+    except ValueError as exc:
+        st.warning(f"Con Kern no se puede resolver este equipo: {exc}")
+        kern = None
+    if kern is not None:
+        rows: list[tuple[str, float | None, float | None, QuantityKind]] = [
+            ("h_o", r.h_shell_W_per_m2K, kern.h_shell_W_per_m2K, _H),
+            ("Δp del casco", r.dp_shell_Pa, kern.dp_shell_Pa, _PL),
+            ("U_D", r.U_D_W_per_m2K, kern.U_D_W_per_m2K, _H),
+        ]
+        if i.problem == "check":
+            rows.append(("R_d que tolera", r.R_d_available, kern.R_d_available, _RF))
+        else:
+            rows += [
+                ("Q̇", r.Q_W, kern.Q_W, _W),
+                ("T de salida del caliente", r.T_hot_out_K, kern.T_hot_out_K, _T),
+                ("T de salida del frío", r.T_cold_out_K, kern.T_cold_out_K, _T),
+            ]
+        _table(
+            pd.DataFrame(
+                [
+                    {
+                        "Magnitud": f"{name} [{_u(kind, system)}]",
+                        "Bell–Delaware": _val(b, kind, system, 4),
+                        "Kern": _val(k, kind, system, 4),
+                        "Kern contra BD": "—"
+                        if kind in (_T, _RF) or not b or k is None
+                        else _signed(k / b - 1.0),
+                    }
+                    for name, b, k, kind in rows
+                ]
+            )
+        )
+        st.caption(
+            "Cada método con sus propias temperaturas de salida y de pared (la nota de arriba "
+            "compara con las mismas propiedades). Kern supone que todo el fluido cruza el haz."
+        )
+    st.markdown("#### h_o y Δp contra los bafles")
+    h_scale, h_unit = convert_from_si(1.0, _H, system), _u(_H, system)
+    dp_scale, dp_unit = convert_from_si(1.0, _PL, system), _u(_PL, system)
+    L_scale, L_unit = convert_from_si(1.0, _L, system), _u(_L, system)
+    series: dict[str, tuple[list[float], list[float], list[float]]] = {}
+    for name, inputs in (("Bell–Delaware", i), ("Kern", _kern_of(i))):
+        pts = _baffle_sweep_cached(inputs)
+        series[name] = (
+            [p.B_m * L_scale for p in pts],
+            [p.h_o_W_per_m2K * h_scale for p in pts],
+            [p.dp_shell_Pa * dp_scale for p in pts],
+        )
+    _chart(
+        methods_sweep_figure(
+            series,
+            x_now=i.B_m * L_scale,
+            h_now=r.h_shell_W_per_m2K * h_scale,
+            dp_now=r.dp_shell_Pa * dp_scale,
+            x_title=f"Separación de los bafles B [{L_unit}]",
+            h_title=f"h_o [{h_unit}]",
+            dp_title=f"Δp del casco [{dp_unit}]",
+            hover_x="B",
+        ),
+        "ik_baffles",
+        "De D_s/5 a D_s, con N_b = L/B − 1 y los extremos como en los datos. Los dos métodos "
+        "ven el mismo compromiso (bafles más juntos: más h_o y mucho más Δp), pero Kern no "
+        "descuenta las fugas ni el bypass.",
+    )
+    st.markdown("#### h_o y Δp contra el corte de los bafles")
+    pts = _cut_sweep_cached(i)
+    cut_series: dict[str, tuple[list[float], list[float], list[float]]] = {
+        "Bell–Delaware": (
+            [100.0 * p.baffle_cut for p in pts],
+            [p.h_o_W_per_m2K * h_scale for p in pts],
+            [p.dp_shell_Pa * dp_scale for p in pts],
+        )
+    }
+    if kern is not None:
+        lo, hi = BAFFLE_CUT_RANGE
+        cut_series["Kern"] = (
+            [100.0 * lo, 100.0 * hi],
+            [kern.h_shell_W_per_m2K * h_scale] * 2,
+            [kern.dp_shell_Pa * dp_scale] * 2,
+        )
+    _chart(
+        methods_sweep_figure(
+            cut_series,
+            x_now=100.0 * bd.geometry.baffle_cut,
+            h_now=r.h_shell_W_per_m2K * h_scale,
+            dp_now=r.dp_shell_Pa * dp_scale,
+            x_title="Corte de los bafles B_c [%]",
+            h_title=f"h_o [{h_unit}]",
+            dp_title=f"Δp del casco [{dp_unit}]",
+            hover_x="B_c [%]",
+            log_x=False,
+        ),
+        "ik_cut",
+        "Del 15 al 45 % de D_s. Un corte chico acelera el fluido en las ventanas (más h_o y "
+        "mucho más Δp); uno grande deja más tubos en las ventanas, donde el flujo es paralelo. "
+        "Kern no ve el corte (supone el 25 %): es una recta.",
+    )
 
 
 # ---------------------------------------------------------------------
@@ -1316,7 +1705,8 @@ def _render_theory() -> None:
             f"El [vademecum de la cátedra]({VADEMECUM_PDF_URL}) ([DOI]({VADEMECUM_DOI_URL})) "
             "todavía no tiene un capítulo de transferencia de calor: las fórmulas siguen a "
             "**Çengel y Ghajar (2015)** (§7-4 y cap. 11), **Incropera et al. (2007)** (§7.6, "
-            "§8.7 y cap. 11), **Kern (1950)** y **Kakaç y Liu (2002)**, con las propiedades de "
+            "§8.7 y cap. 11), **Kern (1950)** y **Kakaç y Liu (2002)** y, para Bell–Delaware, "
+            "**Taborek (1983)**, **Thome (2004)** y **Serth (2014)**, con las propiedades de "
             "CoolProp."
         )
         st.markdown(
@@ -1412,6 +1802,82 @@ def _render_theory() -> None:
             r"R_d &= \frac{U_C - U_{\text{req}}}{U_C\,U_{\text{req}}}\end{aligned}"
         )
         st.latex(r"R_d \ge R''_{f,o} + R''_{f,i}\,\frac{d_o}{d_i}")
+        st.markdown(
+            "**Casco y tubos con Bell–Delaware** (Bell, 1963 y 1988; Taborek, 1983; Thome, "
+            "2004, cap. 3; Serth, 2014, cap. 6). Tinker (1951) partió el flujo del casco en "
+            "corrientes: la que cruza el haz (B), la que se fuga entre los tubos y los agujeros "
+            "de los bafles (A), la que pasa entre el haz y el casco (C), la que se fuga entre "
+            "los bafles y el casco (E) y la del carril de los pasos (F). Kern supone que todo "
+            "es B; Bell–Delaware parte del h de un banco de tubos ideal y lo corrige con un "
+            "factor por cada efecto:"
+        )
+        st.latex(r"h_o = h_{\text{ideal}}\,J_c\,J_l\,J_b\,J_s\,J_r")
+        st.markdown(
+            "El banco ideal va con la velocidad másica del área de flujo cruzado en la línea de "
+            "centros (S_m: la luz entre los tubos y el canal entre el haz y el casco) y j_i de "
+            "la tabla de Taborek para el arreglo de 30°, 45° o 90°:"
+        )
+        st.latex(
+            r"\begin{aligned}S_m &= B\left[L_{bb} + \frac{D_{ctl}}{L_{tp,\text{ef}}}\,"
+            r"(P_T - d_o)\right] \\ h_{\text{ideal}} &= j_i\,c_p\,\frac{\dot m}{S_m}\,"
+            r"\mathrm{Pr}^{-2/3}\,\phi_s\end{aligned}"
+        )
+        st.latex(
+            r"\begin{aligned}j_i &= a_1\left(\frac{1.33}{P_T/d_o}\right)^{a}\mathrm{Re}_s^{a_2}"
+            r" \\ a &= \frac{a_3}{1 + 0.14\,\mathrm{Re}_s^{a_4}}\end{aligned}"
+        )
+        st.markdown(
+            "Los factores: J_c con F_c, la fracción de los tubos entre las puntas de los "
+            "bafles; J_l con las áreas de las fugas (r_s = S_sb/(S_sb + S_tb) y r_lm = "
+            "(S_sb + S_tb)/S_m); J_b con la del bypass (F_sbp = S_b/S_m) y las tiras de "
+            "sellado por hilera (r_ss = N_ss/N_tcc), y J_s con las separaciones de los "
+            "extremos sobre la central (L* = B_ext/B):"
+        )
+        st.latex(
+            r"\begin{aligned}J_c &= 0.55 + 0.72\,F_c \\ J_l &= 0.44\,(1 - r_s) \\ "
+            r"&\quad + \left[1 - 0.44\,(1 - r_s)\right]e^{-2.2\,r_{lm}}\end{aligned}"
+        )
+        st.latex(
+            r"\begin{aligned}J_b &= e^{-C_{bh}\,F_{sbp}\left(1 - \sqrt[3]{2\,r_{ss}}"
+            r"\right)} \\ J_s &= \frac{N_b - 1 + L^{*\,1-n}_{\text{ent}} + "
+            r"L^{*\,1-n}_{\text{sal}}}{N_b - 1 + L^*_{\text{ent}} + L^*_{\text{sal}}}"
+            r"\end{aligned}"
+        )
+        st.markdown(
+            "C_bh = 1,25 y n = 0,6 en turbulento (1,35 y ⅓ con Re_s < 100); con r_ss ≥ ½ las "
+            "tiras anulan el bypass (J_b = 1). J_r vale 1 con Re_s ≥ 100; con Re_s ≤ 20, "
+            "(10/N_c)^0,18, con N_c las hileras que cruza todo el fluido, interpolado en el "
+            "medio y nunca menos de 0,4."
+        )
+        st.markdown(
+            "La caída de presión va por zonas: los N_b − 1 compartimientos centrales, las N_b "
+            "ventanas y los dos extremos, con un compartimiento y una ventana ideales "
+            "(G_w = ṁ/√(S_m·S_w)) y los factores de las fugas (R_l), del bypass (R_b) y de los "
+            "extremos (R_s):"
+        )
+        st.latex(
+            r"\begin{aligned}\Delta p_{bi} &= \frac{2\,f_i\,N_{tcc}\,G_s^2}{\rho\,\phi_s}"
+            r" \\ \Delta p_{wi} &= (2 + 0.6\,N_{tcw})\,\frac{G_w^2}{2\,\rho}"
+            r"\end{aligned}"
+        )
+        st.latex(
+            r"\begin{aligned}\Delta p_s &= (N_b - 1)\,\Delta p_{bi}\,R_b\,R_l \\ "
+            r"&\quad + N_b\,\Delta p_{wi}\,R_l \\ &\quad + \Delta p_{bi}\left(1 + "
+            r"\frac{N_{tcw}}{N_{tcc}}\right)R_b \\ &\qquad \cdot (R_{s,\text{ent}} + "
+            r"R_{s,\text{sal}})\end{aligned}"
+        )
+        st.latex(
+            r"\begin{aligned}R_l &= e^{-1.33\,(1 + r_s)\,r_{lm}^{\,p}} \\ "
+            r"R_b &= e^{-C_{bp}\,F_{sbp}\left(1 - \sqrt[3]{2\,r_{ss}}\right)}"
+            r"\end{aligned}"
+        )
+        st.markdown(
+            "Con p = 0,8 − 0,15·(1 + r_s), C_bp = 3,7 (4,5 en laminar) y R_s = (B/B_ext)^(2 − n′), "
+            "n′ = 0,2 (1 en laminar). En laminar, la ventana suma además la fricción viscosa. "
+            "Las holguras casco–bafle y tubo–bafle por defecto son las de **TEMA (2007)**: "
+            "RCB-4.3 y RCB-4.2. La del haz con el casco depende del cabezal: es un dato del "
+            "equipo."
+        )
 
 
 # ---------------------------------------------------------------------
@@ -1424,8 +1890,8 @@ st.subheader(SUBJECT)
 st.title("🛠️ Diseño de intercambiadores")
 st.markdown(
     "Del h de cada lado al equipo: un **banco de tubos** que cruza un fluido (Zukauskas), un "
-    "**doble tubo** dimensionado en horquillas y un **casco y tubos** con el método de Kern, "
-    "con el U armado, el ensuciamiento y las caídas de presión."
+    "**doble tubo** dimensionado en horquillas y un **casco y tubos** con el método de Kern o "
+    "el de Bell–Delaware, con el U armado, el ensuciamiento y las caídas de presión."
 )
 _render_theory()
 st.markdown("---")

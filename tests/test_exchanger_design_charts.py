@@ -1,4 +1,4 @@
-"""Tests de ui.exchanger_design_charts (Fase 12.1)."""
+"""Tests de ui.exchanger_design_charts (Fases 12.1 y 12.2)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,10 @@ from core.heat_transfer import shell_tube as stt
 from core.heat_transfer import tube_bank as tb
 from ui.exchanger_design_charts import (
     baffle_sweep_figure,
+    dp_zones_figure,
     friction_chart_figure,
+    h_cascade_figure,
+    methods_sweep_figure,
     velocity_sweep_figure,
 )
 
@@ -133,3 +136,109 @@ def test_log_ticks_inside_a_narrow_range() -> None:
     # los números completos hasta 10⁶, con espacio de miles desde 10⁴
     texts = dict(zip(fig.layout.yaxis2.tickvals, fig.layout.yaxis2.ticktext, strict=True))
     assert texts[20_000.0] == "20 000" and texts[5000.0] == "5000"
+
+
+# ---------------------------------------------------------------------
+# Bell–Delaware (Fase 12.2)
+# ---------------------------------------------------------------------
+
+KEROSENE = stt.SHELL_TUBE_EXAMPLES["Enfriador de kerosene con agua de río"].inputs
+
+
+def _bd(inputs: stt.ShellTubeInputs) -> stt.ShellTubeResult:
+    return stt.solve_shell_tube(replace(inputs, shell_method="bell_delaware"))
+
+
+def test_h_cascade_goes_from_the_ideal_bank_to_h_o() -> None:
+    r = _bd(KEROSENE)
+    bd = r.bell_delaware
+    assert bd is not None
+    fc = bd.factors
+    factors = [("J_c", fc.J_c), ("J_l", fc.J_l), ("J_b", fc.J_b), ("J_s", fc.J_s), ("J_r", fc.J_r)]
+    fig = h_cascade_figure(bd.h_ideal_W_per_m2K, factors, h_scale=1.0, h_unit="W/(m²·K)")
+    w = fig.data[0]
+    # J_s y J_r valen 1 (extremos iguales, turbulento): no aparecen
+    assert list(w.x) == ["h ideal", "J_c", "J_l", "J_b", "h_o"]
+    assert list(w.measure) == ["absolute", "relative", "relative", "relative", "total"]
+    assert w.y[0] == pytest.approx(bd.h_ideal_W_per_m2K)
+    assert w.y[-1] == pytest.approx(bd.h_W_per_m2K)
+    # los escalones suman: h_ideal + Σ escalones = h_o
+    assert w.y[0] + sum(w.y[1:-1]) == pytest.approx(bd.h_W_per_m2K)
+    assert w.text[2] == "×" + f"{fc.J_l:.3g}".replace(".", ",")
+    # sin «k» en el eje y el rango arranca en 0
+    assert fig.layout.yaxis.exponentformat == "none"
+    assert fig.layout.yaxis.range[0] == 0.0
+    # en otro sistema: la escala
+    fig = h_cascade_figure(bd.h_ideal_W_per_m2K, factors, h_scale=0.1761, h_unit="Btu")
+    assert fig.data[0].y[-1] == pytest.approx(0.1761 * bd.h_W_per_m2K)
+
+
+def test_dp_zones_ideal_next_to_real() -> None:
+    bd = _bd(KEROSENE).bell_delaware
+    assert bd is not None
+    zones = [
+        ("Flujo cruzado", bd.dp_cross_ideal_Pa, bd.dp_cross_Pa),
+        ("Ventanas", bd.dp_window_ideal_Pa, bd.dp_window_Pa),
+        ("Extremos", bd.dp_ends_ideal_Pa, bd.dp_ends_Pa),
+    ]
+    fig = dp_zones_figure(zones, dp_scale=1e-3, dp_unit="kPa")
+    ideal, real = fig.data
+    assert ideal.name.startswith("ideal") and real.name == "con fugas y bypass"
+    assert fig.layout.barmode == "group"
+    assert list(real.y) == pytest.approx([1e-3 * z[2] for z in zones])
+    # las fugas y el bypass siempre bajan el Δp
+    assert all(i > r for i, r in zip(ideal.y, real.y, strict=True))
+    assert all("e" not in t for t in real.text)
+
+
+def test_methods_sweep_two_panels_both_methods() -> None:
+    i = replace(KEROSENE, shell_method="bell_delaware")
+    r = stt.solve_shell_tube(i)
+    series = {}
+    for name, inputs in (("Bell–Delaware", i), ("Kern", replace(i, shell_method="kern"))):
+        pts = stt.baffle_sweep(inputs)
+        series[name] = (
+            [p.B_m for p in pts],
+            [p.h_o_W_per_m2K for p in pts],
+            [p.dp_shell_Pa for p in pts],
+        )
+    fig = methods_sweep_figure(
+        series,
+        x_now=i.B_m,
+        h_now=r.h_shell_W_per_m2K,
+        dp_now=r.dp_shell_Pa,
+        x_title="B [m]",
+        h_title="h_o",
+        dp_title="Δp",
+        hover_x="B",
+    )
+    names = [t.name for t in fig.data]
+    assert names.count("Bell–Delaware") == 2 and names.count("Kern") == 2
+    # una sola entrada por método en la leyenda
+    shown = [t.name for t in fig.data if t.showlegend is not False]
+    assert shown == ["Bell–Delaware", "Kern", "tus datos"]
+    kern = [t for t in fig.data if t.name == "Kern"]
+    assert all(t.line.dash == "dash" for t in kern)
+    assert fig.layout.xaxis2.type == "log" and fig.layout.yaxis2.type == "log"
+    # el corte, en un eje lineal, con Kern como una recta
+    cut = stt.baffle_cut_sweep(i)
+    fig = methods_sweep_figure(
+        {
+            "Bell–Delaware": (
+                [100 * p.baffle_cut for p in cut],
+                [p.h_o_W_per_m2K for p in cut],
+                [p.dp_shell_Pa for p in cut],
+            ),
+            "Kern": ([15.0, 45.0], [r.shell.h_W_per_m2K] * 2, [r.shell.dp_Pa] * 2),
+        },
+        x_now=25.0,
+        h_now=r.h_shell_W_per_m2K,
+        dp_now=r.dp_shell_Pa,
+        x_title="B_c [%]",
+        h_title="h_o",
+        dp_title="Δp",
+        hover_x="B_c",
+        log_x=False,
+    )
+    assert fig.layout.xaxis2.type != "log"
+    assert len(fig.data[0].x) == len(cut)

@@ -1,4 +1,4 @@
-"""Gráficos del diseño de intercambiadores — Fase 12.1.
+"""Gráficos del diseño de intercambiadores — Fases 12.1 y 12.2.
 
 - :func:`friction_chart_figure`: el f de Zukauskas en log–log (Incropera, figs. 7.13 y 7.14;
   Çengel y Ghajar, fig. 7-27), una curva por P_L (alineado) o P_T (tresbolillo), con el
@@ -8,6 +8,13 @@
   pendientes de ~0,6 y ~1,8.
 - :func:`baffle_sweep_figure`: h_o y Δp del casco contra la separación de los bafles, en
   dos paneles: el compromiso del diseño con Kern.
+- :func:`h_cascade_figure` (Bell–Delaware): del h del banco ideal al h_o, un escalón por
+  factor (J_c, J_l, J_b, J_s y J_r); los que valen 1 no aparecen.
+- :func:`dp_zones_figure` (Bell–Delaware): el Δp del flujo cruzado, de las ventanas y de los
+  extremos, cada uno con su barra ideal (sin fugas ni bypass) al lado.
+- :func:`methods_sweep_figure`: h_o y Δp contra la separación o contra el corte de los
+  bafles, con Kern y Bell–Delaware en los mismos dos paneles (Kern no ve el corte: es una
+  recta).
 
 El perfil de temperaturas de un doble tubo y el peso de las resistencias del U salen de
 :mod:`ui.exchanger_charts` (Fase 8.2).
@@ -17,7 +24,11 @@ título cuando se tocaba el gráfico).
 
 Colores: la paleta validada para daltonismo del proyecto. La familia de curvas de f va en la
 rampa azul ordinal (de claro a oscuro con el paso); el coeficiente h va en azul y la caída
-de presión en naranja; el punto de los datos, en tinta con borde blanco.
+de presión en naranja; el punto de los datos, en tinta con borde blanco. En la cascada, lo
+que suma va en azul, lo que resta en naranja y los totales en gris (como las cascadas de
+:mod:`ui.balance_charts`); en las zonas del Δp, el ideal en gris y el real en azul; en los
+barridos de los dos métodos, Bell–Delaware en azul y Kern en naranja rayado (el color es
+el método; el panel, la magnitud).
 
 Vive en ``ui/`` porque arma figuras de plotly; el cálculo está en
 :mod:`core.heat_transfer.tube_bank` y :mod:`core.heat_transfer.shell_tube`.
@@ -34,10 +45,19 @@ from plotly.subplots import make_subplots
 from core.heat_transfer.shell_tube import BaffleSweepPoint
 from core.heat_transfer.tube_bank import Arrangement, Curve, SweepPoint
 
-__all__ = ["baffle_sweep_figure", "friction_chart_figure", "velocity_sweep_figure"]
+__all__ = [
+    "baffle_sweep_figure",
+    "dp_zones_figure",
+    "friction_chart_figure",
+    "h_cascade_figure",
+    "methods_sweep_figure",
+    "velocity_sweep_figure",
+]
 
 _BLUE = "#2a78d6"
 _ORANGE = "#eb6834"
+_GRAY = "#6b7280"
+_LIGHT = "#9ca3af"
 _INK = "#1f2937"
 _GRID = "#e5e7eb"
 #: Rampa azul ordinal (pasos 250 a 650 de la paleta validada).
@@ -279,3 +299,214 @@ def baffle_sweep_figure(
         bottom_title=f"Δp del casco [{dp_unit}]",
         hover_x="B",
     )
+
+
+# ---------------------------------------------------------------------
+# Bell–Delaware (Fase 12.2)
+# ---------------------------------------------------------------------
+
+
+def _bar_text(x: float) -> str:
+    """El valor de una barra con cuatro cifras, sin «k» ni notación exponencial."""
+    if x == 0.0 or not math.isfinite(x):
+        return "0"
+    if not 1e-3 <= abs(x) < 1e9:
+        return _tick_text(abs(x)) if x > 0 else "−" + _tick_text(abs(x))
+    decimals = max(3 - math.floor(math.log10(abs(x))), 0)
+    text = f"{round(x, decimals):,.{decimals}f}"
+    return text.replace(",", "\u2009").replace(".", ",").replace("-", "−")
+
+
+def _value_axis(values: Sequence[float]) -> dict[str, str]:
+    """Sin los prefijos de plotly («15k» junto a W/(m²·K)), como
+    :func:`ui.balance_charts.value_axis`."""
+    top = max((abs(v) for v in values), default=0.0)
+    return {"exponentformat": "none" if 1e-3 <= top < 1e6 else "power"}
+
+
+def h_cascade_figure(
+    h_ideal: float,
+    factors: Sequence[tuple[str, float]],
+    *,
+    h_scale: float,
+    h_unit: str,
+) -> go.Figure:
+    """La cascada del coeficiente: h_ideal, un escalón por factor (h·(J − 1), con el h que
+    llega a ese factor) y h_o. Los factores que valen 1 no aparecen."""
+    labels = ["h ideal"]
+    values = [h_ideal * h_scale]
+    texts = [_bar_text(h_ideal * h_scale)]
+    hovers = [f"h ideal = {_bar_text(h_ideal * h_scale)} {h_unit}"]
+    h = peak = h_ideal
+    for name, J in factors:
+        if abs(J - 1.0) < 1e-9:
+            continue
+        step = h * (J - 1.0)
+        h *= J
+        peak = max(peak, h)
+        labels.append(name)
+        values.append(step * h_scale)
+        texts.append(f"×{_comma(J, '.3g')}")
+        hovers.append(f"{name} = {_comma(J, '.4g')}: {_bar_text(step * h_scale)} {h_unit}")
+    labels.append("h_o")
+    values.append(h * h_scale)
+    texts.append(_bar_text(h * h_scale))
+    hovers.append(f"h_o = {_bar_text(h * h_scale)} {h_unit}")
+    fig = go.Figure(
+        go.Waterfall(
+            orientation="v",
+            x=labels,
+            y=values,
+            measure=["absolute"] + ["relative"] * (len(labels) - 2) + ["total"],
+            text=texts,
+            textposition="outside",
+            hovertext=hovers,
+            hoverinfo="text",
+            increasing={"marker": {"color": _BLUE}},
+            decreasing={"marker": {"color": _ORANGE}},
+            totals={"marker": {"color": _GRAY}},
+            connector={"line": {"color": _LIGHT, "width": 1}},
+            cliponaxis=False,
+        )
+    )
+    fig.update_layout(
+        height=340,
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        yaxis={
+            "title": f"h [{h_unit}]",
+            "gridcolor": _GRID,
+            "zerolinecolor": _INK,
+            "range": [0.0, 1.15 * peak * h_scale],
+            **_value_axis(values),
+        },
+        xaxis={"type": "category"},
+        showlegend=False,
+        separators=", ",
+    )
+    return fig
+
+
+def dp_zones_figure(
+    zones: Sequence[tuple[str, float, float]],
+    *,
+    dp_scale: float,
+    dp_unit: str,
+) -> go.Figure:
+    """El Δp de cada zona del casco (nombre, ideal, real): la barra ideal (sin fugas ni
+    bypass: R_l = R_b = 1) al lado de la real."""
+    names = [z[0] for z in zones]
+    ideal = [z[1] * dp_scale for z in zones]
+    real = [z[2] * dp_scale for z in zones]
+    fig = go.Figure()
+    for label, ys, color in (
+        ("ideal (sin fugas ni bypass)", ideal, _LIGHT),
+        ("con fugas y bypass", real, _BLUE),
+    ):
+        fig.add_trace(
+            go.Bar(
+                x=names,
+                y=ys,
+                name=label,
+                marker={"color": color},
+                text=[_bar_text(v) for v in ys],
+                textposition="outside",
+                cliponaxis=False,
+                hovertemplate=f"{label}<br>%{{x}}: %{{y:.4g}} {dp_unit}<extra></extra>",
+            )
+        )
+    fig.update_layout(
+        barmode="group",
+        bargap=0.25,
+        bargroupgap=0.08,
+        height=360,
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        yaxis={
+            "title": f"Δp [{dp_unit}]",
+            "gridcolor": _GRID,
+            "zerolinecolor": _INK,
+            "range": [0.0, 1.18 * max([*ideal, *real, 0.0])],
+            **_value_axis([*ideal, *real]),
+        },
+        legend=_LEGEND_BELOW,
+        separators=", ",
+    )
+    return fig
+
+
+#: El color y el trazo de cada método (el color es el método; el panel, la magnitud).
+_METHOD_STYLE: dict[str, dict[str, object]] = {
+    "Bell–Delaware": {"color": _BLUE, "width": 2.6},
+    "Kern": {"color": _ORANGE, "width": 2.2, "dash": "dash"},
+}
+
+
+def methods_sweep_figure(
+    series: Mapping[str, tuple[Sequence[float], Sequence[float], Sequence[float]]],
+    *,
+    x_now: float,
+    h_now: float,
+    dp_now: float,
+    x_title: str,
+    h_title: str,
+    dp_title: str,
+    hover_x: str,
+    log_x: bool = True,
+) -> go.Figure:
+    """h_o (arriba) y Δp (abajo) de cada método contra la misma variable, en dos paneles con
+    el eje x compartido; el punto de los datos va sobre la curva del método elegido."""
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08)
+    xs_all: list[float] = [x_now]
+    tops: list[float] = [h_now]
+    bottoms: list[float] = [dp_now]
+    for name, (xs, hs, dps) in series.items():
+        xs_all += list(xs)
+        tops += list(hs)
+        bottoms += list(dps)
+        style = _METHOD_STYLE.get(name, {"color": _INK, "width": 2.0})
+        for row, ys, label in ((1, hs, h_title), (2, dps, dp_title)):
+            fig.add_trace(
+                go.Scatter(
+                    x=list(xs),
+                    y=list(ys),
+                    mode="lines",
+                    name=name,
+                    legendgroup=name,
+                    showlegend=row == 1,
+                    line=style,
+                    hovertemplate=f"{name}<br>{hover_x} = %{{x:.4g}}<br>{label} = %{{y:.4g}}"
+                    "<extra></extra>",
+                ),
+                row=row,
+                col=1,
+            )
+    for row, now, label in ((1, h_now, h_title), (2, dp_now, dp_title)):
+        fig.add_trace(
+            go.Scatter(
+                x=[x_now],
+                y=[now],
+                mode="markers",
+                name="tus datos",
+                legendgroup="now",
+                showlegend=row == 1,
+                marker=_MARKER,
+                hovertemplate=f"{hover_x} = %{{x:.4g}}<br>{label} = %{{y:.4g}}<extra></extra>",
+            ),
+            row=row,
+            col=1,
+        )
+    for row, ys, label in ((1, tops, h_title), (2, bottoms, dp_title)):
+        fig.update_yaxes(type="log", title=label, gridcolor=_GRID, row=row, col=1, **_log_ticks(ys))
+    if log_x:
+        ticks = _log_ticks(xs_all)
+        fig.update_xaxes(type="log", gridcolor=_GRID, row=1, col=1, **ticks)
+        fig.update_xaxes(type="log", title=x_title, gridcolor=_GRID, row=2, col=1, **ticks)
+    else:
+        fig.update_xaxes(gridcolor=_GRID, row=1, col=1)
+        fig.update_xaxes(title=x_title, gridcolor=_GRID, row=2, col=1)
+    fig.update_layout(
+        height=520,
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        legend=_LEGEND_BELOW,
+        separators=", ",
+    )
+    return fig
