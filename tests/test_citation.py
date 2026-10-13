@@ -237,7 +237,7 @@ def test_groups_follow_the_kind_order(cit: ct.Citation) -> None:
     groups = ct.group_references(cit.references)
     assert list(groups) == [label for label in ct.REFERENCE_KINDS.values() if label in groups]
     assert sum(len(refs) for refs in groups.values()) == len(cit.references)
-    assert len(groups["Normas"]) == 5
+    assert len(groups["Normas"]) == 6  # ISO 14912:2003 desde la 0.30.0
 
 
 def test_unknown_kinds_go_last() -> None:

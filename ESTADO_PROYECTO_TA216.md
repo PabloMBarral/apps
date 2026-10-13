@@ -5,7 +5,8 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.29.0` — Fase 10.2, segundo principio (2026-10-11).
+> **Versión actual**: `0.30.0` — Fase 11.1, conducción transitoria, y la matriz de
+> normalización de ISO 6976 (2026-10-12).
 
 ---
 
@@ -54,10 +55,10 @@
   editable in-place con autocompletado de los 60 componentes de la
   norma. Ejemplos del Annex D (D.2, D.3, D.4) verificados contra los
   valores tabulados.
-- **Deferido**: matriz de normalización completa — requiere
-  implementar ISO 14912:2003 Formula (69). Pseudocódigo de dos
-  formulaciones (`Cov_proj` y `Cov_renorm`) documentado al pie de
-  `core/combustion/iso6976.py` para retomar en fase futura.
+- **Deferido** (resuelto en la 0.30.0, ver abajo): matriz de normalización
+  completa — ISO 14912:2003. Las dos formulaciones que se probaron
+  (`Cov_proj` y `Cov_renorm`) quedan documentadas al pie de
+  `core/combustion/iso6976.py`.
 
 ### Fase 1.4 — Multifluido + selector global de unidades
 - **Commit**: `b0f25c9` (2026-05-21) — `feat: multifluido + selector global de unidades (Fase 1.4)`
@@ -1818,6 +1819,125 @@
     reiniciado.
 - **Dependencias**: ninguna nueva.
 
+### Fase 11.1 — Conducción transitoria
+- **Versión**: `0.30.0` (2026-10-12). Rama `claude/water-state-analyzer-f4fiev`.
+  La primera mitad de la Fase 11 (el plan aprobado: 11.1 = conducción
+  transitoria; 11.2 = ebullición y condensación).
+- **Scope**:
+  - **Unidades nuevas**: el tiempo (s en los tres sistemas), la energía por
+    unidad de área (J/m² | kJ/m² | Btu/ft²) y por unidad de largo (J/m | kJ/m |
+    Btu/ft).
+  - **`core/heat_transfer/transient.py`** (nuevo):
+    - la tabla de sólidos a 300 K (Incropera, tablas A.1 y A.3);
+    - `solve_lumped`: la capacidad concentrada con siete cuerpos, la temperatura
+      a un tiempo o el tiempo hasta una temperatura, el calor y la solución
+      exacta al lado (`lumped_exact_curve`);
+    - `eigenvalues`, `coefficient`, `theta`, `heat_ratio` y
+      `solve_one_dimensional`: la serie de la pared, el cilindro y la esfera
+      (los términos que hagan falta, redondeados a una potencia de 2 para reusar
+      las raíces) y la solución de un término; el tiempo hasta una temperatura
+      del centro;
+    - `solve_semi_infinite` con la superficie a T_s, un flujo o convección, y la
+      temperatura, la profundidad o el tiempo como incógnita (`brentq` para las
+      inversas); `solve_contact` y `contact_profiles`;
+    - `solve_product` con siete formas y la regla de Langston; `product_map`;
+    - ejemplos y export.
+  - `transient_procedure.py`: los cuatro procedimientos en los tres sistemas, con
+    los factores 1000 y 3600 de α y de b a la vista. Los renglones con números se
+    parten con un estimador del ancho que tiene en cuenta el lado izquierdo
+    (`_vis`, `_Pack`, `_chain`).
+  - **`ui/transient_charts.py`** (nuevo): T(t) con la constante de tiempo y la
+    solución exacta, los perfiles a varios tiempos, la historia del centro con
+    τ = 0,2 marcado, el semi-infinito con la penetración, el contacto en dos
+    paneles y el mapa de temperatura del producto.
+  - **Página `/Conduccion_Transitoria` (⏱️)**, en el menú después de
+    Transferencia de calor: la teoría (el vademecum no tiene el capítulo), el
+    procedimiento, el export y el tiempo en s, min, h o días.
+- **Validación**, contra Çengel y Ghajar (2015, cap. 4) e Incropera (2007,
+  cap. 5):
+  - §4-1: la termocupla, 9,94 s (el libro, 10 s); la hora de la muerte, 12,2 h.
+    Con Bi = 0,89 la solución exacta da 27,4 °C de media y 30,9 °C en el centro.
+  - §4-2: el huevo, 927,5 s con la serie y 928,8 s con un término (el libro,
+    933 s: redondea θ₀); las placas de latón, 279,8 °C (279 °C); el eje, 364,1 °C
+    y 30 124 kJ/m (364 °C y 30 120 kJ); los bifes, 2166 s, con la superficie a
+    35,0 °F cuando el centro llega a 45 °F.
+  - §4-3: los caños a 0,80 m; la madera al sol, 148,6 °C, y el aluminio, 22,0 °C.
+  - §4-4: el cilindro corto de latón, 62,7 °C en el centro y 176,5 kJ.
+  - Incropera: la termocupla de 1 s, D = 0,706 mm y 5,2 s; el caño a 0,68 m.
+  - Identidades: las raíces y A₁ de la tabla 4-2; θ = 1 al principio; Q/Q_máx
+    contra la integral del perfil; la capacidad concentrada contra la exacta con
+    Bi chico; la pared gruesa contra el semi-infinito a tiempos cortos; la
+    convección con h → ∞ contra la superficie a T_s; las inversas de ida y
+    vuelta; la regla de Langston con un factor.
+- **Detectado**:
+  - La primera versión del procedimiento tenía 1899 ecuaciones de más de 324 px
+    (de 11 496): los números ×10ⁿ de los tiempos largos (θ de 10⁻²⁰⁰) y las
+    raíces chicas. La teoría tenía 3.
+  - Los términos de la serie que caen por debajo del menor float se muestran con
+    su exponente (10⁻⁶¹⁵) en vez de 0.
+  - En la esfera, la resta s₁ = sin λ₁ − λ₁·cos λ₁ pierde cifras con λ chico:
+    sale de la serie de Taylor.
+  - Una curva en el tiempo recalculaba las raíces con cada N distinto (0,48 s);
+    con N redondeado a una potencia de 2, 0,06 s.
+  - La profundidad 0 (la superficie) del ejemplo de la madera se reemplazaba por
+    2 cm (un `or` en la página; lo encontró un AppTest).
+- **Mensajes al alumno**: propiedades o h que no son positivos, la temperatura
+  inicial igual a la del fluido (no hay transitorio), una temperatura buscada
+  fuera del rango entre T_i y T∞, un tiempo negativo, una posición fuera de 0 a 1
+  y una temperatura que la superficie todavía no alcanzó.
+- **Tests**: de 6218 a 6551 passed (con la matriz de normalización de abajo, de 10
+  skipped a ninguno), sin warnings. 276 de la conducción transitoria:
+  - `tests/test_transient.py` (108), `tests/test_transient_procedure.py` (93),
+    `tests/test_transient_charts.py` (15) y `tests/test_page_conduccion_transitoria.py`
+    (60, AppTest).
+  - LaTeX: 11 546 expresiones distintas del procedimiento y 15 de la teoría validan
+    con KaTeX estricto y entran en 321 y 283 px como máximo en los tres sistemas.
+  - Smoke test en Chromium a 390 y 1280 px de los 18 casos (los cuatro modos y sus
+    ejemplos, en los tres sistemas), con la teoría y el procedimiento abiertos: sin
+    errores, sin desbordes y sin ecuaciones que se pasen de su expansor. Las capturas
+    encontraron cuatro detalles de los gráficos: el semi-infinito en mm llegaba a
+    «4000» (pasó a m o ft, como el procedimiento), los dos ejes del mapa de la barra
+    decían «x» (ahora x e y; la arista y la esquina, cara 1 y cara 2), el rótulo
+    «1/b» pisaba la curva (va arriba) y los dos ceros de los paneles del contacto se
+    tocaban (más separación). Después de los arreglos se repitieron las 18 corridas
+    afectadas con el servidor reiniciado.
+- **Dependencias**: ninguna nueva (scipy ya trae erf, erfcx, j0 y j1).
+
+### ISO 6976 — Matriz de normalización
+- **Versión**: `0.30.0` (2026-10-12), en el mismo PR que la Fase 11.1. Pedido del
+  autor al terminar la 11.1: la página decía que la matriz de normalización
+  (ISO 14912:2003) estaba «prevista para una fase futura».
+- **Scope**:
+  - **`core/combustion/iso6976.py`**: `normalization_fit` (las u del análisis
+    crudo, reconstruidas de las u(x) normalizadas con mínimos cuadrados no
+    negativos o dadas), la covarianza de la normalización
+    (Cov = J·diag(u²(y))·Jᵀ, Jᵢⱼ = δᵢⱼ − xᵢ), `NormalizationFit` en el resultado,
+    `ISO6976Inputs.uncertainty_basis` (`"normalized"` o `"raw"`), la propagación
+    en LaTeX (`UNCERTAINTY_LATEX`) y la narrativa en castellano. Sin
+    `NotImplementedError`; las notas al pie explican por qué las dos derivaciones
+    de la Fase 2.3 no daban.
+  - **Página `/ISO6976`** (0.30.0): las dos matrices, de qué son las u (de la
+    composición normalizada o del análisis crudo), el ejemplo del caso B del D.4,
+    la tabla del análisis crudo con la correlación con el componente principal,
+    la comparación con la identidad y la teoría con las fórmulas.
+- **Validación**: con el ejemplo D.4 la reconstrucción de las u crudas es exacta
+  (6·10⁻¹⁵) y los casos D.4.3.2 y D.4.4.2 (los dos de normalización) salen
+  dentro de las tolerancias de la fixture y a ≤ 0,3 % de las u publicadas
+  (u_Hv_G = 0,0163122 MJ/m³ contra 0,016316; u_ρ = 0,0002762 kg/m³ contra
+  0,000277). La identidad sobre-estima: 39 % en H_v,G y 53 % en ρ.
+- **Errores al alumno**: u(x) que no pueden salir de una normalización (un
+  componente con menos incertidumbre que la que le pasan los demás, dos
+  componentes con u distintas o uno con u > 0) explican la condición y nombran el
+  componente; con las u del análisis crudo cualquier u ≥ 0 vale.
+- **Tests**: los 10 de los casos B y D que estaban salteados pasan a ser 33 (las
+  seis salidas de cada caso contra la fixture, y a 0,5 % de la u publicada), más
+  16 nuevos en `tests/test_iso6976.py` (propiedades de la covarianza, las dos
+  bases, los errores, el export; el del `NotImplementedError` se fue) y 5 en
+  `tests/test_page_iso6976.py` (AppTest). La suite ya no saltea ningún test.
+  LaTeX: 13 expresiones, KaTeX estricto, máx. 291 px; smoke test a 390 y 1280 px
+  sin errores ni desbordes.
+- **Referencia nueva** en el `CITATION.cff` y el README: ISO 14912:2003.
+
 ---
 
 ## Pendientes / próximas fases
@@ -1850,8 +1970,6 @@
   de un gas real con la carta generalizada, Çengel §12-6), la ecuación virial,
   Beattie–Bridgeman y Benedict–Webb–Rubin (Çengel §3-8), Soave–Redlich–Kwong,
   mezclas de gases reales (regla de Kay, Amagat con Z) y la fugacidad.
-- **Fase 2.3 (continuación)** — Matriz de normalización ISO 6976
-  cuando se incorpore ISO 14912:2003 Formula (69).
 - **HRSG (continuación)**: secciones intercaladas o en paralelo
   (economizadores partidos), quemadores suplementarios, pérdidas de carga y
   purga, diseño de las superficies (UA, NTU), condensación ácida.
@@ -1886,10 +2004,11 @@
   cada componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Transferencia de calor (continuación)**: conducción transitoria (capacidad
-  concentrada, solución de un término), conducción bidimensional (factores de
-  forma), generación interna, bancos de tubos, ebullición y condensación,
-  aletas de perfil variable; radiación de gases (CO₂ y H₂O, gráficos de Hottel)
+- **Transferencia de calor (continuación)**: ebullición y condensación (Fase
+  11.2, con el plan aprobado), conducción bidimensional (factores de forma) y
+  transitoria por diferencias finitas (generación interna, bordes que cambian
+  en el tiempo, cuerpos de dos materiales), bancos de tubos, aletas de perfil
+  variable; radiación de gases (CO₂ y H₂O, gráficos de Hottel)
   e intensidad direccional; intercambiadores compactos (j de Colburn), la caída
   de presión del casco (Kern, Bell–Delaware), el U armado con las
   correlaciones de la 8.1 y la selección económica.

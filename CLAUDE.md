@@ -75,7 +75,9 @@ apps/
 │   │                          # Channiwala–Parikh; Parikh, Cordero) en cualquier
 │   │                          # base, PCI y W*, comparación contra el medido o el
 │   │                          # exacto, validación con 536 biomasas y 5 carbones.
-│   ├── 4_ISO6976.py           # ✅ Fase 2.3 (matriz identidad; teoría y export 1.7)
+│   ├── 4_ISO6976.py           # ✅ Fase 2.3 (teoría y export 1.7; matriz de
+│   │                          # normalización, análisis crudo y comparación
+│   │                          # con la identidad en la 0.30.0)
 │   ├── 10_HRSG.py             # ✅ Fase 3.3 — HRSG de una presión: diagrama T–Q
 │   │                          # (plotly) con vapor sobrecalentado o saturado,
 │   │                          # composición con λ o cargada, secciones, estados,
@@ -149,6 +151,12 @@ apps/
 │   │                          # Carnot (fluido real o gas ideal, cilindro o flujo
 │   │                          # estacionario) y la entropía de un calor (entre dos
 │   │                          # fuentes o por una pared, con la exergía).
+│   ├── 21_Conduccion_Transitoria.py # ✅ Fase 11.1 — Capacidad concentrada (siete
+│   │                          # cuerpos, la exacta al lado), pared, cilindro y
+│   │                          # esfera (un término y la serie), sólido
+│   │                          # semi-infinito (T_s, flujo o convección; el
+│   │                          # contacto de dos sólidos) y producto de soluciones
+│   │                          # (Langston); el tiempo en s, min, h o días.
 │   └── 99_Acerca.py           # ✅ 0.25.1 — Créditos, cómo citar la app (APA y
 │                              # BibTeX), las fuentes del CITATION.cff por tipo
 │                              # (con búsqueda y la bibliografía .bib), las
@@ -186,6 +194,9 @@ apps/
 │   │                          # (μ_JT: K/Pa | K/bar | °F/psia),
 │   │                          # pressure_per_temperature, volume_per_temperature
 │   │                          # y temperature_per_volume (Maxwell).
+│   │                          # Fase 11.1: + time (s en los tres sistemas),
+│   │                          # energy_per_area (J/m² | kJ/m² | Btu/ft²) y
+│   │                          # energy_per_length (J/m | kJ/m | Btu/ft).
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
@@ -282,9 +293,22 @@ apps/
 │   │   │                      # cuerpo negro, el factor de forma, las dos
 │   │   │                      # superficies, el recinto, la superficie y la
 │   │   │                      # termocupla.
-│   │   └── exchangers_procedure.py # ✅ Fase 8.2 — exchanger_steps (los tres
-│   │                          # problemas, con la exergía), overall_u_steps,
-│   │                          # EPS_FORMULAS y NTU_FORMULAS (renglones).
+│   │   ├── exchangers_procedure.py # ✅ Fase 8.2 — exchanger_steps (los tres
+│   │   │                      # problemas, con la exergía), overall_u_steps,
+│   │   │                      # EPS_FORMULAS y NTU_FORMULAS (renglones).
+│   │   ├── transient.py       # ✅ Fase 11.1 — SOLIDS (Incropera A.1 y A.3),
+│   │   │                      # solve_lumped (siete cuerpos) y lumped_exact_curve,
+│   │   │                      # eigenvalues/coefficient/theta/heat_ratio (la
+│   │   │                      # serie) y solve_one_dimensional (un término y
+│   │   │                      # serie; el tiempo hasta una T del centro),
+│   │   │                      # solve_semi_infinite (tres bordes, tres
+│   │   │                      # incógnitas), solve_contact y contact_profiles,
+│   │   │                      # solve_product (siete formas, Langston) y
+│   │   │                      # product_map, ejemplos y export.
+│   │   └── transient_procedure.py # ✅ Fase 11.1 — lumped_steps, one_dim_steps,
+│   │                          # semi_infinite_steps, contact_steps y
+│   │                          # product_steps (factores 1000 y 3600 a la vista;
+│   │                          # _vis, _Pack y _chain parten los renglones).
 │   ├── gases/                 # ✅ Fase 9.1 (ideales) y 9.2 (reales)
 │   │   ├── ideal.py           # IdealGas (15 gases, NASA-9; el helio con 5/2·R):
 │   │   │                      # cp, h, u, s°, p_r, v_r; model_cp/h/u/s (c_p a
@@ -409,9 +433,10 @@ apps/
 │   │   ├── heating_value_procedure.py # ✅ Fase 6 — heating_value_steps y
 │   │   │                      # correlation_latex (tabla de aportes).
 │   │   └── iso6976.py         # ✅ Fase 2.3 — ISO 6976:2016 (matriz identidad;
-│   │                          # iso6976_to_dict, Fase 1.7)
-│   │                          # Normalization matrix: pendiente, requiere
-│   │                          # ISO 14912:2003 Formula (69) — deferido.
+│   │                          # iso6976_to_dict, Fase 1.7). 0.30.0: matriz de
+│   │                          # normalización (normalization_fit: las u del
+│   │                          # análisis crudo, reconstruidas por NNLS o
+│   │                          # dadas; NormalizationFit, UNCERTAINTY_LATEX).
 │   ├── cycles/
 │   │   ├── tespy_utils.py     # ✅ Fase 3.1a — new_network() en SI y
 │   │   │                      # solve() (status de TESPy → ValueError en castellano).
@@ -552,6 +577,10 @@ apps/
 │                              # contra T, la zona imposible y la máquina) y
 │                              # heat_exergy_figure (la exergía del calor a cada
 │                              # temperatura).
+│   └── transient_charts.py    # ✅ Fase 11.1 — lumped_figure (con 1/b y la
+│                              # exacta), profiles_figure, history_figure (τ = 0,2),
+│                              # semi_infinite_figure (δ), contact_figure (dos
+│                              # paneles) y product_map_figure (isotermas).
 │   └── real_gas_charts.py     # ✅ Fase 9.2 — generalized_chart_figure,
 │                              # z_isotherm_figure, fluid_isotherm_figure,
 │                              # vdw_isotherms_figure (las áreas de Maxwell),
@@ -1736,6 +1765,121 @@ Notas de la Fase 10.2 (segundo principio):
   su «Imposible». Después de los arreglos de los gráficos se repitieron las 42
   corridas con el servidor reiniciado (~17 min, con el pytest completo corriendo
   en paralelo).
+
+Notas de la Fase 11.1 (conducción transitoria):
+
+- La Fase 11 se partió como la 8, la 9 y la 10: 11.1 = conducción transitoria
+  (página /Conduccion_Transitoria, ⏱️, en el menú después de Transferencia de
+  calor); 11.2 = ebullición y condensación (/Ebullicion_y_Condensacion, 🫖). Keys
+  `cd_mode`, `ti_what` y por modo `tl_{e}_…` (capacidad concentrada; las medidas
+  llevan el cuerpo: `tl_{e}_{body}_{dim}`), `tw_{e}_…` (pared, cilindro y esfera),
+  `ti_{e}_…` (semi-infinito), `tc_{e}_…` (contacto) y `tp_{e}_…` (producto; las
+  medidas y el punto llevan la forma: `tp_{e}_{shape}_d{j}` y `…_p{j}`). Recalcula
+  sola (`st.cache_data` con los dataclasses).
+- **El tiempo** se carga en s, min, h o días: un selectbox `{key}_unit` al lado y
+  el número en `{key}@{unidad}`, como `number_input_si` (al cambiar de unidad, el
+  widget nuevo arranca con el mismo tiempo convertido). Los resultados lo muestran
+  con la unidad que se lee mejor (`time_label`).
+- El vademecum no tiene transferencia de calor: la teoría cita a Çengel y Ghajar
+  (2015) §4-1 a §4-4 e Incropera (2007) cap. 5, y a Heisler (1947), Carslaw y
+  Jaeger (1959) y Langston (1982), que suman el CITATION.cff y el README.
+- **Factores de unidades**: α = k/(ρ·c) y b = h/(ρ·c·L_c) llevan 1000 en el
+  Técnico (c en kJ/(kg·K)) y 3600 en el Inglés (k y h por hora; el tiempo va en s
+  en los tres sistemas); q̇·t, los mismos números. Bi, τ, h·√(α·t)/k, ρ·c·V·ΔT y
+  q̇·√(α·t)/k cierran solos (`test_transient_conduction_units_are_coherent`).
+- La serie: las raíces con `brentq` en sus intervalos (pared (kπ, kπ + π/2),
+  esfera (kπ, (k + 1)π), cilindro entre los ceros de J₁ y J₀), los términos que
+  hagan falta para e^(−λ_N²·τ) < 10⁻¹², redondeados a una potencia de 2 para que
+  una curva en el tiempo reuse las raíces del cache (0,48 → 0,06 s). La tabla 4-2
+  de Çengel y Ghajar sale exacta (el cilindro con Bi → ∞, A₁ = 1,6020). La
+  solución de un término se muestra siempre junto a la serie, que es el resultado;
+  con τ < 0,2 hay nota.
+- Capacidad concentrada: la placa va por m² de cara (V = e, A = 2) y el cilindro
+  largo por metro; con un cuerpo que tiene solución exacta (todos menos «V y A a
+  elección»), la media sale del producto de factores con la regla de Langston y el
+  centro, del producto de los θ.
+- **El signo del calor**: el núcleo guarda Q > 0 si el cuerpo entrega calor (el
+  export, con el signo); la página y el procedimiento muestran la magnitud con
+  «entrega» o «recibe» y la diferencia ordenada para que sea positiva
+  (T_i − T∞ o T∞ − T_i). En el semi-infinito q̇_s > 0 entra al sólido (la
+  fórmula da el signo).
+- Semi-infinito: la convección con `erfcx` (e^(2ηβ + β²)·erfc(η + β) desborda
+  con h grande); la energía con convección se integra con `quad`; las inversas,
+  con `brentq`, y con la superficie a T_s el procedimiento invierte erfc en
+  cerrado (Çengel y Ghajar, los caños enterrados). Penetración δ = 2·erfinv(0,99)·
+  √(α·t) = 3,64·√(α·t). El contacto pesa con √(k·ρ·c); en el procedimiento e va
+  en W·s^½/(m²·K) (en el Técnico con el 1000 a la vista) o Btu/(h^½·ft²·°F), y el
+  flujo con k_A y α_A.
+- **LaTeX**: las sustituciones con tiempos largos (θ de 10⁻²⁰⁰) o raíces chicas
+  no entraban (1899 de 11 496 en la primera pasada). `_vis` estima el ancho de un
+  renglón (una fracción cuenta su parte más ancha, un exponente el 70 %, los
+  signos con sus espacios); `_Pack` es un renglón de números que `_chain` parte
+  con el presupuesto que deja el lado izquierdo (29 − su ancho), y `_flush` pone
+  los renglones contra el margen cuando el lado izquierdo es una fracción. Los
+  términos de la serie por debajo del menor float se muestran con su exponente
+  (`_exp_term`: 10⁻⁶¹⁵, no 0) y en la esfera s₁ = sin λ₁ − λ₁·cos λ₁ sale de la
+  serie de Taylor con λ chico. 11 546 expresiones distintas del procedimiento
+  (los ejemplos y 5199 variantes de cuerpo, geometría, borde, forma, incógnita y
+  sistema) y 15 de la teoría, KaTeX estricto, máx. 321 y 283 px.
+- Gráficos (`ui/transient_charts.py`): los tiempos en la rampa azul ordinal (claro
+  el primero), el punto pedido en naranja, T∞ o T_i en gris rayado; el eje del
+  tiempo elige la unidad por el máximo. El contacto va en dos paneles con el mismo
+  eje de temperatura (el calor llega 30 veces más lejos en el aluminio que en la
+  piel) y el producto, en un mapa de isotermas con la rampa azul desde casi
+  blanco.
+- Un AppTest encontró que la profundidad 0 del ejemplo de la madera se
+  reemplazaba por 2 cm: `inp.depth_m or 0.02`. Con un dato que puede valer 0, la
+  comparación es contra `None`.
+- Largos: el semi-infinito va en m o ft (`length`: los caños enterrados están a
+  0,8 m y δ llega a metros en meses; en mm el eje decía «4000»), igual que el
+  procedimiento; las medidas de los cuerpos, el contacto (fracciones de mm en un
+  segundo) y el producto, en mm o in (`small_length`). La key de la profundidad
+  pasó a `ti_{e}_depth`.
+- Smoke test a 390 y 1280 px: los 18 casos (los cuatro modos y sus ejemplos, en
+  los tres sistemas) con la teoría y el procedimiento abiertos, sin errores ni
+  desbordes. Las capturas encontraron el eje del semi-infinito en mm, los dos
+  ejes del mapa de la barra rotulados «x» (`_axis_title` numera x, y, z en las
+  paredes y la cara 1, 2 en la arista y la esquina), el «1/b» encima de la curva
+  (va arriba de la línea) y los dos ceros del contacto pegados
+  (`horizontal_spacing` 0,08); se repitieron las corridas afectadas con el
+  servidor reiniciado.
+
+Notas de la matriz de normalización de ISO 6976 (0.30.0):
+
+- Pedido del autor al terminar la 11.1 (la página decía «prevista para una fase
+  futura»). ISO 6976:2016 calcula la matriz con ISO 14912:2003 desde las
+  incertidumbres del análisis crudo y el Anexo D publica solo las u(x) ya
+  normalizadas. Las dos derivaciones de la Fase 2.3 aplicaban fórmulas a las u(x)
+  como si fueran las crudas; la que vale es la propagación de xᵢ = yᵢ/Σyₖ desde
+  las u(y), Cov = J·diag(u²(y))·Jᵀ con Jᵢⱼ = δᵢⱼ − xᵢ (filas que suman 0,
+  semidefinida positiva).
+- Con las u(x) normalizadas, las u²(y) salen de invertir la diagonal,
+  u²(xᵢ) = (1 − xᵢ)²·u²(yᵢ) + xᵢ²·Σₖ≠ᵢ u²(yₖ), con `scipy.optimize.nnls` (u² ≥ 0).
+  Con el D.4 la reconstrucción es exacta (6·10⁻¹⁵) y los casos D.4.3.2 y D.4.4.2
+  salen dentro de las tolerancias de la fixture y a ≤ 0,3 % de las u publicadas
+  (u_Hv_G = 0,0163122 contra 0,016316). D.2 y D.3 también son compatibles.
+- No toda u(x) sale de una normalización: ninguna fracción puede tener menos
+  incertidumbre que xᵢ·√(Σₖ≠ᵢ u²(yₖ)), con dos componentes las dos u(x) son
+  iguales y con uno, 0. Con u inventadas no cumple el 83 % (3000 composiciones al
+  azar): `normalization_fit` da un `ValueError` que nombra el componente (con 1 %
+  más 10⁻³ de la mayor u de tolerancia, por el redondeo de los datos publicados).
+  Por eso la página también acepta las u del análisis crudo
+  (`uncertainty_basis="raw"`, keys `iso_corr` e `iso_basis`), con las que
+  cualquier u ≥ 0 vale.
+- Lo didáctico: la u del componente principal normalizado sale casi toda de la de
+  los demás ((1 − x)² ≈ 0,006 en el metano del D.4); el metano se anticorrelaciona
+  con los de más incertidumbre (r = −0,66 con el etano) y se correlaciona
+  levemente con las trazas (se escalan con el mismo Σy); la incertidumbre baja
+  39 % en H_v,G y 53 % en ρ respecto de la identidad (§D.4.3.2: la identidad es la
+  sobre-estimación segura).
+- AppTest no edita el `st.data_editor`: el error de la página se prueba
+  reemplazando `normalization_fit` con `monkeypatch`.
+- LaTeX: 13 expresiones de la página (teoría y procedimiento, con los cuatro
+  ejemplos y las dos matrices), KaTeX estricto, máx. 291 px (la covarianza en tres
+  renglones: en dos llegaba a 332). Smoke test a 390 y 1280 px: los cuatro casos
+  (identidad, caso B, análisis crudo y D.3), sin errores ni desbordes; la tabla de
+  la comparación lleva el cambio en la segunda columna y la unidad con la
+  magnitud (en el celular la última columna quedaba afuera).
 
 ### Citas y licencias
 

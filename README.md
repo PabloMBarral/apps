@@ -124,14 +124,19 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
 - ✅ **ISO 6976:2016 — Poder calorífico de gases combustibles**:
   poder calorífico bruto y neto (molar, másico, volumétrico), densidad,
   densidad relativa al aire e índices de Wobbe G y N, con propagación
-  de incertidumbre estándar (matriz identidad; la matriz de normalización
-  queda deferida a fase futura por requerir ISO 14912:2003). Composición
-  editable in-place con autocompletado de los 60 componentes de la norma.
-  Ejemplos del Annex D (D.2, D.3, D.4) precargados y verificados contra
-  los valores tabulados de la norma. Expansor con la relación PCS − PCI
-  del vademecum (§16.9) y las fórmulas de la norma; descarga CSV/JSON con
-  u (k = 1) y U (k = 2) de cada magnitud. _Fase 2.3 cerrada; teoría y
-  export en la 1.7._
+  de incertidumbre estándar con la matriz identidad o, desde la 0.30.0, la
+  de **normalización** (ISO 14912:2003): con las u de la composición
+  normalizada (como las publica el Anexo D) la app reconstruye las del
+  análisis crudo, exactas en el D.4, y reproduce los casos D.4.3.2 y
+  D.4.4.2; o se cargan directamente las del análisis crudo. Muestra las u
+  crudas, la correlación con el componente principal y cuánto baja la
+  incertidumbre respecto de la identidad (−39 % la de H_v,G en el D.4).
+  Composición editable in-place con autocompletado de los 60 componentes de
+  la norma. Ejemplos del Annex D (D.2, D.3, D.4 casos A y B) precargados y
+  verificados contra los valores tabulados de la norma. Expansor con la
+  relación PCS − PCI del vademecum (§16.9) y las fórmulas de la norma;
+  descarga CSV/JSON con u (k = 1) y U (k = 2) de cada magnitud. _Fase 2.3
+  cerrada; teoría y export en la 1.7; matriz de normalización en la 0.30.0._
 - ✅ **Diagramas de propiedades** (log p–h, T–s, h–s, p–log v) con
   [fluprodia](https://github.com/fwitte/fluprodia) + plotly. La página de
   **Propiedades** dibuja el estado calculado sobre el diagrama elegido
@@ -457,6 +462,31 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   9.2, Nu = 147); con las propiedades de CoolProp (k del aire 2,7 % mayor que la
   tabla A-15) h queda 1,5 a 2 % arriba del libro. Procedimiento en los tres
   sistemas y export. _Fase 8.1 cerrada._
+- ✅ **Conducción transitoria** (página `/Conduccion_Transitoria`, Çengel y
+  Ghajar cap. 4; Incropera cap. 5). **Capacidad concentrada**: esfera,
+  cilindro, placa, cubo, prisma o V y A a elección, con L_c, Bi, la constante
+  de tiempo 1/b, la temperatura a un tiempo o el tiempo hasta una temperatura,
+  y el calor; con Bi > 0,1 la compara con la solución exacta (la media y el
+  centro). **Pared, cilindro largo y esfera**: λ₁ y A₁ de la ecuación
+  característica (la tabla 4-2, calculada), la solución de un término (los
+  gráficos de Heisler) y la **serie completa** al lado, la temperatura del
+  centro, de cualquier posición y de la superficie, Q/Q_máx y Q, los perfiles a
+  varios tiempos y la historia del centro con τ = 0,2 marcado. **Sólido
+  semi-infinito** con la superficie a T_s, un flujo constante o convección: T(x,
+  t), la profundidad a la que llega una temperatura o el tiempo que tarda, el
+  flujo en la superficie, la energía y la penetración δ = 3,64·√(α·t); y el
+  **contacto de dos sólidos** con √(k·ρ·c) (por qué el aluminio se siente frío y
+  la madera no). **Varias dimensiones**: el producto de soluciones (cilindro
+  corto y semi-infinito, barra, paralelepípedo, placa semi-infinita, arista y
+  esquina) con la regla de Langston para el calor y el mapa de temperatura. El
+  tiempo se carga en s, min, h o días. Reproduce Çengel y Ghajar (termocupla,
+  9,94 s; hora de la muerte, 12,2 h; huevo hervido, 929 s con un término y
+  927,5 s con la serie; placas de latón, 279,8 °C; eje de acero inoxidable,
+  364,1 °C y 30 124 kJ/m; bifes, 45 y 35 °F a la vez; caños enterrados a
+  0,80 m; madera al sol, 148,6 °C, y aluminio, 22,0 °C; cilindro corto de latón,
+  62,7 °C) e Incropera (termocupla con 1 s de constante de tiempo, 5,2 s; caño
+  de agua a 0,68 m). Procedimiento en los tres sistemas (con los factores 1000 y
+  3600 de α y de b a la vista) y export. _Fase 11.1 cerrada._
 - ✅ **Radiación** (página `/Radiacion`, Çengel y Ghajar caps. 12 y 13; Incropera
   caps. 12 y 13). **Cuerpo negro**: Planck, Wien y Stefan–Boltzmann con las
   constantes de CODATA 2018, la fracción emitida en una banda (la serie de
@@ -579,10 +609,11 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
   componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Transferencia de calor (continuación)**: conducción transitoria y
-  bidimensional, bancos de tubos, ebullición y condensación, radiación de gases
-  (CO₂ y H₂O, gráficos de Hottel), intercambiadores compactos (j de Colburn) y
-  la caída de presión del casco (Kern, Bell–Delaware).
+- **Transferencia de calor (continuación)**: ebullición y condensación (Fase
+  11.2, con el plan aprobado), conducción bidimensional y transitoria por
+  diferencias finitas, bancos de tubos, radiación de gases (CO₂ y H₂O,
+  gráficos de Hottel), intercambiadores compactos (j de Colburn) y la caída de
+  presión del casco (Kern, Bell–Delaware).
 
 ---
 
@@ -645,6 +676,7 @@ apps/
 │   │   ├── convection.py  # correlaciones de Nusselt: externa, en un tubo y natural
 │   │   ├── radiation.py   # cuerpo negro, bandas, factores de forma, pantallas, recintos
 │   │   ├── exchangers.py  # intercambiadores: ε-NTU, LMTD y F, U global, exergía
+│   │   ├── transient.py   # conducción transitoria: concentrada, serie, semi-infinito, producto
 │   │   └── *_procedure.py # sus procedimientos «como en el pizarrón»
 │   ├── exergy/
 │   │   ├── physical.py    # exergía física: estado muerto, ψ, φ, calor, fuente finita
@@ -685,7 +717,8 @@ apps/
 │                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica,
 │                          # gráficos de la combustión, del poder calorífico, de la
 │                          # exergía (Grassmann), de la transferencia de calor, de la
-│                          # radiación, de los intercambiadores, de los gases
+│                          # radiación, de los intercambiadores, de la conducción
+│                          # transitoria, de los gases
 │                          # ideales y reales, de los balances y del segundo
 │                          # principio, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
@@ -707,7 +740,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.29.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.30.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 La página **ℹ️ Acerca de** de la app arma esta cita y la de todas las fuentes
@@ -819,6 +852,10 @@ estándar, entalpía del hielo y bulbo húmedo termodinámico. ASHRAE, Atlanta.
 **ISO 6976:2016** — *Natural gas — Calculation of calorific values, density,
 relative density and Wobbe indices from composition*. International
 Organization for Standardization, 2016.
+
+**ISO 14912:2003** — *Gas analysis — Conversion of gas mixture composition
+data*. International Organization for Standardization, 2003 (la matriz de
+normalización de ISO 6976).
 
 **Ciclo de Rankine orgánico (ORC)** — clasificación de los fluidos de trabajo
 (seco, húmedo, isoentrópico) y estado del arte:
@@ -1346,6 +1383,42 @@ cruzado y el ensuciamiento (los libros de texto son los de arriba):
                   Association},
   edition      = {6},
   year         = {1978}
+}
+```
+
+**Conducción transitoria** — la solución de un término (los gráficos de
+Heisler), el sólido semi-infinito y el contacto de dos sólidos, y el calor de un
+cuerpo de varias dimensiones:
+
+```bibtex
+@article{heisler1947charts,
+  author  = {Heisler, M. P.},
+  title   = {Temperature charts for induction and constant-temperature
+             heating},
+  journal = {Transactions of the ASME},
+  volume  = {69},
+  pages   = {227--236},
+  year    = {1947}
+}
+
+@book{carslaw1959conduction,
+  author    = {Carslaw, H. S. and Jaeger, J. C.},
+  title     = {Conduction of Heat in Solids},
+  edition   = {2},
+  publisher = {Clarendon Press},
+  address   = {Oxford},
+  year      = {1959}
+}
+
+@article{langston1982multidimensional,
+  author  = {Langston, L. S.},
+  title   = {Heat transfer from multidimensional objects using
+             one-dimensional solutions for heat loss},
+  journal = {International Journal of Heat and Mass Transfer},
+  volume  = {25},
+  number  = {1},
+  pages   = {149--150},
+  year    = {1982}
 }
 ```
 

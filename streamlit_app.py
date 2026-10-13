@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.29.0"
+PAGE_VERSION = "0.30.0"
 
 
 def _home_page() -> None:
@@ -84,10 +84,10 @@ def _home_page() -> None:
           al pasar de una temperatura a otra (ejemplos de Cengel cap. 6 y 7).
         - 🔥 **ISO 6976** — poder calorífico (bruto y neto), densidad,
           densidad relativa al aire e índice de Wobbe de mezclas
-          gaseosas combustibles, con propagación de incertidumbre y los
-          ejemplos del Annex D precargados (matriz identidad; matriz
-          de normalización deferida a fase futura por requerir
-          ISO 14912:2003).
+          gaseosas combustibles, con propagación de incertidumbre con la
+          matriz identidad o la de **normalización** (ISO 14912:2003: las
+          fracciones correlacionadas, desde las u del análisis crudo) y los
+          ejemplos del Annex D precargados.
         - ♨️ **Rankine** — ciclo de potencia de vapor simple, con
           recalentamiento o con regeneración (calentadores abiertos y
           cerrados, con subenfriador de drenaje y desrecalentador), ideal
@@ -180,6 +180,16 @@ def _home_page() -> None:
           y el coeficiente de **convección** h de las correlaciones de
           Nusselt: forzada externa, en un tubo y natural, comparadas entre sí
           (ejemplos de Cengel y Ghajar e Incropera).
+        - ⏱️ **Conducción transitoria** — la **capacidad concentrada** (con
+          el número de Biot, la constante de tiempo y la comparación con la
+          solución exacta), la **pared, el cilindro largo y la esfera** con
+          la solución de un término (los gráficos de Heisler) y la serie
+          completa, el **sólido semi-infinito** (superficie a T_s, flujo o
+          convección; la profundidad a la que llega una temperatura y el
+          tiempo que tarda), el **contacto de dos sólidos** (por qué el
+          aluminio se siente frío) y los cuerpos de **varias dimensiones**
+          por el producto de soluciones, con el calor de Langston (ejemplos
+          de Cengel y Ghajar cap. 4 e Incropera cap. 5).
         - ☀️ **Radiación** — el **cuerpo negro** (Planck, Wien y
           Stefan–Boltzmann, la fracción en una banda) y las **superficies
           reales** (ε por bandas y la absortividad para el sol), los
@@ -228,7 +238,8 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        Exergoeconomía (el costo de la exergía en cada componente). Ver el
+        La ebullición y la condensación, y la exergoeconomía (el costo de
+        la exergía en cada componente). Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -243,8 +254,9 @@ def _home_page() -> None:
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
         Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado,
-        Exergía, Transferencia de calor, Radiación, Intercambiadores, Gases
-        ideales, Gases reales, Primer principio y Segundo principio.
+        Exergía, Transferencia de calor, Conducción transitoria, Radiación,
+        Intercambiadores, Gases ideales, Gases reales, Primer principio y
+        Segundo principio.
         Interpolación respeta las
         unidades del CSV original; ISO 6976 usa las unidades de la norma.
         """
@@ -272,6 +284,7 @@ pages = [
     st.Page("app_pages/12_Ciclo_Combinado.py", title="Ciclo combinado", icon="⚡"),
     st.Page("app_pages/11_Exergia.py", title="Exergía", icon="🔋"),
     st.Page("app_pages/14_Transferencia_de_Calor.py", title="Transferencia de calor", icon="🧱"),
+    st.Page("app_pages/21_Conduccion_Transitoria.py", title="Conducción transitoria", icon="⏱️"),
     st.Page("app_pages/15_Radiacion.py", title="Radiación", icon="☀️"),
     st.Page("app_pages/16_Intercambiadores.py", title="Intercambiadores", icon="🔄"),
     st.Page("app_pages/17_Gases_Ideales.py", title="Gases ideales", icon="🎈"),

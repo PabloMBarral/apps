@@ -11,13 +11,16 @@ condiciones de referencia (combustión y medición):
 - densidad y densidad relativa al aire,
 - índice de Wobbe bruto y neto,
 
-junto con la propagación de incertidumbre estándar bajo matriz de
-correlación de composición ``identity`` (mediciones independientes).
-La opción ``normalization`` queda reservada en el tipo pero levanta
-``NotImplementedError``: la fórmula exacta vive en ISO 14912:2003
-Formula (69) y se difiere a fase futura. Ver bloque de notas al pie
-de este archivo para las dos derivaciones que se probaron del Annex B
-de ISO 6976:2016 y por qué no matchean exactamente.
+junto con la propagación de incertidumbre estándar con dos matrices de
+correlación de la composición:
+
+- ``identity``: las u(xⱼ) se tratan como independientes. Es conservadora: la
+  norma (§D.4.3.2) la llama una sobre-estimación segura (*safe overestimate*).
+- ``normalization``: la composición se normalizó a Σx = 1, así que las
+  fracciones están correlacionadas (si una sube, las demás bajan). La norma
+  calcula esa covarianza con ISO 14912:2003 desde las incertidumbres del
+  análisis crudo; el Anexo D publica solo las u(xⱼ) ya normalizadas, y
+  :func:`normalization_fit` reconstruye las crudas (ver las notas al pie).
 
 El módulo no importa Streamlit. Las tablas (4 CSV en ``data/``) se
 cargan con :func:`load_tables`; la página de UI puede envolver esa
@@ -32,13 +35,14 @@ density and Wobbe indices from composition*.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import nnls
 
 # ---------------------------------------------------------------------
 # Constantes del módulo
@@ -49,6 +53,10 @@ _SUPPORTED_T_METERING: tuple[float, ...] = (0.0, 15.0, 15.55, 20.0)
 _TOL_SUM = 1.0e-6
 _NUMERICAL_H_REL = 1.0e-6
 _NUMERICAL_H_ABS = 1.0e-12
+# Matriz de normalización: las u(x) que reconstruye el modelo pueden apartarse de las
+# dadas un 1 % más 10⁻³ de la mayor (las u se publican redondeadas a una o dos cifras).
+_NORM_TOL_REL = 1.0e-2
+_NORM_TOL_ABS = 1.0e-3
 
 # Mapa de label °C → kelvin exacto. La etiqueta "15.55" es el redondeo de
 # 60 °F = (60 − 32)·5/9 = 15.5555… °C, **no** un decimal exacto. La norma
@@ -83,6 +91,10 @@ _DATA_DIR_DEFAULT: Path = Path(__file__).resolve().parents[2] / "data"
 # ---------------------------------------------------------------------
 
 CorrelationMatrix = Literal["identity", "normalization"]
+#: De qué son las u de la composición con la matriz de normalización: de las
+#: fracciones ya normalizadas (como el Anexo D) o del análisis crudo, antes de
+#: normalizar (como las da un cromatógrafo calibrado).
+UncertaintyBasis = Literal["normalized", "raw"]
 
 
 @dataclass(frozen=True)
@@ -110,6 +122,8 @@ class ISO6976Inputs:
     combustion_reference: ReferenceCondition
     metering_reference: ReferenceCondition
     correlation_matrix: CorrelationMatrix
+    #: Solo con la matriz de normalización (con la identidad, las u son las de x).
+    uncertainty_basis: UncertaintyBasis = "normalized"
 
 
 @dataclass(frozen=True)
@@ -128,11 +142,35 @@ class Quantity:
 
 @dataclass(frozen=True)
 class ISO6976Steps:
-    """Pasos didácticos: fórmula en LaTeX, sustitución y narrativa."""
+    """Pasos didácticos: fórmula en LaTeX, sustitución y narrativa.
+
+    ``uncertainty_latex`` es la propagación de la incertidumbre de la composición
+    con la matriz elegida (una ecuación por elemento).
+    """
 
     formula_latex: str
     substituted_latex: str
     narrative_es: str
+    uncertainty_latex: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class NormalizationFit:
+    """Las incertidumbres del análisis crudo y de la composición normalizada.
+
+    ``u_given`` son las que se cargaron (de x o de y, según ``basis``), ``u_raw`` las
+    u(yⱼ) de las fracciones medidas antes de normalizar, ``u_normalized`` las u(xⱼ) de
+    las fracciones normalizadas (iguales a las dadas, dentro de la tolerancia, si
+    ``basis`` es ``"normalized"``) y ``correlation`` los coeficientes r(xᵢ, xⱼ).
+    """
+
+    names: tuple[str, ...]
+    x: tuple[float, ...]
+    basis: UncertaintyBasis
+    u_given: tuple[float, ...]
+    u_raw: tuple[float, ...]
+    u_normalized: tuple[float, ...]
+    correlation: tuple[tuple[float, ...], ...]
 
 
 @dataclass(frozen=True)
@@ -161,6 +199,8 @@ class ISO6976Result:
     Wobbe_net_MJ_per_m3: Quantity
     # Didáctico
     steps: ISO6976Steps
+    # Matriz de normalización: las u del análisis crudo (None con la identidad)
+    normalization: NormalizationFit | None = None
 
 
 # ---------------------------------------------------------------------
@@ -402,6 +442,11 @@ def _validate_inputs(inputs: ISO6976Inputs, tables: ISO6976Tables) -> None:
             f"correlation_matrix debe ser 'identity' o 'normalization'. "
             f"Recibí: {inputs.correlation_matrix!r}."
         )
+    if inputs.uncertainty_basis not in ("normalized", "raw"):
+        raise ValueError(
+            f"uncertainty_basis debe ser 'normalized' (las u de x, ya normalizada) o "
+            f"'raw' (las del análisis crudo). Recibí: {inputs.uncertainty_basis!r}."
+        )
 
 
 # ---------------------------------------------------------------------
@@ -524,23 +569,152 @@ def _grad_scalar(
     return (f({**params, key: val + h}) - f({**params, key: val - h})) / (2.0 * h)
 
 
+def _raw_variances(x: np.ndarray, u_x: np.ndarray) -> np.ndarray:
+    """Las u²(yⱼ) ≥ 0 del análisis crudo que mejor reproducen las u²(xⱼ) normalizadas.
+
+    La diagonal de la covarianza de la normalización es lineal en las u²(y):
+    u²(xᵢ) = (1 − 2xᵢ)·u²(yᵢ) + xᵢ²·Σₖ u²(yₖ). Se resuelve con mínimos cuadrados no
+    negativos (``scipy.optimize.nnls``, el algoritmo de Lawson y Hanson, 1974),
+    escalado por la mayor u² para que el problema quede bien condicionado.
+    """
+    u2 = u_x**2
+    scale = float(u2.max(initial=0.0))
+    if scale <= 0.0:
+        return np.zeros_like(u2)
+    a = np.diag(1.0 - 2.0 * x) + np.outer(x**2, np.ones_like(x))
+    v, _residual = nnls(a, u2 / scale)
+    return v * scale
+
+
+def _normalization_covariance(x: np.ndarray, raw_u2: np.ndarray) -> np.ndarray:
+    """Covarianza de xᵢ = yᵢ/Σyₖ con las yₖ independientes, a primer orden (Σy = 1).
+
+    Con J = ∂x/∂y (Jᵢⱼ = δᵢⱼ − xᵢ), Cov(x) = J·diag(u²(y))·Jᵀ:
+
+        u(xᵢ, xⱼ) = u²(yᵢ)·δᵢⱼ − xⱼ·u²(yᵢ) − xᵢ·u²(yⱼ) + xᵢ·xⱼ·Σₖ u²(yₖ)
+
+    Cada fila suma 0 (Σx = 1 no tiene incertidumbre) y la matriz es semidefinida
+    positiva por construcción. Es la propagación que ISO 6976:2016 (Anexo D) pide con
+    ISO 14912:2003.
+    """
+    jac = np.eye(x.size) - np.outer(x, np.ones_like(x))
+    cov = jac @ np.diag(raw_u2) @ jac.T
+    return 0.5 * (cov + cov.T)  # simétrica también con el redondeo
+
+
+def _normalization_message(
+    names: tuple[str, ...],
+    x: np.ndarray,
+    u_x: np.ndarray,
+    u_fit: np.ndarray,
+    worst: int,
+) -> str:
+    """Por qué unas u(x) no pueden salir de normalizar una composición."""
+    if len(names) == 1:
+        return (
+            "Con la matriz de normalización y un solo componente, la fracción normalizada "
+            f"vale 1 exacto: u(x) tiene que ser 0 y cargaste {u_x[0]:.3g}. Poné u(x) = 0 o "
+            "usá la matriz identidad."
+        )
+    if len(names) == 2:
+        return (
+            "Con la matriz de normalización y dos componentes, x₁ + x₂ = 1 obliga a que las "
+            f"dos u(x) sean iguales: cargaste {u_x[0]:.3g} para {names[0]!r} y "
+            f"{u_x[1]:.3g} para {names[1]!r}. Igualalas o usá la matriz identidad."
+        )
+    return (
+        "Con la matriz de normalización, las u(x) tienen que ser las de una composición "
+        "normalizada (xᵢ = yᵢ/Σyₖ): u²(xᵢ) = (1 − xᵢ)²·u²(yᵢ) + xᵢ²·Σₖ≠ᵢ u²(yₖ), así "
+        "que ninguna fracción puede tener menos incertidumbre que xᵢ·√(Σₖ≠ᵢ u²(yₖ)): "
+        "al normalizar, la de los demás componentes se le pasa. Con las que cargaste no "
+        f"hay incertidumbres del análisis crudo que las reproduzcan: a {names[worst]!r} "
+        f"(x = {x[worst]:.6g}) le tocaría u(x) ≈ {u_fit[worst]:.2g} y cargaste "
+        f"{u_x[worst]:.2g}. Revisá las u(x), cargá las del análisis crudo (antes de "
+        "normalizar) o usá la matriz identidad, que no supone nada sobre cómo se "
+        "obtuvieron."
+    )
+
+
+def normalization_fit(
+    composition: Sequence[GasComponent], basis: UncertaintyBasis = "normalized"
+) -> NormalizationFit:
+    """Las incertidumbres del análisis crudo y de la composición normalizada.
+
+    ISO 6976:2016 (Anexo D) calcula la matriz de normalización con ISO 14912:2003 a
+    partir de las incertidumbres del análisis crudo: las fracciones medidas yⱼ
+    (independientes) se normalizan, xⱼ = yⱼ/Σyₖ, y se propaga a primer orden
+    (:func:`_normalization_covariance`).
+
+    - ``basis="raw"``: las u de la composición son las u(yⱼ) del análisis crudo y las
+      u(xⱼ) normalizadas salen de la diagonal de la covarianza.
+    - ``basis="normalized"``: son las u(xⱼ) ya normalizadas (el Anexo D publica solo
+      esas) y las u(yⱼ) salen de invertir la diagonal,
+
+          u²(xᵢ) = (1 − xᵢ)²·u²(yᵢ) + xᵢ²·Σ_{k≠i} u²(yₖ),
+
+      con u²(y) ≥ 0. Con el ejemplo D.4 (11 componentes) la reconstrucción es exacta
+      y las u de los casos D.4.3.2 y D.4.4.2 salen dentro de las tolerancias de la
+      norma.
+
+    Raises
+    ------
+    ValueError
+        Con ``basis="normalized"``, si ninguna u(y) ≥ 0 reproduce las u(x) dadas
+        (dentro de 1 % más 10⁻³ de la mayor): por ejemplo, el componente principal con
+        menos incertidumbre que la que le pasan los demás al normalizar, o dos
+        componentes con u(x) distintas.
+    """
+    names = tuple(c.name for c in composition)
+    x = np.array([c.x for c in composition], dtype=float)
+    u_given = np.array([c.u_x for c in composition], dtype=float)
+    raw_u2 = u_given**2 if basis == "raw" else _raw_variances(x, u_given)
+    cov = _normalization_covariance(x, raw_u2)
+    u_norm = np.sqrt(np.clip(np.diag(cov), 0.0, None))
+    if basis == "normalized":
+        tol = _NORM_TOL_REL * u_given + _NORM_TOL_ABS * float(u_given.max(initial=0.0))
+        gap = np.abs(u_norm - u_given)
+        if np.any(gap > tol):
+            worst = int(np.argmax(gap / np.where(tol > 0.0, tol, 1.0)))
+            raise ValueError(_normalization_message(names, x, u_given, u_norm, worst))
+    sd = np.where(u_norm > 0.0, u_norm, 1.0)
+    corr = cov / np.outer(sd, sd)
+    corr[u_norm == 0.0, :] = 0.0
+    corr[:, u_norm == 0.0] = 0.0
+    np.fill_diagonal(corr, np.where(u_norm > 0.0, 1.0, 0.0))
+    return NormalizationFit(
+        names=names,
+        x=tuple(float(v) for v in x),
+        basis=basis,
+        u_given=tuple(float(v) for v in u_given),
+        u_raw=tuple(float(v) for v in np.sqrt(raw_u2)),
+        u_normalized=tuple(float(v) for v in u_norm),
+        correlation=tuple(tuple(float(v) for v in row) for row in corr),
+    )
+
+
 def _build_composition_covariance(
     u_x: np.ndarray,
-    x: np.ndarray,  # noqa: ARG001 — reservado para futura matriz normalization
+    x: np.ndarray,
     correlation_matrix: CorrelationMatrix,
+    fit: NormalizationFit | None = None,
 ) -> np.ndarray:
     """Devuelve la matriz de covarianza n×n de la composición.
 
-    Por ahora solo soporta ``identity`` (mediciones independientes,
-    ``Cov_ij = u(xᵢ)² · δᵢⱼ``). El modo ``normalization`` requiere ISO
-    14912:2003 Formula (69), no incluida acá — se rechaza en
-    :func:`calculate` antes de llegar a este punto.
+    ``identity``: mediciones independientes, ``Cov_ij = u(xᵢ)²·δᵢⱼ``.
+    ``normalization``: la de normalizar el análisis crudo, con las u(yⱼ) de
+    :func:`normalization_fit` (``fit``; si no viene, se reconstruyen de las u(x) como
+    si fueran las normalizadas, sin nombres).
     """
-    if correlation_matrix != "identity":
-        # Defensive — calculate() ya levanta NotImplementedError antes.
-        raise NotImplementedError(f"Matriz de correlación {correlation_matrix!r} no implementada.")
-    u2 = u_x**2
-    return np.diag(u2)
+    if correlation_matrix == "identity":
+        return np.diag(u_x**2)
+    if fit is None:
+        fit = normalization_fit(
+            [
+                GasComponent(f"componente {j + 1}", float(xj), float(uj))
+                for j, (xj, uj) in enumerate(zip(x, u_x, strict=True))
+            ]
+        )
+    return _normalization_covariance(x, np.array(fit.u_raw) ** 2)
 
 
 # Lista de "fuentes" de incertidumbre para iteración determinista.
@@ -694,15 +868,12 @@ def calculate(
         "u_Z_air": tabs.u_Z_air,
     }
 
-    if inputs.correlation_matrix == "normalization":
-        raise NotImplementedError(
-            "El cálculo de incertidumbre con matriz de normalización requiere "
-            "ISO 14912:2003 Formula (69), que no está incluida en esta "
-            "implementación. Usá correlation_matrix='identity' por ahora. La "
-            "matriz numérica para casos específicos está tabulada en ISO "
-            "6976:2016 Annex D pero no es derivable sin ISO 14912."
-        )
-    cov_x = _build_composition_covariance(u_x, x, inputs.correlation_matrix)
+    fit = (
+        normalization_fit(inputs.composition, inputs.uncertainty_basis)
+        if inputs.correlation_matrix == "normalization"
+        else None
+    )
+    cov_x = _build_composition_covariance(u_x, x, inputs.correlation_matrix, fit)
 
     values = _compute_all_quantities(params)
 
@@ -744,6 +915,7 @@ def calculate(
         Wobbe_gross_MJ_per_m3=quantities["W_G"],
         Wobbe_net_MJ_per_m3=quantities["W_N"],
         steps=_build_steps(inputs, values, n),
+        normalization=fit,
     )
 
 
@@ -795,7 +967,7 @@ def _build_steps(inputs: ISO6976Inputs, values: dict[str, float], n: int) -> ISO
         f"{inputs.combustion_reference.P_kPa:g} kPa. Referencia de "
         f"medición: T_m = {T_m:g} °C, P_m = "
         f"{inputs.metering_reference.P_kPa:g} kPa. Matriz de correlación "
-        f"de composición: {inputs.correlation_matrix}. "
+        f"de la composición: {_CORRELATION_NAMES[inputs.correlation_matrix]}. "
         f"(1) Masa molar de la mezcla M = Σⱼ xⱼ·Mⱼ = "
         f"{values['M']:.6f} kg/kmol. "
         f"(2) Factor de sumación s = Σⱼ xⱼ·sⱼ(T_m) = "
@@ -815,75 +987,103 @@ def _build_steps(inputs: ISO6976Inputs, values: dict[str, float], n: int) -> ISO
         f"(9) Densidad relativa al aire d = M·Z_air/(M_air·Z) = "
         f"{values['d']:.6f}. "
         f"(10) Índice de Wobbe bruto W_G = H_v,G/√d = "
-        f"{values['W_G']:.6f} MJ/m³."
+        f"{values['W_G']:.6f} MJ/m³. "
+        f"(11) {_UNCERTAINTY_NARRATIVE[_narrative_key(inputs)]}"
     )
     return ISO6976Steps(
         formula_latex=formula,
         substituted_latex=substituted,
         narrative_es=narrative,
+        uncertainty_latex=UNCERTAINTY_LATEX[inputs.correlation_matrix],
     )
 
 
+_CORRELATION_NAMES: dict[str, str] = {
+    "identity": "identidad (las u(xⱼ) se tratan como independientes)",
+    "normalization": (
+        "normalización (la composición se normalizó a Σx = 1 y las fracciones quedan "
+        "correlacionadas)"
+    ),
+}
+
+_UNCERTAINTY_NARRATIVE: dict[str, str] = {
+    "identity": (
+        "Incertidumbre: cada salida Y suma los aportes cⱼ²·u²(xⱼ) de la composición, con "
+        "cⱼ = ∂Y/∂xⱼ, y los de los datos de las tablas (sⱼ, H_c,j, las masas atómicas, "
+        "L₀, M_aire y Z_aire). Tratar las u(xⱼ) como independientes ignora que la "
+        "composición suma 1: la norma (§D.4.3.2) dice que es una sobre-estimación segura."
+    ),
+    "normalized": (
+        "Incertidumbre: la composición se normalizó (xⱼ = yⱼ/Σyₖ), así que si una fracción "
+        "sube, las demás bajan. La covarianza u(xᵢ, xⱼ) sale de las u(yⱼ) del análisis "
+        "crudo, que se reconstruyen de las u(xⱼ) dadas, y cada salida suma Σᵢ Σⱼ "
+        "cᵢ·cⱼ·u(xᵢ, xⱼ) más los aportes de los datos de las tablas. Las correlaciones "
+        "negativas se compensan y la incertidumbre baja respecto de la matriz identidad."
+    ),
+    "raw": (
+        "Incertidumbre: las u cargadas son las u(yⱼ) del análisis crudo y la composición "
+        "se normalizó (xⱼ = yⱼ/Σyₖ), así que si una fracción sube, las demás bajan. La "
+        "covarianza u(xᵢ, xⱼ) sale de propagar la normalización y cada salida suma Σᵢ Σⱼ "
+        "cᵢ·cⱼ·u(xᵢ, xⱼ) más los aportes de los datos de las tablas."
+    ),
+}
+
+
+def _narrative_key(inputs: ISO6976Inputs) -> str:
+    if inputs.correlation_matrix == "identity":
+        return "identity"
+    return inputs.uncertainty_basis
+
+
+#: La propagación de la incertidumbre con cada matriz (cada elemento, un ``st.latex``).
+UNCERTAINTY_LATEX: dict[str, tuple[str, ...]] = {
+    "identity": (
+        r"\begin{aligned}u_c^2(Y) &= \sum_j c_j^2\,u^2(x_j) \\"
+        r"&\quad + \sum_p c_p^2\,u^2(p) \\"
+        r"c_j &= \frac{\partial Y}{\partial x_j}\end{aligned}",
+    ),
+    "normalization": (
+        r"\begin{aligned}u_c^2(Y) &= \sum_i \sum_j c_i\,c_j\,u(x_i, x_j) \\"
+        r"&\quad + \sum_p c_p^2\,u^2(p)\end{aligned}",
+        r"\begin{aligned}u(x_i, x_j) &= u^2(y_i)\,\delta_{ij} \\"
+        r"&\quad - x_j\,u^2(y_i) - x_i\,u^2(y_j) \\"
+        r"&\quad + x_i\,x_j \sum_k u^2(y_k)\end{aligned}",
+        r"\begin{aligned}u^2(x_i) &= (1 - x_i)^2\,u^2(y_i) \\"
+        r"&\quad + x_i^2 \sum_{k \neq i} u^2(y_k)\end{aligned}",
+    ),
+}
+
+
 # ---------------------------------------------------------------------
-# Notas sobre la matriz de correlación de normalización (pendiente)
+# Notas sobre la matriz de correlación de normalización
 # ---------------------------------------------------------------------
 #
-# La opción ``correlation_matrix="normalization"`` está deferida a fase
-# futura. La fórmula exacta vive en ISO 14912:2003 Formula (69), no
-# incluida en esta implementación.
+# Fase 2.3 dejó ``correlation_matrix="normalization"`` pendiente: la norma calcula
+# la matriz con ISO 14912:2003 a partir del análisis crudo, y las dos derivaciones
+# que se probaron con las u(x) publicadas no reproducían el Anexo D (caso D.4.3.2):
 #
-# Durante el desarrollo de Fase 2.3 se probaron dos derivaciones razonables
-# del Annex B de ISO 6976:2016. Ninguna matchea exactamente los valores
-# expandidos de incertidumbre que la norma tabula en el Annex D:
+# (A) Proyección sobre Σx = 1: Cov = diag(u²) − (u²)·(u²)ᵀ/Σu² → u_Hv_G = 0.016971 y
+#     u_ρ = 0.000221 (esperado 0.016316 y 0.000277).
+# (B) Renormalización con las u(x) dadas como si fueran las crudas:
+#     Cov = diag(u²) − u²·xᵀ − x·(u²)ᵀ + x·xᵀ·Σu² → u_Hv_G = 0.016120, u_ρ = 0.000269.
 #
-# (A) Proyección ortogonal sobre el subespacio Σx = 1
-#     (covarianza condicionada bajo el constraint, derivada por Lagrange):
+# (B) es la propagación correcta, pero de las u(y) del análisis crudo, no de las
+# u(x) ya normalizadas: la diagonal de (B) no devuelve las u(x) (al normalizar, a
+# cada fracción se le suma la incertidumbre de las demás). La 0.30.0 reconstruye
+# las u(y) invirtiendo esa diagonal con mínimos cuadrados no negativos
+# (:func:`normalization_fit`): con las u(x) del ejemplo D.4 la reconstrucción es
+# exacta (error relativo 6·10⁻¹⁵) y los casos D.4.3.2 y D.4.4.2 salen dentro de las
+# tolerancias de la norma (u_Hv_G = 0.0163122 contra 0.016316; u_ρ = 0.0002762
+# contra 0.000277; las diferencias son del orden del redondeo de los datos
+# publicados, que tienen una o dos cifras).
 #
-#     Cov_proj[i,j] = u_i² · δ_ij − u_i² · u_j² / Σₖ u_k²
-#
-#     Para el caso D.4.3.2 (case_b), esta fórmula sobre-estima u en ~4 %
-#     para Hv_G y sub-estima u en ~20 % para densidad.
-#
-# (B) Renormalización multiplicativa (x_i = x_i_raw / Σx_k_raw)
-#     con propagación lineal de error a primer orden:
-#
-#     Cov_renorm[i,j] = u_i² · δ_ij − x_j · u_i² − x_i · u_j² + x_i · x_j · Σₖ u_k²
-#
-#     Esta fórmula sub-estima u en ~1.2 % para Hv_G y en ~3 % para densidad.
-#
-# Para el caso D.4.3.2:
-#     - Identity (case_a):     u_Hv_G = 0.026917, u_density = 0.000586  ✓ exacto
-#     - Cov_proj:              u_Hv_G = 0.016971, u_density = 0.000221  ✗
-#     - Cov_renorm (actual):   u_Hv_G = 0.016120, u_density = 0.000269  ✗
-#     - Esperado (Annex D):    u_Hv_G = 0.016316, u_density = 0.000277
-#
-# El valor esperado para Hv_G queda *entre* las dos formulaciones, y para
-# densidad queda *por encima de ambas*. Esa inconsistencia descarta que
-# sea una combinación lineal simple — la norma usa una matriz específica
-# que solo se puede reconstruir con la fórmula de ISO 14912:2003.
-#
-# Pseudocódigo del modelo (B) por si se retoma — descomentar y reemplazar
-# `_build_composition_covariance` cuando se incorpore ISO 14912:
-#
-#     def _build_composition_covariance(u_x, x, correlation_matrix):
-#         u2 = u_x ** 2
-#         cov_diag = np.diag(u2)
-#         if correlation_matrix == "identity":
-#             return cov_diag
-#         # Modelo (B): renormalización multiplicativa.
-#         total = float(u2.sum())
-#         if total <= 0.0:
-#             return np.zeros_like(cov_diag)
-#         cov = cov_diag.copy()
-#         cov -= np.outer(u2, x)
-#         cov -= np.outer(x, u2)
-#         cov += np.outer(x, x) * total
-#         return cov
-#
-# Nota didáctica: la propia ISO 6976 §D.4.3.2 confirma que el modelo
-# identity da una sobre-estimación segura ("safe overestimate") de la
-# incertidumbre, así que usarlo no es un error técnico — solo es
-# conservador.
+# No todas las u(x) pueden salir de una normalización: ninguna fracción puede tener
+# menos incertidumbre que xᵢ·√(Σ_{k≠i} u²(yₖ)), con dos componentes las dos u(x)
+# son iguales y con uno, u(x) = 0. Con u(x) inventadas, la mayoría de las
+# composiciones no cumple (en un ensayo con 3000 composiciones al azar, el 83 %):
+# ``normalization_fit`` lo explica en vez de calcular con una matriz que no
+# corresponde. La identidad sigue siendo la opción por defecto y, como dice la
+# propia norma (§D.4.3.2), da una sobre-estimación segura (*safe overestimate*).
 
 
 # ---------------------------------------------------------------------
@@ -915,7 +1115,8 @@ def iso6976_to_dict(result: ISO6976Result) -> dict[str, Any]:
     """Resultado de ISO 6976:2016 serializable a JSON (unidades de la norma).
 
     Cada magnitud lleva su valor, la incertidumbre estándar ``u`` (k = 1)
-    y la expandida ``U`` (k = 2).
+    y la expandida ``U`` (k = 2). Con la matriz de normalización suma las u(y) del
+    análisis crudo que se reconstruyeron.
     """
 
     def quantity(attr: str, symbol: str, unit: str) -> dict[str, Any]:
@@ -935,6 +1136,23 @@ def iso6976_to_dict(result: ISO6976Result) -> dict[str, Any]:
             "P_kPa": inp.metering_reference.P_kPa,
         },
         "matriz_de_correlacion": inp.correlation_matrix,
+        **(
+            {}
+            if result.normalization is None
+            else {
+                "base_de_las_u": result.normalization.basis,
+                "analisis_crudo": [
+                    {"componente": name, "x": x, "u_y_crudo": u_y, "u_x_normalizada": u_x}
+                    for name, x, u_y, u_x in zip(
+                        result.normalization.names,
+                        result.normalization.x,
+                        result.normalization.u_raw,
+                        result.normalization.u_normalized,
+                        strict=True,
+                    )
+                ],
+            }
+        ),
         "intermedios": [quantity(*spec) for spec in _EXPORT_INTERMEDIATES],
         "resultados": [quantity(*spec) for spec in _EXPORT_RESULTS],
     }
