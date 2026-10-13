@@ -12,6 +12,9 @@
 El perfil de temperaturas de un doble tubo y el peso de las resistencias del U salen de
 :mod:`ui.exchanger_charts` (Fase 8.2).
 
+Sin título propio: la sección de la página lo nombra (a 390 px la barra de plotly tapaba el
+título cuando se tocaba el gráfico).
+
 Colores: la paleta validada para daltonismo del proyecto. La familia de curvas de f va en la
 rampa azul ordinal (de claro a oscuro con el paso); el coeficiente h va en azul y la caída
 de presión en naranja; el punto de los datos, en tinta con borde blanco.
@@ -51,10 +54,12 @@ def _comma(x: float, fmt: str = ".3g") -> str:
 _SUP = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
 
 
-def _tick_text(v: float) -> str:
-    """El rótulo de una marca: el número completo hasta 10⁶ (con espacio de miles desde
-    10⁴, como :func:`ui.balance_charts.value_axis`) y potencias de 10 fuera de eso."""
-    if 1e4 <= v < 1e6:
+def _tick_text(v: float, full: bool = True) -> str:
+    """El rótulo de una marca. Con ``full``, el número completo hasta 10⁶ (con espacio de
+    miles desde 10⁴, como :func:`ui.balance_charts.value_axis`); sin él (un eje de muchas
+    décadas, con una marca por potencia de 10), potencias desde 10⁴, así no quedan «10000»
+    y «100000» junto a «10⁶»."""
+    if full and 1e4 <= v < 1e6:
         return f"{v:,.0f}".replace(",", "\u2009")
     if 1e-3 <= v < 1e4:
         return _comma(v, "g")
@@ -67,7 +72,8 @@ def _tick_text(v: float) -> str:
 def _log_ticks(values: Sequence[float]) -> dict[str, object]:
     """Marcas con el número completo en un eje logarítmico (plotly rotula 20 y 0,2 con un
     «2» suelto): más densas con menos de una década (si no, quedaba una sola marca),
-    1-2-5 hasta dos décadas y media y, con más, las potencias de 10."""
+    1-2-5 hasta dos décadas y media y, con más, las potencias de 10 (rotuladas como
+    potencias desde 10⁴)."""
     pos = [v for v in values if v > 0.0 and math.isfinite(v)]
     if not pos:
         return {}
@@ -82,7 +88,8 @@ def _log_ticks(values: Sequence[float]) -> dict[str, object]:
     else:
         factors = (1.0,)
     vals = [f * 10.0**e for e in range(lo - 1, hi + 2) for f in factors]
-    return {"tickvals": vals, "ticktext": [_tick_text(v) for v in vals]}
+    full = len(factors) > 1
+    return {"tickvals": vals, "ticktext": [_tick_text(v, full) for v in vals]}
 
 
 def _ramp(k: int, n: int) -> str:
@@ -139,13 +146,11 @@ def friction_chart_figure(
             "<extra></extra>",
         )
     )
-    reference = "alineado cuadrado" if aligned else "tresbolillo equilátero"
     fig.update_xaxes(type="log", title="Re = ρ·V_máx·D/μ", gridcolor=_GRID, **_log_ticks(xs_all))
     fig.update_yaxes(type="log", title="f", gridcolor=_GRID, **_log_ticks(ys_all))
     fig.update_layout(
-        height=430,
-        margin={"l": 10, "r": 10, "t": 40, "b": 10},
-        title={"text": f"El f de Zukauskas ({reference})", "x": 0},
+        height=410,
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
         legend=_LEGEND_BELOW,
         separators=", ",
     )
@@ -168,7 +173,6 @@ def _two_panels(
     x_title: str,
     top_title: str,
     bottom_title: str,
-    title: str,
     hover_x: str,
 ) -> go.Figure:
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08)
@@ -213,9 +217,8 @@ def _two_panels(
     fig.update_xaxes(type="log", gridcolor=_GRID, row=1, col=1, **ticks)
     fig.update_xaxes(type="log", title=x_title, gridcolor=_GRID, row=2, col=1, **ticks)
     fig.update_layout(
-        height=520,
-        margin={"l": 10, "r": 10, "t": 40, "b": 10},
-        title={"text": title, "x": 0},
+        height=500,
+        margin={"l": 10, "r": 10, "t": 30, "b": 10},
         legend=_LEGEND_BELOW,
         separators=", ",
     )
@@ -246,7 +249,6 @@ def velocity_sweep_figure(
         x_title=f"Velocidad de llegada V [{V_unit}]",
         top_title=f"h [{h_unit}]",
         bottom_title=f"Δp [{dp_unit}]",
-        title="h y Δp contra la velocidad",
         hover_x="V",
     )
 
@@ -275,6 +277,5 @@ def baffle_sweep_figure(
         x_title=f"Separación de los bafles B [{B_unit}]",
         top_title=f"h_o [{h_unit}]",
         bottom_title=f"Δp del casco [{dp_unit}]",
-        title="h_o y Δp contra los bafles",
         hover_x="B",
     )

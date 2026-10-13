@@ -662,7 +662,8 @@ def _render_bank(r: tb.TubeBankResult, system: UnitSystem) -> None:
     )
     _messages(r.warnings, tb.tube_bank_notes(r))
     sweep, comparison = _bank_extras_cached(i)
-    st.markdown("#### El f de Zukauskas")
+    reference = "alineado cuadrado" if i.arrangement == "aligned" else "tresbolillo equilátero"
+    st.markdown(f"#### El f de Zukauskas ({reference})")
     _chart(
         friction_chart_figure(
             tb.friction_curves(i.arrangement),

@@ -44,6 +44,11 @@ def test_friction_chart_has_every_curve_and_the_point(arrangement: str) -> None:
     for value, text in zip(ticks.tickvals, ticks.ticktext, strict=True):
         if 1e-3 <= value < 1e4:
             assert float(text.replace(",", ".")) == pytest.approx(value)
+    # Re abarca varias décadas: una marca por potencia de 10, todas como potencias desde
+    # 10⁴ (no «10000» y «100000» junto a «10⁶»)
+    re_ticks = dict(zip(fig.layout.xaxis.tickvals, fig.layout.xaxis.ticktext, strict=True))
+    assert re_ticks[1e3] == "1000"
+    assert re_ticks[1e4] == "10⁴" and re_ticks[1e5] == "10⁵" and re_ticks[1e6] == "10⁶"
     # la rampa ordinal: de claro a oscuro con el paso
     colors = [t.line.color for t in fig.data[:-1]]
     assert colors[0] != colors[-1]
@@ -97,7 +102,9 @@ def test_baffle_sweep_in_other_units() -> None:
     assert h.y[0] == pytest.approx(points[0].h_o_W_per_m2K * 0.17611)
     marker = next(t for t in fig.data if t.name == "tus datos")
     assert marker.y[0] == pytest.approx(r.shell.h_W_per_m2K * 0.17611)
-    assert "bafles" in fig.layout.title.text
+    # sin título propio (lo pone la página): la barra de plotly lo tapaba a 390 px
+    assert not fig.layout.title.text
+    assert "bafles" in fig.layout.xaxis2.title.text
 
 
 def test_log_ticks_inside_a_narrow_range() -> None:

@@ -2119,9 +2119,12 @@
   - Smoke test en Chromium a 390 y 1280 px de los 18 casos (los tres modos y sus ejemplos,
     en los tres sistemas), con la teoría y el procedimiento abiertos: sin errores, sin
     desbordes y sin ecuaciones que se pasen de su expansor. Las capturas encontraron el
-    título del barrido de bafles pisado por la barra de plotly a 390 px, una sola marca en
-    los ejes logarítmicos de menos de una década y «5000» junto a «10⁴»; después del arreglo
-    se repitieron los 12 casos con barridos con el servidor reiniciado.
+    título del barrido de bafles tapado por la barra de plotly al tocar el gráfico a 390 px
+    (los tres gráficos nuevos van ahora sin título propio: lo dice el encabezado de la
+    sección), una sola marca en los ejes logarítmicos de menos de una década y «5000» junto
+    a «10⁴» (los números van completos hasta 10⁶ en los ejes de pocas décadas; en el f de
+    Zukauskas, que abarca cinco, potencias desde 10⁴); después de los arreglos se
+    repitieron los 12 casos con barridos con el servidor reiniciado.
 - **Dependencias**: ninguna nueva (ht se usó para muestrear los gráficos y como control,
   solo en el scratchpad).
 
