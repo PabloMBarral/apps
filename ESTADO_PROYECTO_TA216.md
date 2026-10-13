@@ -5,8 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.30.0` — Fase 11.1, conducción transitoria, y la matriz de
-> normalización de ISO 6976 (2026-10-12).
+> **Versión actual**: `0.31.0` — Fase 11.2, ebullición y condensación (2026-10-13).
 
 ---
 
@@ -1938,6 +1937,105 @@
   sin errores ni desbordes.
 - **Referencia nueva** en el `CITATION.cff` y el README: ISO 14912:2003.
 
+### Fase 11.2 — Ebullición y condensación
+- **Versión**: `0.31.0` (2026-10-13). Rama `claude/water-state-analyzer-f4fiev`.
+  La segunda mitad de la Fase 11 (el plan aprobado: 11.1 = conducción
+  transitoria; 11.2 = ebullición y condensación).
+- **Scope**:
+  - **Unidad nueva**: la tensión superficial (N/m en el SI y el Técnico, lbf/ft en
+    el Inglés, con g_c en las fórmulas).
+  - **`core/heat_transfer/phase_change.py`** (nuevo): nueve fluidos puros con
+    tensión superficial y propiedades de transporte en CoolProp (agua, n-pentano,
+    benceno, etanol, R-134a, amoníaco, propano, isobutano y nitrógeno), la
+    saturación a p (líquido y vapor a T_sat, σ y β), la presión de saturación a T y
+    las propiedades de una fase con la fase impuesta.
+  - **`core/heat_transfer/boiling.py`** (nuevo):
+    - Rohsenow (1952) en las dos direcciones, con C_sf y n de Vachon, Nix y Tanger
+      (1968; la tabla 10.1 de Incropera, 12 pares);
+    - el flujo crítico de Zuber (1958) con el C_cr de Lienhard y Dhir (1973) según
+      la geometría y L* (placa grande, cilindro y esfera grandes y chicos);
+    - el flujo mínimo (el 0,09 de Berenson), la película de Bromley (1950; Berenson
+      en la placa) con la radiación, y la transición interpolada en log–log;
+    - `solve_pool_boiling` con la temperatura de la superficie, el flujo o el flujo
+      crítico como dato; el «burnout» con un flujo mayor que el crítico; la curva
+      de ebullición con los puntos notables exactos; ejemplos y export.
+  - **`core/heat_transfer/condensation.py`** (nuevo): h*_fg (con el vapor
+    sobrecalentado), la pared vertical con los tres regímenes (Nusselt,
+    Kutateladze y Labuntsov), la placa inclinada, el tubo vertical, el tubo
+    horizontal, el banco de N tubos, la esfera y el interior de un tubo (Chato),
+    el espesor de la película, las gotas (Griffith), la comparación de geometrías,
+    las curvas h(L) y h(D), ejemplos y export.
+  - `phase_change_procedure.py`: los dos procedimientos en los tres sistemas, con el
+    1000 (Técnico) y el 3600 (Inglés) a la vista (adentro de la raíz cuarta en
+    Bromley y Nusselt) y g_c con σ en lbf/ft. Las utilidades de ancho de renglón
+    de la 11.1 pasaron a `procedure_common` (sin cambios en la 11.1).
+  - **`ui/phase_change_charts.py`** (nuevo): la curva de ebullición en log–log por
+    regímenes (la nucleada en azul, la película en naranja, la convección natural
+    en gris y la transición en gris claro rayado) con el crítico, Leidenfrost, el
+    punto de los datos y el salto del «burnout»; h y Re contra el alto en dos
+    paneles (o h contra el diámetro) y la comparación de geometrías en puntos.
+  - **Página `/Ebullicion_y_Condensacion` (🫖)**, en el menú después de
+    Conducción transitoria: los dos modos con sus ejemplos, la teoría (el
+    vademecum no tiene el capítulo), el procedimiento y el export.
+- **Validación**, contra Çengel y Ghajar (2015, cap. 10), con las propiedades de
+  sus enunciados (las correlaciones dan los números del libro) y con las de
+  CoolProp (dentro de 3 %):
+  - 10-1, la olla: 7,21·10⁴ W/m², 5,10 kW y 2,26 g/s (con CoolProp, 7,22·10⁴ W/m²,
+    5,11 kW y 2,263 g/s).
+  - 10-2, el flujo crítico de la resistencia niquelada: L* = 2,0, C_cr = 0,12,
+    1,017 MW/m² y 109 °C (1,015 MW/m² y 108,9 °C).
+  - 10-3, la película a 350 °C con ε = 0,05: 922,6 W por metro (940,6 W/m con las
+    propiedades del vapor de CoolProp, +2 %).
+  - 10-4, la placa vertical: Re = 1287, h = 5848 W/(m²·K), 702 kW y 0,303 kg/s
+    (Re = 1286, h = 5838, 699,6 kW y 0,3024 kg/s).
+  - 10-5, inclinada 30°: 677 kW (674,9 kW). 10-6, el tubo del condensador:
+    h = 9292 W/(m²·K), 8,76 kW y 3,6 g/s por metro (9284, 8,74 kW y 3,59 g/s).
+    10-7, el banco de 3 × 4: 7060 W/(m²·K) y 79,8 kW (7054 y 79,7 kW).
+  - Identidades: Rohsenow de ida y vuelta; la curva continua en el crítico y en
+    Leidenfrost, creciente salvo en la transición; las formas con ondas y laminar
+    coinciden en Re = 30 (0,2 %); h_vertical/h_horizontal = 1 con L = 2,77·D en
+    laminar; el espesor de Nusselt con h = (4/3)·k/δ; la forma completa de Bromley
+    con poca radiación da ¾·q̇_rad.
+- **Detectado**:
+  - Con agua a 1 atm, un flujo apenas mayor que el crítico necesita casi 1800 °C en la
+    rama de película (la radiación manda): el tope de 1500 K de exceso no alcanzaba y
+    se subió a 2500 K (o la T máxima de CoolProp).
+  - El punto de Leidenfrost puede no existir en el modelo: con alambres finos la
+    película de Bromley ya supera el mínimo de Zuber en el flujo crítico (sin
+    transición) y con refrigerantes la película no baja al mínimo antes de la T máxima
+    de CoolProp. Los dos casos quedan con nota (3303 combinaciones de fluido, presión,
+    calentador y modo, sin errores).
+  - La curva salteaba el pico: el flujo crítico quedaba entre dos puntos de la grilla.
+    Ahora el inicio de la nucleada, el crítico y el mínimo van exactos.
+  - Las formas explícitas de Re de Çengel y Ghajar llevan coeficientes redondeados: su
+    Re y el del balance, 4·L·h·ΔT/(μ·h*_fg), difieren 0,3 %.
+  - La página se caía con una presión supercrítica (buscaba la T_sat del valor por
+    defecto de T_s antes de validar): lo encontró un AppTest.
+  - El smoke test encontró el eje de Re aplastado (las líneas de Re = 30 y 1800 como
+    formas: en un eje logarítmico plotly toma la y como exponente y el eje llegaba a
+    10¹⁸⁰⁰), la leyenda de la comparación pisando el título del eje a 390 px, los
+    nombres de la comparación en m y mm en el sistema inglés y el eje de h con «15k».
+- **Mensajes al alumno**: un fluido sin propiedades de transporte, una presión
+  supercrítica o bajo el punto triple, una T_sat fuera de rango, una superficie que no
+  está más caliente que la saturación (no hierve), un ΔT que deja el vapor fuera de la
+  ecuación de estado, un flujo mayor que el crítico que no se alcanza en la película
+  («se quemaría antes»), una pared que no está más fría que la saturación (no condensa)
+  o bajo el punto triple (escarcha), un vapor más frío que la saturación, la placa
+  horizontal (90°) y medidas que no son positivas.
+- **Tests**: de 6551 a 6784 passed, sin warnings. 233 de la Fase 11.2:
+  - `tests/test_boiling.py` (40), `tests/test_condensation.py` (66),
+    `tests/test_phase_change.py` (17), `tests/test_phase_change_procedure.py` (51),
+    `tests/test_phase_change_charts.py` (7), `tests/test_page_ebullicion_y_condensacion.py`
+    (48, AppTest), la coherencia de unidades (3) y la página en la navegación (1).
+  - LaTeX: 5213 expresiones distintas del procedimiento y 45 de la teoría validan con
+    KaTeX estricto y entran en 323 px como máximo en los tres sistemas.
+  - Smoke test en Chromium a 390 y 1280 px de los 12 casos (los dos modos y sus
+    ejemplos, en los tres sistemas), con la teoría y el procedimiento abiertos: sin
+    errores, sin desbordes y sin ecuaciones que se pasen de su expansor. Después de
+    los arreglos de los gráficos se repitieron las 24 corridas con el servidor
+    reiniciado.
+- **Dependencias**: ninguna nueva.
+
 ---
 
 ## Pendientes / próximas fases
@@ -2004,8 +2102,9 @@
   cada componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Transferencia de calor (continuación)**: ebullición y condensación (Fase
-  11.2, con el plan aprobado), conducción bidimensional (factores de forma) y
+- **Transferencia de calor (continuación)**: la ebullición en flujo (dentro de
+  tubos) y la condensación anular con mucho vapor, la placa horizontal chica de
+  Lienhard y Dhir, conducción bidimensional (factores de forma) y
   transitoria por diferencias finitas (generación interna, bordes que cambian
   en el tiempo, cuerpos de dos materiales), bancos de tubos, aletas de perfil
   variable; radiación de gases (CO₂ y H₂O, gráficos de Hottel)

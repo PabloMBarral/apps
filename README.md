@@ -487,6 +487,32 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   62,7 °C) e Incropera (termocupla con 1 s de constante de tiempo, 5,2 s; caño
   de agua a 0,68 m). Procedimiento en los tres sistemas (con los factores 1000 y
   3600 de α y de b a la vista) y export. _Fase 11.1 cerrada._
+- ✅ **Ebullición y condensación** (página `/Ebullicion_y_Condensacion`, Çengel
+  y Ghajar cap. 10; Incropera cap. 10), con agua, n-pentano, benceno, etanol,
+  refrigerantes y nitrógeno y las propiedades de CoolProp. **Ebullición en
+  pileta** sobre una placa (disco), un cilindro o una esfera, con la presión o
+  la T de saturación y la temperatura de la superficie, el flujo o el flujo
+  crítico como dato: la **curva de ebullición** en log–log con la convección
+  natural, la nucleada de Rohsenow (C_sf y n de Vachon, Nix y Tanger), el
+  **flujo crítico** de Zuber con el C_cr de Lienhard y Dhir según L*, la
+  transición (interpolada), el flujo mínimo (Leidenfrost) y la película de
+  Bromley (Berenson en la placa) con la radiación; q̇, h, Q̇, el líquido que se
+  evapora y el margen al crítico, y con un flujo mayor que el crítico el salto a
+  la película (el «burnout», con las temperaturas de fusión de los metales).
+  **Condensación en película** sobre una placa vertical (laminar de Nusselt, con
+  ondas de Kutateladze o turbulenta de Labuntsov según el Re de la película),
+  inclinada, un tubo vertical u horizontal, un banco de N tubos, una esfera o
+  adentro de un tubo horizontal (Chato, con el rango de Re del vapor): h*_fg con
+  el subenfriamiento y el vapor sobrecalentado, h, Q̇, el caudal condensado, el
+  espesor de la película, h y Re contra el alto, la comparación de geometrías y
+  las gotas (Griffith) como nota. Reproduce Çengel y Ghajar (olla, 7,21·10⁴ W/m²
+  y 5,1 kW; flujo crítico de la resistencia niquelada, 1,017 MW/m² a 109 °C;
+  película, 922,6 W/m con sus propiedades; placa vertical, Re = 1287, 5848
+  W/(m²·K) y 702 kW; inclinada, 677 kW; tubo del condensador, 9292 W/(m²·K) y
+  8,76 kW/m; banco de 3 × 4, 7060 W/(m²·K) y 79,8 kW) con sus propiedades, y
+  dentro de 2 % con las de CoolProp. Procedimiento en los tres sistemas (con el
+  1000 y el 3600 a la vista y g_c con σ en lbf/ft) y export. _Fase 11.2
+  cerrada._
 - ✅ **Radiación** (página `/Radiacion`, Çengel y Ghajar caps. 12 y 13; Incropera
   caps. 12 y 13). **Cuerpo negro**: Planck, Wien y Stefan–Boltzmann con las
   constantes de CODATA 2018, la fracción emitida en una banda (la serie de
@@ -609,11 +635,11 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
   componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Transferencia de calor (continuación)**: ebullición y condensación (Fase
-  11.2, con el plan aprobado), conducción bidimensional y transitoria por
-  diferencias finitas, bancos de tubos, radiación de gases (CO₂ y H₂O,
-  gráficos de Hottel), intercambiadores compactos (j de Colburn) y la caída de
-  presión del casco (Kern, Bell–Delaware).
+- **Transferencia de calor (continuación)**: conducción bidimensional y
+  transitoria por diferencias finitas, bancos de tubos, radiación de gases (CO₂
+  y H₂O, gráficos de Hottel), intercambiadores compactos (j de Colburn), la
+  caída de presión del casco (Kern, Bell–Delaware), la ebullición en flujo
+  (dentro de tubos) y la condensación anular con mucho vapor.
 
 ---
 
@@ -677,6 +703,9 @@ apps/
 │   │   ├── radiation.py   # cuerpo negro, bandas, factores de forma, pantallas, recintos
 │   │   ├── exchangers.py  # intercambiadores: ε-NTU, LMTD y F, U global, exergía
 │   │   ├── transient.py   # conducción transitoria: concentrada, serie, semi-infinito, producto
+│   │   ├── phase_change.py  # fluidos y propiedades de saturación para el cambio de fase
+│   │   ├── boiling.py     # ebullición en pileta: Rohsenow, flujo crítico, película, curva
+│   │   ├── condensation.py  # condensación en película: placa, tubos, banco, esfera, Chato
 │   │   └── *_procedure.py # sus procedimientos «como en el pizarrón»
 │   ├── exergy/
 │   │   ├── physical.py    # exergía física: estado muerto, ψ, φ, calor, fuente finita
@@ -718,7 +747,7 @@ apps/
 │                          # gráficos de la combustión, del poder calorífico, de la
 │                          # exergía (Grassmann), de la transferencia de calor, de la
 │                          # radiación, de los intercambiadores, de la conducción
-│                          # transitoria, de los gases
+│                          # transitoria, de la ebullición y la condensación, de los gases
 │                          # ideales y reales, de los balances y del segundo
 │                          # principio, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
@@ -740,7 +769,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.30.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.31.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 La página **ℹ️ Acerca de** de la app arma esta cita y la de todas las fuentes
@@ -1419,6 +1448,120 @@ cuerpo de varias dimensiones:
   number  = {1},
   pages   = {149--150},
   year    = {1982}
+}
+```
+
+**Ebullición y condensación** — la ebullición nucleada, el flujo crítico y el
+mínimo, la película, y la condensación en película (laminar, con ondas,
+turbulenta y adentro de un tubo):
+
+```bibtex
+@article{rohsenow1952boiling,
+  author  = {Rohsenow, W. M.},
+  title   = {A method of correlating heat-transfer data for surface boiling
+             of liquids},
+  journal = {Transactions of the ASME},
+  volume  = {74},
+  pages   = {969--976},
+  year    = {1952}
+}
+
+@article{vachon1968rohsenow,
+  author  = {Vachon, R. I. and Nix, G. H. and Tanger, G. E.},
+  title   = {Evaluation of constants for the Rohsenow pool-boiling
+             correlation},
+  journal = {Journal of Heat Transfer},
+  volume  = {90},
+  number  = {2},
+  pages   = {239--246},
+  year    = {1968}
+}
+
+@article{zuber1958stability,
+  author  = {Zuber, N.},
+  title   = {On the stability of boiling heat transfer},
+  journal = {Transactions of the ASME},
+  volume  = {80},
+  pages   = {711--720},
+  year    = {1958}
+}
+
+@article{lienhard1973peak,
+  author  = {Lienhard, J. H. and Dhir, V. K.},
+  title   = {Hydrodynamic prediction of peak pool-boiling heat fluxes from
+             finite bodies},
+  journal = {Journal of Heat Transfer},
+  volume  = {95},
+  number  = {2},
+  pages   = {152--158},
+  year    = {1973}
+}
+
+@article{bromley1950film,
+  author  = {Bromley, L. A.},
+  title   = {Heat transfer in stable film boiling},
+  journal = {Chemical Engineering Progress},
+  volume  = {46},
+  number  = {5},
+  pages   = {221--227},
+  year    = {1950}
+}
+
+@article{berenson1961film,
+  author  = {Berenson, P. J.},
+  title   = {Film-boiling heat transfer from a horizontal surface},
+  journal = {Journal of Heat Transfer},
+  volume  = {83},
+  number  = {3},
+  pages   = {351},
+  year    = {1961}
+}
+
+@article{nusselt1916kondensation,
+  author  = {Nusselt, Wilhelm},
+  title   = {Die Oberfl{\"a}chenkondensation des Wasserdampfes},
+  journal = {Zeitschrift des Vereines Deutscher Ingenieure},
+  volume  = {60},
+  pages   = {541--546, 569--575},
+  year    = {1916}
+}
+
+@article{rohsenow1956condensation,
+  author  = {Rohsenow, W. M.},
+  title   = {Heat transfer and temperature distribution in laminar film
+             condensation},
+  journal = {Transactions of the ASME},
+  volume  = {78},
+  pages   = {1645--1648},
+  year    = {1956}
+}
+
+@book{kutateladze1963fundamentals,
+  author    = {Kutateladze, S. S.},
+  title     = {Fundamentals of Heat Transfer},
+  publisher = {Academic Press},
+  address   = {Nueva York},
+  year      = {1963}
+}
+
+@article{labuntsov1957condensation,
+  author  = {Labuntsov, D. A.},
+  title   = {Heat transfer in film condensation of pure steam on vertical
+             surfaces and horizontal tubes},
+  journal = {Teploenergetika},
+  volume  = {4},
+  number  = {7},
+  pages   = {72--81},
+  year    = {1957}
+}
+
+@article{chato1962laminar,
+  author  = {Chato, J. C.},
+  title   = {Laminar condensation inside horizontal and inclined tubes},
+  journal = {ASHRAE Journal},
+  volume  = {4},
+  pages   = {52--60},
+  year    = {1962}
 }
 ```
 

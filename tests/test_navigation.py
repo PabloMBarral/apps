@@ -28,7 +28,7 @@ def test_no_legacy_pages_directory() -> None:
 
 
 def test_every_page_file_is_registered_in_navigation() -> None:
-    registered = re.findall(r'st\.Page\("([^"]+)"', MAIN.read_text(encoding="utf-8"))
+    registered = re.findall(r'st\.Page\(\s*"([^"]+)"', MAIN.read_text(encoding="utf-8"))
     assert sorted(registered) == PAGE_FILES
 
 

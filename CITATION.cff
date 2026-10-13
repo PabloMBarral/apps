@@ -68,8 +68,8 @@ keywords:
   - transient-conduction
   - lumped-capacitance
 license: MIT
-version: "0.30.0"
-date-released: "2026-10-12"
+version: "0.31.0"
+date-released: "2026-10-13"
 references:
   - type: article
     scope: "Motor de propiedades termofísicas (CoolProp)"
@@ -875,6 +875,138 @@ references:
     issue: 1
     start: 149
     end: 150
+  - type: article
+    scope: "Ebullición: la ebullición nucleada (correlación de Rohsenow)"
+    authors:
+      - family-names: "Rohsenow"
+        given-names: "W. M."
+    title: "A method of correlating heat-transfer data for surface boiling of liquids"
+    journal: "Transactions of the ASME"
+    year: 1952
+    volume: 74
+    start: 969
+    end: 976
+  - type: article
+    scope: "Ebullición: C_sf y n de Rohsenow para cada par fluido–superficie"
+    authors:
+      - family-names: "Vachon"
+        given-names: "R. I."
+      - family-names: "Nix"
+        given-names: "G. H."
+      - family-names: "Tanger"
+        given-names: "G. E."
+    title: "Evaluation of constants for the Rohsenow pool-boiling correlation"
+    journal: "Journal of Heat Transfer"
+    year: 1968
+    volume: 90
+    issue: 2
+    start: 239
+    end: 246
+  - type: article
+    scope: "Ebullición: el flujo crítico y el mínimo (la teoría hidrodinámica)"
+    authors:
+      - family-names: "Zuber"
+        given-names: "N."
+    title: "On the stability of boiling heat transfer"
+    journal: "Transactions of the ASME"
+    year: 1958
+    volume: 80
+    start: 711
+    end: 720
+  - type: article
+    scope: "Ebullición: el flujo crítico de un calentador finito (C_cr según la geometría)"
+    authors:
+      - family-names: "Lienhard"
+        given-names: "J. H."
+      - family-names: "Dhir"
+        given-names: "V. K."
+    title: "Hydrodynamic prediction of peak pool-boiling heat fluxes from finite bodies"
+    journal: "Journal of Heat Transfer"
+    year: 1973
+    volume: 95
+    issue: 2
+    start: 152
+    end: 158
+  - type: article
+    scope: "Ebullición: la película sobre cilindros y esferas, con la radiación"
+    authors:
+      - family-names: "Bromley"
+        given-names: "L. A."
+    title: "Heat transfer in stable film boiling"
+    journal: "Chemical Engineering Progress"
+    year: 1950
+    volume: 46
+    issue: 5
+    start: 221
+    end: 227
+  - type: article
+    scope: "Ebullición: la película sobre una placa horizontal y el 0,09 del flujo mínimo"
+    authors:
+      - family-names: "Berenson"
+        given-names: "P. J."
+    title: "Film-boiling heat transfer from a horizontal surface"
+    journal: "Journal of Heat Transfer"
+    year: 1961
+    volume: 83
+    issue: 3
+    start: 351
+  - type: article
+    scope: "Condensación: la película laminar en paredes verticales, tubos y esferas"
+    authors:
+      - family-names: "Nusselt"
+        given-names: "Wilhelm"
+    title: "Die Oberflächenkondensation des Wasserdampfes"
+    journal: "Zeitschrift des Vereines Deutscher Ingenieure"
+    year: 1916
+    volume: 60
+    start: 541
+    end: 575
+  - type: article
+    scope: "Condensación: el calor latente corregido h*_fg"
+    authors:
+      - family-names: "Rohsenow"
+        given-names: "W. M."
+    title: "Heat transfer and temperature distribution in laminar film condensation"
+    journal: "Transactions of the ASME"
+    year: 1956
+    volume: 78
+    start: 1645
+    end: 1648
+  - type: book
+    scope: "Condensación: la película laminar con ondas"
+    authors:
+      - family-names: "Kutateladze"
+        given-names: "S. S."
+    title: "Fundamentals of Heat Transfer"
+    publisher:
+      name: "Academic Press"
+      city: "Nueva York"
+    year: 1963
+  - type: article
+    scope: "Condensación: la película turbulenta"
+    authors:
+      - family-names: "Labuntsov"
+        given-names: "D. A."
+    title: >-
+      Heat transfer in film condensation of pure steam on vertical surfaces
+      and horizontal tubes
+    journal: "Teploenergetika"
+    year: 1957
+    volume: 4
+    issue: 7
+    start: 72
+    end: 81
+  - type: article
+    scope: "Condensación: adentro de un tubo horizontal con poco vapor"
+    authors:
+      - family-names: "Chato"
+        given-names: "J. C."
+    title: "Laminar condensation inside horizontal and inclined tubes"
+    journal: "ASHRAE Journal"
+    year: 1962
+    volume: 4
+    start: 52
+    end: 60
   - type: article
     scope: "Intercambiadores: el factor de corrección F de la ΔT media logarítmica"
     authors:

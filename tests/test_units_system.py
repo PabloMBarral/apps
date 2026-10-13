@@ -706,3 +706,52 @@ def test_transient_conduction_units_are_coherent(system: str) -> None:
     assert back(rho * c * si(1.0, "area") * dT, "energy_per_length") == pytest.approx(1.0)
     q = si(1.0, "heat_flux")
     assert back(q * math.sqrt(alpha * t) / k, "temperature_difference") == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("system", ["SI", "Técnico", "Inglés"])
+def test_phase_change_units_are_coherent(system: str) -> None:
+    """Fase 11.2: con h_fg en kJ/kg (Técnico) o Btu/lb y k por hora (Inglés), las
+    correlaciones de ebullición y condensación llevan 1000 o 3600 (adentro de la raíz
+    cuarta en Bromley y Nusselt), y g·Δρ/σ lleva g_c = 32,174 en el Inglés (σ en lbf/ft)."""
+
+    def si(value: float, kind: str) -> float:
+        return convert_to_si(value, kind, system)  # type: ignore[arg-type]
+
+    def back(value: float, kind: str) -> float:
+        return convert_from_si(value, kind, system)  # type: ignore[arg-type]
+
+    F = {"SI": 1.0, "Técnico": 1000.0, "Inglés": 3600.0}[system]
+    g_c = 32.17404855643 if system == "Inglés" else 1.0
+    mu, h_fg = si(1.0, "dynamic_viscosity"), si(1.0, "specific_enthalpy")
+    g, rho, sigma = si(1.0, "acceleration"), si(1.0, "density"), si(1.0, "surface_tension")
+    k, L, dT = si(1.0, "thermal_conductivity"), si(1.0, "length"), si(1.0, "temperature_difference")
+    h, nu = si(1.0, "heat_transfer_coefficient"), si(1.0, "diffusivity")
+    # Rohsenow: q̇ = F·μ·h_fg·√(g·Δρ/(g_c·σ))·[…]³ (el corchete es adimensional)
+    assert back(mu * h_fg * math.sqrt(g * rho / sigma), "heat_flux") == pytest.approx(
+        F / math.sqrt(g_c), rel=1e-6
+    )
+    assert si(1.0, "specific_heat") * dT / h_fg == pytest.approx(1.0, rel=1e-9)
+    # L* = L·√(g·Δρ/(g_c·σ)) y la longitud capilar √(g_c·σ/(g·Δρ))
+    assert L * math.sqrt(g * rho / sigma) == pytest.approx(1.0 / math.sqrt(g_c), rel=1e-6)
+    # Zuber: q̇_máx = F·C·h_fg·(g_c·σ·g·ρ_v²·Δρ)^¼ y el mínimo, F·0,09·ρ_v·h_fg·(…)^¼
+    assert back(h_fg * (sigma * g * rho**3) ** 0.25, "heat_flux") == pytest.approx(
+        F * g_c**0.25, rel=1e-6
+    )
+    assert back(rho * h_fg * (sigma * g * rho / rho**2) ** 0.25, "heat_flux") == pytest.approx(
+        F * g_c**0.25, rel=1e-6
+    )
+    # Bromley y Nusselt: [F·g·k³·ρ·Δρ·h_fg/(μ·D·ΔT)]^¼ da h (y por ΔT, q̇)
+    bracket = g * k**3 * rho * rho * h_fg / (mu * L * dT)
+    assert back(bracket**0.25, "heat_transfer_coefficient") == pytest.approx(F**0.25, rel=1e-6)
+    # Re = 4·L·h·ΔT/(F·μ·h*_fg), el grupo L·k·ΔT/(F·μ·h*_fg)·(g/ν²)^⅓ y h = Re·k·(g/ν²)^⅓
+    assert L * h * dT / (mu * h_fg) == pytest.approx(1.0 / F, rel=1e-6)
+    assert L * k * dT / (mu * h_fg) * (g / nu**2) ** (1 / 3) == pytest.approx(1.0 / F, rel=1e-6)
+    assert back(k * (g / nu**2) ** (1 / 3), "heat_transfer_coefficient") == pytest.approx(1.0)
+    # ṁ = Q̇/(F·h*_fg) y δ = [4·μ·k·ΔT·x/(F·g·ρ·Δρ·h*_fg)]^¼
+    Q = si(1.0, "heat_rate")
+    assert back(Q / h_fg, "mass_flow") == pytest.approx(1.0 / F, rel=1e-6)
+    delta = (mu * k * dT * L / (g * rho * rho * h_fg)) ** 0.25
+    assert back(delta, "length") == pytest.approx(F**-0.25, rel=1e-6)
+    # 1 lbf/ft = 14,5939 N/m
+    if system == "Inglés":
+        assert sigma == pytest.approx(14.5939, rel=1e-5)

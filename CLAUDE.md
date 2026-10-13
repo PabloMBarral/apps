@@ -157,6 +157,14 @@ apps/
 │   │                          # semi-infinito (T_s, flujo o convección; el
 │   │                          # contacto de dos sólidos) y producto de soluciones
 │   │                          # (Langston); el tiempo en s, min, h o días.
+│   ├── 22_Ebullicion_y_Condensacion.py # ✅ Fase 11.2 — Ebullición en pileta
+│   │                          # (la curva con la convección natural, Rohsenow,
+│   │                          # el flujo crítico de Zuber con Lienhard y Dhir,
+│   │                          # la transición, Leidenfrost y la película de
+│   │                          # Bromley con la radiación; el «burnout») y
+│   │                          # condensación en película (pared vertical con
+│   │                          # tres regímenes, inclinada, tubos, banco, esfera
+│   │                          # y Chato por dentro; sobrecalentamiento, gotas).
 │   └── 99_Acerca.py           # ✅ 0.25.1 — Créditos, cómo citar la app (APA y
 │                              # BibTeX), las fuentes del CITATION.cff por tipo
 │                              # (con búsqueda y la bibliografía .bib), las
@@ -197,6 +205,8 @@ apps/
 │   │                          # Fase 11.1: + time (s en los tres sistemas),
 │   │                          # energy_per_area (J/m² | kJ/m² | Btu/ft²) y
 │   │                          # energy_per_length (J/m | kJ/m | Btu/ft).
+│   │                          # Fase 11.2: + surface_tension (N/m | N/m |
+│   │                          # lbf/ft, con g_c en las fórmulas del Inglés).
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
@@ -284,7 +294,10 @@ apps/
 │   │   │                      # type_comparison, curvas ε–NTU y F–P, perfil del
 │   │   │                      # doble tubo, overall_u (FOULING_FACTORS de TEMA),
 │   │   │                      # notas, ejemplos y export.
-│   │   ├── procedure_common.py # q, n, frac, sub, times, sum_rows, numbered.
+│   │   ├── procedure_common.py # q, n, frac, sub, times, sum_rows, numbered;
+│   │   │                      # desde la 11.2 también el ancho de los renglones
+│   │   │                      # (vis, Pack, pack, chain, flush, prod; eran de
+│   │   │                      # transient_procedure, que los importa).
 │   │   ├── conduction_procedure.py # conduction_steps (símbolos de la red).
 │   │   ├── fins_procedure.py  # fin_steps (con γ y Bessel en la anular).
 │   │   ├── convection_procedure.py # convection_steps, internal_steps,
@@ -305,10 +318,33 @@ apps/
 │   │   │                      # incógnitas), solve_contact y contact_profiles,
 │   │   │                      # solve_product (siete formas, Langston) y
 │   │   │                      # product_map, ejemplos y export.
-│   │   └── transient_procedure.py # ✅ Fase 11.1 — lumped_steps, one_dim_steps,
-│   │                          # semi_infinite_steps, contact_steps y
-│   │                          # product_steps (factores 1000 y 3600 a la vista;
-│   │                          # _vis, _Pack y _chain parten los renglones).
+│   │   ├── transient_procedure.py # ✅ Fase 11.1 — lumped_steps, one_dim_steps,
+│   │   │                      # semi_infinite_steps, contact_steps y
+│   │   │                      # product_steps (factores 1000 y 3600 a la vista;
+│   │   │                      # _vis, _Pack y _chain parten los renglones).
+│   │   ├── phase_change.py    # ✅ Fase 11.2 — PHASE_CHANGE_FLUIDS (nueve fluidos
+│   │   │                      # puros), saturation_state (líquido y vapor a
+│   │   │                      # T_sat, σ y β), saturation_pressure y
+│   │   │                      # phase_properties (la fase impuesta).
+│   │   ├── boiling.py         # ✅ Fase 11.2 — SURFACES (C_sf y n de Vachon, Nix
+│   │   │                      # y Tanger), q_rohsenow/dT_rohsenow, length_ratio,
+│   │   │                      # c_critical (Lienhard y Dhir), q_critical,
+│   │   │                      # q_minimum, q_film (Bromley; Berenson en la placa),
+│   │   │                      # q_radiation y film_radiation_combined,
+│   │   │                      # solve_pool_boiling (T_s, flujo o crítico; el
+│   │   │                      # burnout; minimum_case), boiling_curve, ejemplos y
+│   │   │                      # export.
+│   │   ├── condensation.py    # ✅ Fase 11.2 — h_star, Nusselt (h_laminar_vertical,
+│   │   │                      # h_horizontal_tube, h_sphere), re_wavy/h_wavy
+│   │   │                      # (Kutateladze), re_turbulent/h_turbulent
+│   │   │                      # (Labuntsov), h_chato, film_thickness, dropwise_h
+│   │   │                      # (Griffith), solve_condensation (siete geometrías),
+│   │   │                      # geometry_comparison, condensation_curve, ejemplos
+│   │   │                      # y export.
+│   │   └── phase_change_procedure.py # ✅ Fase 11.2 — boiling_steps y
+│   │                          # condensation_steps (1000 y 3600 a la vista,
+│   │                          # adentro de la raíz cuarta en Bromley y Nusselt;
+│   │                          # g_c con σ en lbf/ft).
 │   ├── gases/                 # ✅ Fase 9.1 (ideales) y 9.2 (reales)
 │   │   ├── ideal.py           # IdealGas (15 gases, NASA-9; el helio con 5/2·R):
 │   │   │                      # cp, h, u, s°, p_r, v_r; model_cp/h/u/s (c_p a
@@ -581,6 +617,10 @@ apps/
 │                              # exacta), profiles_figure, history_figure (τ = 0,2),
 │                              # semi_infinite_figure (δ), contact_figure (dos
 │                              # paneles) y product_map_figure (isotermas).
+│   └── phase_change_charts.py # ✅ Fase 11.2 — boiling_curve_figure (log–log por
+│                              # regímenes, el crítico, Leidenfrost y el burnout),
+│                              # condensation_curve_figure (h y Re contra L en dos
+│                              # paneles, o h contra D) y comparison_figure.
 │   └── real_gas_charts.py     # ✅ Fase 9.2 — generalized_chart_figure,
 │                              # z_isotherm_figure, fluid_isotherm_figure,
 │                              # vdw_isotherms_figure (las áreas de Maxwell),
@@ -1880,6 +1920,70 @@ Notas de la matriz de normalización de ISO 6976 (0.30.0):
   (identidad, caso B, análisis crudo y D.3), sin errores ni desbordes; la tabla de
   la comparación lleva el cambio en la segunda columna y la unidad con la
   magnitud (en el celular la última columna quedaba afuera).
+
+Notas de la Fase 11.2 (ebullición y condensación):
+
+- Página /Ebullicion_y_Condensacion (🫖, en el menú después de Conducción
+  transitoria), keys `bc_mode` y por modo `eb_{e}_…` (ebullición) y `ec_{e}_…`
+  (condensación). Los widgets que dependen del fluido llevan el fluido en la key
+  (`eb_{e}_{fluido}_p`, `…_Tsat`, `…_Ts`, `…_surf`, `…_Csf`, `…_n`; `ec_{e}_{fluido}_Ts`,
+  `…_sh`, `…_Tv`). Recalcula sola (`st.cache_data` con los dataclasses). La presión se
+  valida apenas se carga: con una supercrítica la página se caía al buscar la T_sat del
+  valor por defecto de T_s (lo encontró un AppTest).
+- **Secciones**, solo a nivel de sección: Çengel y Ghajar §10-2 (ebullición en pileta,
+  ejemplos 10-1 a 10-3), §10-5 (película, ejemplos 10-4 a 10-7), §10-6 (adentro de un
+  tubo, Chato) y §10-7 (gotas, Griffith); Incropera §10.4 (las correlaciones de la
+  ebullición en pileta) y §10.7 a §10.10. El vademecum no tiene el capítulo.
+- C_sf y n de la tabla 10.1 de Incropera (Vachon, Nix y Tanger, 1968): el acero
+  inoxidable pulido mecánicamente es 0,0132; Çengel y Ghajar redondean a 0,0130 en la
+  olla, así que ese ejemplo carga 0,0130 «a elección» y la descripción lo dice. Los
+  fluidos sin C_sf medido (refrigerantes, nitrógeno) piden C_sf y n con nota. La placa
+  horizontal chica de Lienhard y Dhir (C_cr con los costados del calentador) quedó afuera:
+  no se pudo verificar la forma de la tabla.
+- La curva: la convección natural de la Fase 8.1 con el líquido saturado (placa con
+  L = D/4, Churchill y Chu, Churchill) y la mayor con Rohsenow; el crítico en
+  ΔT_máx = Rohsenow(q̇_máx); el mínimo de Zuber con el 0,09 de Berenson; la película de
+  Bromley (0,62 cilindro, 0,67 esfera; la placa con Berenson, 0,425 y la longitud
+  capilar) con ¾·q̇_rad; la transición, recta en log–log. El punto de Leidenfrost es
+  donde la película baja a q̇_mín (`minimum_case`): «crossing»; «no_transition» si la
+  película ya lo supera en ΔT_máx (alambres finos) y «beyond_range» si no baja antes del
+  tope (refrigerantes con T_máx de CoolProp baja): las dos con nota. Los puntos notables
+  van exactos en la curva (si no, el pico quedaba entre dos puntos de la grilla).
+- **Burnout**: con un flujo mayor que el crítico la superficie salta a la película. Con
+  agua a 1 atm hace falta casi 1800 °C (la rama de película crece despacio: ¾·ε·σ·T⁴
+  manda), así que el tope de ΔT es 2500 K (`DT_MAX_SEARCH`, o la T_máx de CoolProp) y la
+  nota nombra los metales que se funden (Incropera, tabla A.1). Sin radiación (ε = 0) no
+  se llega: error «se quemaría antes». Con q̇_rad > q̇_película la nota da también la
+  forma completa de Bromley, h^(4/3) = h_pel^(4/3) + h_rad·h^(1/3).
+- Condensación con el procedimiento de Çengel y Ghajar: se supone la película con ondas,
+  Re = (4,81 + 3,70·X)^0,820, y si sale de 30–1800 se pasa a la laminar (Nusselt, con
+  Re del balance) o a la turbulenta (Labuntsov, explícita). Los coeficientes redondeados
+  de las formas explícitas dejan 0,3 % entre su Re y 4·L·h·ΔT/(μ·h*_fg) (test). La
+  inclinada es h·(cos θ)^¼ también con ondas (como el ejemplo 10-5); el banco,
+  h₁·N^−¼; Chato usa h_fg + ⅜·c_p·ΔT y avisa con Re_v > 35 000. El líquido de la película
+  va a T_f con la fase impuesta en CoolProp (`specify_phase`): a pocos mK de T_sat caía
+  del otro lado. h*_fg suma c_pv·(T_v − T_sat) con el vapor a la T media.
+- Unidades: `surface_tension` (N/m, lbf/ft). Con h_fg en kJ/kg (Técnico) los flujos
+  llevan 1000 y con k por hora (Inglés) 3600, adentro de la raíz cuarta en Bromley y
+  Nusselt; en el Inglés g·Δρ/σ lleva g_c = 32,174 (test de coherencia).
+- LaTeX: las utilidades de ancho de la 11.1 pasaron a `procedure_common` (vis, Pack,
+  chain, flush, prod). Lo que hizo falta: q̇₀ = μ·h_fg·√(g·Δρ/σ) y ψ (q̇ = q̇₀·ψ³, o
+  ψ = (q̇/q̇₀)^⅓ y ΔT_e = ψ·Θ), el corchete de Zuber Z, Bromley y Nusselt en tres renglones
+  (N, M y la raíz), el cociente q̇_mín/q̇_máx antes de la transición, a y b de Labuntsov,
+  Re y X enteros con espacio fino (`big`) y Pr^n sin exponente con n = 1. 5213
+  expresiones del procedimiento (ejemplos y variantes de calentador, régimen, modo,
+  geometría y sistema) y 45 de la teoría, KaTeX estricto, máx. 323 px (la teoría de
+  Rohsenow en un renglón llegaba a 351).
+- **En un eje logarítmico de plotly, las formas (`add_hline`, `add_vline`) toman la
+  coordenada como exponente**, como las anotaciones: las líneas de Re = 30 y 1800 iban a
+  10³⁰ y 10¹⁸⁰⁰ y el eje aplastaba la curva. Van como trazas (`go.Scatter` de dos puntos).
+- Smoke test a 390 y 1280 px: los 12 casos (los dos modos y sus ejemplos, en los tres
+  sistemas) con la teoría y el procedimiento abiertos, sin errores ni desbordes. Las
+  capturas encontraron el eje de Re aplastado (lo de arriba), la leyenda de la
+  comparación de geometrías pisando el título del eje (ahora sin leyenda: «(tus datos)»
+  en el rótulo y en naranja), los nombres de la comparación en m y mm en el Inglés (sin
+  medidas: son las de los datos) y el eje de h con «15k»; se repitieron las 24 corridas
+  con el servidor reiniciado.
 
 ### Citas y licencias
 

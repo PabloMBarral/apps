@@ -13,6 +13,7 @@ from dataclasses import replace
 
 import pytest
 
+from core.heat_transfer import procedure_common as pc
 from core.heat_transfer import transient as tr
 from core.heat_transfer import transient_procedure as tp
 from core.latex import latex_number, latex_quantity
@@ -53,19 +54,19 @@ def _q(value: float, kind: str, system: str) -> str:
 
 
 def test_vis_counts_fractions_by_their_widest_part() -> None:
-    assert tp._vis(r"\frac{1}{2}") == pytest.approx(tp._vis("1") + 1.0)
-    assert tp._vis(r"\frac{123456}{1}") > tp._vis("12345")
-    assert tp._vis(r"1.5\times 10^{-7}") > tp._vis("1.5")
-    assert tp._vis("1 + 2") > tp._vis("12")
+    assert pc.vis(r"\frac{1}{2}") == pytest.approx(pc.vis("1") + 1.0)
+    assert pc.vis(r"\frac{123456}{1}") > pc.vis("12345")
+    assert pc.vis(r"1.5\times 10^{-7}") > pc.vis("1.5")
+    assert pc.vis("1 + 2") > pc.vis("12")
 
 
 def test_pack_breaks_rows_that_do_not_fit() -> None:
-    short = tp._pack(tp._prod("2", "3"), 30.0)
+    short = pc.pack(pc.prod("2", "3"), 30.0)
     assert short == r"2 \cdot 3"
-    long = tp._pack(tp._prod(*["1.2345\\times 10^{-7}"] * 4), 20.0)
+    long = pc.pack(pc.prod(*["1.2345\\times 10^{-7}"] * 4), 20.0)
     assert long.count(r"\\ &\quad") >= 2
     # los negativos van entre paréntesis después del primero
-    assert tp._pack(tp._prod("-2", "-3"), 30.0) == r"-2 \cdot (-3)"
+    assert pc.pack(pc.prod("-2", "-3"), 30.0) == r"-2 \cdot (-3)"
 
 
 def test_exp_term_survives_underflow() -> None:

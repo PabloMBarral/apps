@@ -24,11 +24,25 @@ no entran en un celular; con raíces chicas o tiempos largos aparecen números �
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 
 from scipy.special import erfc, erfcinv, erfcx, j0, j1
 
-from core.heat_transfer.procedure_common import dimensionless, frac, n, numbered, q, sub, times
+from core.heat_transfer.procedure_common import ROW as _ROW  # noqa: F401
+from core.heat_transfer.procedure_common import Pack as _Pack
+from core.heat_transfer.procedure_common import budget as _budget
+from core.heat_transfer.procedure_common import chain as _chain
+from core.heat_transfer.procedure_common import (
+    dimensionless,
+    frac,
+    n,
+    numbered,
+    q,
+    sub,
+    times,
+)
+from core.heat_transfer.procedure_common import flush as _flush
+from core.heat_transfer.procedure_common import prod as _prod
+from core.heat_transfer.procedure_common import vis as _vis
 from core.heat_transfer.transient import (
     BI_LUMPED,
     TAU_ONE_TERM,
@@ -46,7 +60,7 @@ from core.heat_transfer.transient import (
     heat_ratio,
     shape_function,
 )
-from core.latex import latex_chain, latex_number, latex_paren
+from core.latex import latex_number, latex_paren
 from core.state_report import ProcedureStep
 from core.units_system import UnitSystem, convert_from_si
 
@@ -78,142 +92,6 @@ _FACTOR: dict[str, str] = {"SI": "", "Técnico": "1000", "Inglés": "3600"}
 _PENETRATION = 2.0 * float(erfcinv(0.01))
 #: Más allá de este exponente e^x desborda o da números ilegibles: el producto va junto.
 _EXP_MAX = 300.0
-#: Un renglón de ``latex_chain`` en «caracteres» de :func:`_vis` (324 px son unos 33 dígitos
-#: de 9,7 px, menos el signo = y un margen).
-_ROW = 29.0
-
-
-# ---------------------------------------------------------------------
-# Ancho de los renglones
-# ---------------------------------------------------------------------
-
-_NARROW_CMDS = {",": 0.2, " ": 0.3, ";": 0.3, "quad": 1.0, "qquad": 2.0, "left": 0.0, "right": 0.0}
-_FUNCS = {"sin", "cos", "tan", "cot", "ln", "exp"}
-
-
-def _group(tex: str, i: int) -> tuple[str, int]:
-    """El contenido del grupo ``{…}`` que empieza en ``i`` y la posición siguiente."""
-    if i >= len(tex) or tex[i] != "{":
-        return (tex[i] if i < len(tex) else ""), i + 1
-    depth = 0
-    for j in range(i, len(tex)):
-        if tex[j] == "{":
-            depth += 1
-        elif tex[j] == "}":
-            depth -= 1
-            if depth == 0:
-                return tex[i + 1 : j], j + 1
-    return tex[i + 1 :], len(tex)
-
-
-def _vis(tex: str) -> float:
-    """El ancho aproximado de un renglón de LaTeX, en «caracteres» (un dígito = 1).
-
-    Alcanza para decidir si un renglón se parte: una fracción cuenta lo que su parte más
-    ancha, un exponente o un subíndice el 70 %, y los signos +, − e = con sus espacios, 2.
-    """
-    total = 0.0
-    i = 0
-    while i < len(tex):
-        ch = tex[i]
-        if ch == "\\":
-            j = i + 1
-            if j < len(tex) and not tex[j].isalpha():
-                total += _NARROW_CMDS.get(tex[j], 0.5)
-                i = j + 1
-                continue
-            while j < len(tex) and tex[j].isalpha():
-                j += 1
-            cmd = tex[i + 1 : j]
-            if cmd in ("frac", "tfrac"):
-                a, j = _group(tex, j)
-                b, j = _group(tex, j)
-                total += max(_vis(a), _vis(b)) * (0.75 if cmd == "tfrac" else 1.0) + 1.0
-            elif cmd in ("text", "mathrm", "operatorname"):
-                a, j = _group(tex, j)
-                total += float(len(a))
-            elif cmd == "sqrt":
-                a, j = _group(tex, j)
-                total += _vis(a) + 1.0
-            elif cmd == "times":
-                total += 1.6
-            elif cmd == "cdot":
-                total += 1.4
-            elif cmd in _FUNCS:
-                total += len(cmd) + 0.5
-            elif cmd in _NARROW_CMDS:
-                total += _NARROW_CMDS[cmd]
-            else:
-                total += 1.0
-            i = j
-            continue
-        if ch in "^_":
-            a, i = _group(tex, i + 1)
-            total += 0.7 * _vis(a)
-            continue
-        if ch == "=":
-            total += 2.7
-        elif ch in "+-":
-            total += 2.4
-        elif ch in "()":
-            total += 0.8
-        elif ch in ".,":
-            total += 0.55
-        elif ch in "{}& ":
-            pass
-        else:
-            total += 1.0
-        i += 1
-    return total
-
-
-@dataclass(frozen=True)
-class _Pack:
-    """Un renglón de números que :func:`_chain` parte si no entra: ``first`` y después cada
-    ``(operador, término)``."""
-
-    first: str
-    rest: tuple[tuple[str, str], ...] = ()
-
-
-def _pack(p: _Pack, budget: float) -> str:
-    r"""Junta los términos y pasa a otro renglón (``\\ &\quad``) cuando no entran."""
-    out, width = p.first, _vis(p.first)
-    for op, term in p.rest:
-        piece = f" {op} {term}"
-        w = _vis(piece)
-        if width + w > budget:
-            out += rf" \\ &\quad {op} {term}"
-            width = 2.0 + w
-        else:
-            out += piece
-            width += w
-    return out
-
-
-def _budget(lhs: str) -> float:
-    """Lo que queda para los números en un renglón con ese lado izquierdo."""
-    return _ROW - _vis(lhs)
-
-
-def _chain(lhs: str, *steps: str | _Pack) -> str:
-    """:func:`~core.latex.latex_chain` con los renglones de números partidos si no entran (en
-    un ``aligned`` el lado izquierdo se suma al ancho de cada renglón)."""
-    budget = _budget(lhs)
-    return latex_chain(lhs, *(st if isinstance(st, str) else _pack(st, budget) for st in steps))
-
-
-def _flush(lhs: str, *steps: str | _Pack) -> str:
-    """Como :func:`_chain`, con los renglones contra el margen: para un lado izquierdo ancho
-    (una fracción), que en un ``aligned`` se sumaría a cada renglón."""
-    out = [st if isinstance(st, str) else _pack(st, _ROW) for st in steps]
-    rows = [rf"&{lhs} = {out[0]}", *(rf"&= {st}" for st in out[1:])]
-    return r"\begin{aligned}" + r" \\ ".join(rows) + r"\end{aligned}"
-
-
-def _prod(*factors: str) -> _Pack:
-    r"""``a \cdot b \cdot c`` (los negativos entre paréntesis), partido si no entra."""
-    return _Pack(factors[0], tuple((r"\cdot", latex_paren(f)) for f in factors[1:]))
 
 
 def _affine(a: str, diff: str, factor: str) -> _Pack:
