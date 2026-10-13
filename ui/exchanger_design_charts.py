@@ -52,6 +52,10 @@ _SUP = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
 
 
 def _tick_text(v: float) -> str:
+    """El rótulo de una marca: el número completo hasta 10⁶ (con espacio de miles desde
+    10⁴, como :func:`ui.balance_charts.value_axis`) y potencias de 10 fuera de eso."""
+    if 1e4 <= v < 1e6:
+        return f"{v:,.0f}".replace(",", "\u2009")
     if 1e-3 <= v < 1e4:
         return _comma(v, "g")
     exponent = math.floor(math.log10(v) + 1e-9)
@@ -62,12 +66,21 @@ def _tick_text(v: float) -> str:
 
 def _log_ticks(values: Sequence[float]) -> dict[str, object]:
     """Marcas con el número completo en un eje logarítmico (plotly rotula 20 y 0,2 con un
-    «2» suelto): 1-2-5 hasta dos décadas y media y, con más, las potencias de 10."""
+    «2» suelto): más densas con menos de una década (si no, quedaba una sola marca),
+    1-2-5 hasta dos décadas y media y, con más, las potencias de 10."""
     pos = [v for v in values if v > 0.0 and math.isfinite(v)]
-    if not pos or math.log10(max(pos) / min(pos)) <= 0.3:
+    if not pos:
         return {}
+    span = math.log10(max(pos) / min(pos))
     lo, hi = math.floor(math.log10(min(pos))), math.ceil(math.log10(max(pos)))
-    factors = (1.0, 2.0, 5.0) if math.log10(max(pos) / min(pos)) <= 2.5 else (1.0,)
+    if span <= 0.5:
+        factors: tuple[float, ...] = (1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0)
+    elif span <= 1.2:
+        factors = (1.0, 1.5, 2.0, 3.0, 5.0, 7.0)
+    elif span <= 2.5:
+        factors = (1.0, 2.0, 5.0)
+    else:
+        factors = (1.0,)
     vals = [f * 10.0**e for e in range(lo - 1, hi + 2) for f in factors]
     return {"tickvals": vals, "ticktext": [_tick_text(v) for v in vals]}
 
@@ -262,6 +275,6 @@ def baffle_sweep_figure(
         x_title=f"Separación de los bafles B [{B_unit}]",
         top_title=f"h_o [{h_unit}]",
         bottom_title=f"Δp del casco [{dp_unit}]",
-        title="h_o y Δp del casco contra los bafles",
+        title="h_o y Δp contra los bafles",
         hover_x="B",
     )

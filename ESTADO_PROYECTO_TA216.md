@@ -2106,15 +2106,22 @@
   una salida imposible (las temperaturas se cruzan o pasan el máximo del tipo) y medidas
   que no son positivas; avisos de Re fuera de los rangos (Zukauskas, Kern), bafles fuera
   de D_s/5 a D_s y F < 0,75, y una nota si un Δp pasa los 10 psi (69 kPa) de Kern.
-- **Tests**: 176 nuevos de la Fase 12.1, más la coherencia de unidades y la página en la
-  navegación:
+- **Tests**: de 6784 a 6989 passed, sin warnings (la suite completa dio 6988 en 19 min;
+  después se sumó el test de las marcas de los gráficos). 205 de la Fase 12.1:
   - `tests/test_tube_bank.py` (33), `tests/test_double_pipe.py` (27),
     `tests/test_shell_tube.py` (29);
   - `tests/test_exchanger_design_procedure.py` (44), `tests/test_exchanger_design_charts.py`
-    (4) y `tests/test_page_diseno_de_intercambiadores.py` (39, AppTest).
+    (5) y `tests/test_page_diseno_de_intercambiadores.py` (39, AppTest);
+  - las unidades nuevas (27) y la página en la navegación (1).
   - LaTeX: 10 443 expresiones distintas del procedimiento y 780 de la página (teoría y
     procedimiento) validan con KaTeX estricto y entran en 317 y 310 px como máximo en los
     tres sistemas.
+  - Smoke test en Chromium a 390 y 1280 px de los 18 casos (los tres modos y sus ejemplos,
+    en los tres sistemas), con la teoría y el procedimiento abiertos: sin errores, sin
+    desbordes y sin ecuaciones que se pasen de su expansor. Las capturas encontraron el
+    título del barrido de bafles pisado por la barra de plotly a 390 px, una sola marca en
+    los ejes logarítmicos de menos de una década y «5000» junto a «10⁴»; después del arreglo
+    se repitieron los 12 casos con barridos con el servidor reiniciado.
 - **Dependencias**: ninguna nueva (ht se usó para muestrear los gráficos y como control,
   solo en el scratchpad).
 

@@ -98,3 +98,31 @@ def test_baffle_sweep_in_other_units() -> None:
     marker = next(t for t in fig.data if t.name == "tus datos")
     assert marker.y[0] == pytest.approx(r.shell.h_W_per_m2K * 0.17611)
     assert "bafles" in fig.layout.title.text
+
+
+def test_log_ticks_inside_a_narrow_range() -> None:
+    # h_o del casco va de ~480 a ~1150 W/(m²·K): con 1-2-5 quedaba una sola marca
+    r = stt.solve_shell_tube(WATER)
+    points = stt.baffle_sweep(WATER)
+    fig = baffle_sweep_figure(
+        points,
+        B_now=WATER.B_m,
+        h_now=r.shell.h_W_per_m2K,
+        dp_now=r.shell.dp_Pa,
+        B_scale=1.0,
+        B_unit="m",
+        h_scale=1.0,
+        h_unit="W/(m²·K)",
+        dp_scale=1.0,
+        dp_unit="Pa",
+    )
+    for axis, ys in (
+        (fig.layout.yaxis, [p.h_o_W_per_m2K for p in points]),
+        (fig.layout.yaxis2, [p.dp_shell_Pa for p in points]),
+        (fig.layout.xaxis2, [p.B_m for p in points]),
+    ):
+        inside = [v for v in axis.tickvals if min(ys) <= v <= max(ys)]
+        assert len(inside) >= 3, (axis.title, inside)
+    # los números completos hasta 10⁶, con espacio de miles desde 10⁴
+    texts = dict(zip(fig.layout.yaxis2.tickvals, fig.layout.yaxis2.ticktext, strict=True))
+    assert texts[20_000.0] == "20 000" and texts[5000.0] == "5000"

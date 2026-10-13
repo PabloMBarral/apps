@@ -2112,6 +2112,13 @@ Notas de la Fase 12.1 (diseño de intercambiadores):
   y 310 px. Lo que hizo falta: C' en su renglón (a_s llegaba a 369 px en el Inglés), el
   área libre y el perímetro mojado antes de D_e (358 px), la interpolación de Kays y
   Perkins con t (343 px) y `_pw` con paréntesis en una base \frac.
+- Smoke test a 390 y 1280 px: los 18 casos (los tres modos con sus ejemplos, en los tres
+  sistemas) con la teoría y el procedimiento abiertos, sin errores ni desbordes. Las
+  capturas encontraron el título del barrido de bafles pisado por la barra de plotly a
+  390 px, una sola marca en un eje logarítmico de menos de una década (`_log_ticks` pone
+  ahora 1-1,2-1,5-2-2,5-3-4-5-6-8 hasta media década y 1-1,5-2-3-5-7 hasta 1,2) y «5000»
+  junto a «10⁴» (los números van completos hasta 10⁶, como `value_axis`); se repitieron
+  los 12 casos con barridos con el servidor reiniciado.
 
 ### Citas y licencias
 
