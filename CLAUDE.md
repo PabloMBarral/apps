@@ -165,6 +165,15 @@ apps/
 │   │                          # condensación en película (pared vertical con
 │   │                          # tres regímenes, inclinada, tubos, banco, esfera
 │   │                          # y Chato por dentro; sobrecalentamiento, gotas).
+│   ├── 23_Diseno_de_Intercambiadores.py # ✅ Fase 12.1 — Banco de tubos
+│   │                          # (Zukauskas con las constantes de los dos libros,
+│   │                          # V_máx por la diagonal, f y χ de los gráficos, h y
+│   │                          # Δp contra V), doble tubo (el anular, el U por
+│   │                          # metro, el largo y las horquillas o las salidas,
+│   │                          # Δp con el largo instalado, las corrientes al
+│   │                          # revés) y casco y tubos con Kern (BWG, N_t estimado
+│   │                          # o dato, U_C y U_D, el criterio de R_d, h_o y Δp
+│   │                          # contra los bafles).
 │   └── 99_Acerca.py           # ✅ 0.25.1 — Créditos, cómo citar la app (APA y
 │                              # BibTeX), las fuentes del CITATION.cff por tipo
 │                              # (con búsqueda y la bibliografía .bib), las
@@ -207,6 +216,9 @@ apps/
 │   │                          # energy_per_length (J/m | kJ/m | Btu/ft).
 │   │                          # Fase 11.2: + surface_tension (N/m | N/m |
 │   │                          # lbf/ft, con g_c en las fórmulas del Inglés).
+│   │                          # Fase 12.1: + mass_flux (kg/(m²·s) | kg/(m²·s) |
+│   │                          # lb/(s·ft²)) y pressure_loss (Pa | kPa | psi, el
+│   │                          # Δp de un intercambiador, como Kern).
 │   ├── fluids.py              # ✅ Fase 1.6 — Wrappers sobre CoolProp:
 │   │                          # StatePoint/state_from_pair (cálculo) y
 │   │                          # FluidState/fluid_state_from_pair (estado completo:
@@ -309,6 +321,8 @@ apps/
 │   │   ├── exchangers_procedure.py # ✅ Fase 8.2 — exchanger_steps (los tres
 │   │   │                      # problemas, con la exergía), overall_u_steps,
 │   │   │                      # EPS_FORMULAS y NTU_FORMULAS (renglones).
+│   │   │                      # Fase 12.1: effectiveness_steps (ε-NTU y la LMTD
+│   │   │                      # sin numerar ni exergía, para el diseño).
 │   │   ├── transient.py       # ✅ Fase 11.1 — SOLIDS (Incropera A.1 y A.3),
 │   │   │                      # solve_lumped (siete cuerpos) y lumped_exact_curve,
 │   │   │                      # eigenvalues/coefficient/theta/heat_ratio (la
@@ -341,10 +355,36 @@ apps/
 │   │   │                      # (Griffith), solve_condensation (siete geometrías),
 │   │   │                      # geometry_comparison, condensation_curve, ejemplos
 │   │   │                      # y export.
-│   │   └── phase_change_procedure.py # ✅ Fase 11.2 — boiling_steps y
-│   │                          # condensation_steps (1000 y 3600 a la vista,
-│   │                          # adentro de la raíz cuarta en Bromley y Nusselt;
-│   │                          # g_c con σ en lbf/ft).
+│   │   ├── phase_change_procedure.py # ✅ Fase 11.2 — boiling_steps y
+│   │   │                      # condensation_steps (1000 y 3600 a la vista,
+│   │   │                      # adentro de la raíz cuarta en Bromley y Nusselt;
+│   │   │                      # g_c con σ en lbf/ft).
+│   │   ├── design_common.py   # ✅ Fase 12.1 — DesignStream (CoolProp o
+│   │   │                      # FluidProperties dadas, con μ_p), stream_props,
+│   │   │                      # wall_viscosity, check_single_phase, darcy_f,
+│   │   │                      # tube_flow (las correlaciones de la 8.1),
+│   │   │                      # overall_u_per_length y suggested_pressure.
+│   │   ├── tube_bank.py       # ✅ Fase 12.1 — Zukauskas (zukauskas_fit de
+│   │   │                      # Çengel y Ghajar o Incropera, row_correction),
+│   │   │                      # max_velocity (la diagonal), friction_chart (f y χ
+│   │   │                      # de data/zukauskas_tube_bank_friction.csv),
+│   │   │                      # solve_tube_bank (T_m iterada), velocity_sweep,
+│   │   │                      # compare_arrangements, notas, ejemplos y export.
+│   │   ├── double_pipe.py     # ✅ Fase 12.1 — ANNULUS_TABLE (Kays y Perkins),
+│   │   │                      # annulus_friction_Re (Shah y London), annulus_flow,
+│   │   │                      # solve_double_pipe (dimensionamiento o
+│   │   │                      # verificación con el ε-NTU de la 8.2), swap_sides,
+│   │   │                      # notas, ejemplos y export.
+│   │   ├── shell_tube.py      # ✅ Fase 12.1 — BWG_WALL_IN, tube_inner_diameter,
+│   │   │                      # estimate_tube_count (Kakaç y Liu, múltiplo de N_p),
+│   │   │                      # kern_equivalent_diameter, kern_friction,
+│   │   │                      # kern_shell_side, solve_shell_tube (U_C, U_D y el
+│   │   │                      # criterio de R_d), baffle_sweep, notas, ejemplos y
+│   │   │                      # export.
+│   │   └── exchanger_design_procedure.py # ✅ Fase 12.1 — tube_bank_steps,
+│   │                          # double_pipe_steps y shell_tube_steps (C', el área
+│   │                          # libre y el perímetro mojado, ṁ·c_p con 1000 o
+│   │                          # 3600, g_c y el Δp en Pa y en kPa o psi).
 │   ├── gases/                 # ✅ Fase 9.1 (ideales) y 9.2 (reales)
 │   │   ├── ideal.py           # IdealGas (15 gases, NASA-9; el helio con 5/2·R):
 │   │   │                      # cp, h, u, s°, p_r, v_r; model_cp/h/u/s (c_p a
@@ -621,6 +661,9 @@ apps/
 │                              # regímenes, el crítico, Leidenfrost y el burnout),
 │                              # condensation_curve_figure (h y Re contra L en dos
 │                              # paneles, o h contra D) y comparison_figure.
+│   └── exchanger_design_charts.py # ✅ Fase 12.1 — friction_chart_figure (el f
+│                              # de Zukauskas con el punto), velocity_sweep_figure
+│                              # y baffle_sweep_figure (dos paneles en log–log).
 │   └── real_gas_charts.py     # ✅ Fase 9.2 — generalized_chart_figure,
 │                              # z_isotherm_figure, fluid_isotherm_figure,
 │                              # vdw_isotherms_figure (las áreas de Maxwell),
@@ -634,10 +677,14 @@ apps/
 │   ├── ghugare2014_biomass.csv # ✅ Fase 6 — 536 biomasas (de modeldata, MIT;
 │   │                          # LICENSE-modeldata.txt al lado)
 │   ├── argonne_premium_coals.csv # ✅ Fase 6 — 5 carbones (Vorres, 1990)
-│   └── szargut_chemical_exergy.csv # ✅ Fase 7 — 42 sustancias, modelos II
-│                              # (Szargut et al., 1988) y I (Ahrendts, 1980)
+│   ├── szargut_chemical_exergy.csv # ✅ Fase 7 — 42 sustancias, modelos II
+│   │                          # (Szargut et al., 1988) y I (Ahrendts, 1980)
+│   └── zukauskas_tube_bank_friction.csv # ✅ Fase 12.1 — f y χ de los gráficos
+│                              # de Zukauskas (1137 puntos de la digitalización
+│                              # de ht, MIT: LICENSE-ht.txt al lado)
 ├── scripts/
-│   └── extract_nasa9.py       # ✅ Fase 5 — thermo.inp de NASA CEA → el CSV
+│   ├── extract_nasa9.py       # ✅ Fase 5 — thermo.inp de NASA CEA → el CSV
+│   └── sample_zukauskas.py    # ✅ Fase 12.1 — las curvas de ht → el CSV
 ├── requirements.txt
 ├── CITATION.cff
 ├── LICENSE
@@ -1984,6 +2031,87 @@ Notas de la Fase 11.2 (ebullición y condensación):
   en el rótulo y en naranja), los nombres de la comparación en m y mm en el Inglés (sin
   medidas: son las de los datos) y el eje de h con «15k»; se repitieron las 24 corridas
   con el servidor reiniciado.
+
+Notas de la Fase 12.1 (diseño de intercambiadores):
+
+- La Fase 12 se partió como las anteriores: 12.1 = banco de tubos, doble tubo y casco y
+  tubos con Kern (página /Diseno_de_Intercambiadores, 🛠️ —📐 ya es de Interpolación—, en
+  el menú después de Intercambiadores); 12.2 = Bell–Delaware en el mismo casco
+  (comparado con Kern; control: Peters et al. 14-6, h_o = 3080 W/(m²·K) y Δp = 9,48 kPa) y
+  compactos (Manglik y Bergles, Briggs y Young). Keys `ix_mode` y por modo `ib_{e}_…`
+  (banco; la presión lleva el fluido, `ib_{e}_{fluido}_p`), `id_{e}_…` (doble tubo; las
+  corrientes `id_{e}_h_…` e `id_{e}_c_…`: `…_fluid`, `…_Tin`, `…_m`, `…_{fluido}_p`,
+  las propiedades a elección `…_name`, `…_rho`, `…_cp`, `…_mu`, `…_k`, `…_hasmuw`,
+  `…_muw` y el ensuciamiento `…_Rf_sel`/`…_Rf_v`) e `ik_{e}_…` (casco y tubos, las mismas
+  corrientes y `…_Ds`, `…_B`, `…_Nb`, `…_do`, `…_bwg`, `…_di`, `…_PT`, `…_np`,
+  `…_ntmode`, `…_nt`, `…_problem`, `…_target`). Recalcula sola (con los barridos, menos
+  de 0,5 s; `st.cache_data`).
+- **Secciones**, solo a nivel de sección: Çengel y Ghajar §7-4 (bancos: tablas 7-2 y 7-3,
+  fig. 7-27) y §11-2 (el U); Incropera §7.6 (tablas 7.5 y 7.6, figs. 7.13 y 7.14), §8.7
+  (el anular, tabla 8.2) y cap. 11; Kern (1950) caps. 6 y 7; Kakaç y Liu (2002) cap. 8.
+  El vademecum no tiene el capítulo.
+- **La red**: desde el contenedor solo se llega a PyPI (WebFetch no resuelve los
+  nombres y curl recibe 403). Los libros no se pudieron leer: los ejemplos se controlaron
+  con los resultados que dan los enunciados y con la biblioteca ht (C. Bell, MIT, de
+  PyPI) como control cruzado, solo en el scratchpad.
+- **f y χ de Zukauskas**: los gráficos no tienen fórmula y el autor aprobó la
+  digitalización de ht. `scripts/sample_zukauskas.py` muestrea sus curvas en
+  `data/zukauskas_tube_bank_friction.csv` (1137 puntos; la licencia en
+  `data/LICENSE-ht.txt`; error de interpolación ≤ 0,95 %). Se lee en log–log sobre cada
+  curva, lineal en el paso entre curvas y en log Re entre las de χ; el paso se acota a
+  1,25–2,5 y fuera del rango de Re de una curva se prolonga su tramo final (con aviso). χ
+  se divide por su valor en la referencia (alineado con (P_T − 1)/(P_L − 1) = 1,
+  tresbolillo con P_T/P_L = 2/√3): la digitalización se apartaba hasta 5 % ahí. Las
+  series de Zukauskas y Ulinskas que se recordaban de memoria se apartaban 5–30 % de los
+  gráficos.
+- **Banco**: V_máx por la diagonal si S_D < (S_T + D)/2; las propiedades a la T media
+  (iterada), Pr_s a T_s y ρ_ent para el caudal, ṁ = ρ_ent·V·N_T·S_T·L; la salida con
+  T_s − T exponencial. Incropera usa entre Re = 10² y 10³ el cilindro aislado
+  (0,51·Re^0,5) y C = 0,40 en un alineado con S_T/S_L > 2. Las constantes de los dos
+  libros difieren unos %: la nota lo dice.
+- **Doble tubo**: el anular con D_h = D − d_o; en laminar, el Nu de Kays y Perkins
+  interpolado en d_o/D (t, la fracción del tramo de la tabla) y el f·Re de Shah y London;
+  en turbulento, las correlaciones del tubo con D_h. El U por metro, referido a π·d_o (la
+  pared no cuenta si d_o = d_i); el ε-NTU de la 8.2 con c_p fijo (cada `Stream` con el
+  nombre del fluido), iterando las temperaturas medias, las de la pared (μ_p) y el largo.
+  Horquillas = ⌈L/(2·L_rama)⌉ y **Δp con el largo instalado** (Kern: el equipo que se
+  pone; el primer borrador usaba el necesario); las vueltas, aparte, ~una carga de
+  velocidad por horquilla en el anular.
+- **Kern**: a_s = D_s·C'·B/P_T (C' = P_T − d_o), D_e = 4·A_libre/perímetro mojado (la
+  celda triangular con √3/4: 0,720" con tubos de 3/4" en 1", donde Kern lee 0,73"),
+  h_o = 0,36·(k/D_e)·Re^0,55·Pr^⅓·φ_s, f = exp(0,576 − 0,19·ln Re) (Kakaç y Liu) y
+  Δp_s = f·G²·D_s·(N_b + 1)/(2·ρ·D_e·φ_s); los tubos con
+  Δp_t = (f·L·N_p/d_i + 4·N_p)·ρ·u²/2. N_t estimado (0,785·(CTP/CL)·D_s²/P_T²) se
+  redondea hacia abajo a un múltiplo de N_p (178 → 176 con 4 pasos); un N_t dado que no
+  se reparte igual lleva una nota. Con 1 paso por los tubos es un contracorriente; con
+  más, un paso de casco y F < 1. El criterio: U_req = Q̇/(A_o·F·ΔT_ml) y
+  R_d = (U_C − U_req)/(U_C·U_req) contra R''_f,o + R''_f,i·d_o/d_i.
+- **Validación** (tests): Incropera 7.7 con sus propiedades, h = 137,0 W/(m²·K) (135,6 con
+  C redondeado a 0,34, como el libro), q' = 19,56 kW/m y Δp = 234 Pa contra 246 (−5 %:
+  el libro lee f y χ); con CoolProp, h = 138,1. Çengel y Ghajar 7-7 con sus propiedades:
+  Q̇ = 24,86 kW, T_sal = 29,11 °C y Δp = 23,4 Pa contra 21 (P_L = 3,33 cae fuera del
+  gráfico). Incropera 11.1: h_i = 2251, h_o = 38,9 y U = 38,27 W/(m²·K), L = 65,65 m
+  contra 65,9. Çengel y Ghajar 11-1: U = 74,43 contra ≈ 74,5. Peters et al. 14-6 con
+  Kern: h_o = 3253 W/(m²·K) (−3,4 % contra 3369) y Δp = 18,7 kPa (+14 % contra 16,4): el
+  libro lee j_H y f de los gráficos de Kern.
+- **Valores por defecto con otro fluido**: `design_common.suggested_pressure` deja la
+  presión dada si el fluido no cruza la saturación entre las temperaturas del problema;
+  si no, el doble de p_sat a T_máx + 10 K (o 1,2·p_crítica). Con los 13 fluidos no queda
+  ningún cambio de fase (test); un objetivo de salida imposible con el fluido nuevo sigue
+  siendo un error con su mensaje.
+- **Unidades**: `mass_flux` y `pressure_loss`; el banco sigue con `pressure_drop`
+  (Pa | Pa | lbf/ft²). En el procedimiento, ṁ·c_p lleva 1000 (Técnico) o 3600
+  (Inglés), ρ·u²/2 se divide por g_c = 32,174 en el Inglés y el Δp se da en Pa y en kPa
+  o psi. En los textos, nada de la «e» de Python (`_txt`: «4,2·10⁻⁵ psi») y los Re de
+  las tablas como «200 000».
+- El procedimiento reusa los pasos de ε-NTU de la 8.2 (`effectiveness_steps`), con otro
+  texto en las capacidades: el c_p sale del paso «Propiedades» (decía «es un dato»).
+  LaTeX: 10 443 expresiones distintas del procedimiento (ejemplos y variantes de arreglo,
+  constantes, velocidad, filas, la diagonal, correlaciones, lados, problemas, pasos,
+  calibres y caudales, en los tres sistemas) y 780 de la página, KaTeX estricto, máx. 317
+  y 310 px. Lo que hizo falta: C' en su renglón (a_s llegaba a 369 px en el Inglés), el
+  área libre y el perímetro mojado antes de D_e (358 px), la interpolación de Kays y
+  Perkins con t (343 px) y `_pw` con paréntesis en una base \frac.
 
 ### Citas y licencias
 

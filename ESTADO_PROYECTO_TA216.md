@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.31.0` — Fase 11.2, ebullición y condensación (2026-10-13).
+> **Versión actual**: `0.32.0` — Fase 12.1, diseño de intercambiadores (2026-10-13).
 
 ---
 
@@ -2036,6 +2036,88 @@
     reiniciado.
 - **Dependencias**: ninguna nueva.
 
+### Fase 12.1 — Diseño de intercambiadores: banco de tubos, doble tubo y casco y tubos (Kern)
+- **Versión**: `0.32.0` (2026-10-13). Rama `claude/water-state-analyzer-f4fiev`.
+  La primera mitad de la Fase 12 (el plan aprobado: 12.1 = banco de tubos, doble tubo
+  y casco y tubos con Kern; 12.2 = Bell–Delaware y compactos). El autor aprobó la
+  digitalización de los gráficos de Zukauskas de la biblioteca ht, no tiene un ejemplo
+  de Kern de la cátedra y prefirió las propiedades de los aceites a elección (sin la
+  tabla A.5 de Incropera).
+- **Scope**:
+  - **Unidades nuevas**: el caudal por unidad de área G (kg/(m²·s) en el SI y el
+    Técnico, lb/(s·ft²) en el Inglés) y la caída de presión de un intercambiador (Pa,
+    kPa o psi, como Kern).
+  - **`data/zukauskas_tube_bank_friction.csv`** (nuevo, con `data/LICENSE-ht.txt`): f y
+    χ de los gráficos de Zukauskas (1137 puntos), muestreados de ht con
+    `scripts/sample_zukauskas.py`.
+  - **`core/heat_transfer/design_common.py`** (nuevo): las corrientes (un fluido de
+    CoolProp o propiedades dadas, con μ_p), el h de un tubo con las correlaciones de la
+    8.1, el factor de fricción, el U por metro y la presión inicial de un fluido nuevo
+    (`suggested_pressure`).
+  - **`core/heat_transfer/tube_bank.py`** (nuevo): Zukauskas con las constantes de
+    Çengel y Ghajar o de Incropera y la corrección por filas, V_máx por la diagonal, f y
+    χ de los gráficos, la salida con la T media iterada, el barrido de la velocidad, la
+    comparación de los arreglos, ejemplos y export.
+  - **`core/heat_transfer/double_pipe.py`** (nuevo): el anular (Kays y Perkins, Shah y
+    London), el dimensionamiento o la verificación con el ε-NTU de la 8.2, las
+    horquillas, el Δp con el largo instalado, las corrientes al revés, ejemplos y export.
+  - **`core/heat_transfer/shell_tube.py`** (nuevo): los calibres BWG, N_t estimado con
+    D_s (múltiplo de los pasos), Kern (a_s, G_s, D_e, h_o, f y Δp del casco), los tubos,
+    U_C y U_D, el criterio de R_d, el barrido de los bafles, ejemplos y export.
+  - `exchanger_design_procedure.py`: los tres procedimientos en los tres sistemas, con
+    los pasos de ε-NTU de la 8.2 (`effectiveness_steps`, nuevo en
+    `exchangers_procedure`).
+  - **`ui/exchanger_design_charts.py`** (nuevo): el f de Zukauskas con el punto, h y Δp
+    contra la velocidad y h_o y Δp contra los bafles (dos paneles en log–log); el
+    perfil de temperaturas y las resistencias salen de `ui/exchanger_charts`.
+  - **Página `/Diseno_de_Intercambiadores` (🛠️)**, en el menú después de
+    Intercambiadores: los tres modos con sus ejemplos, la teoría (el vademecum no tiene
+    el capítulo), el procedimiento y el export.
+- **Validación** (con las propiedades de los enunciados las correlaciones dan los
+  números de los libros; f y χ, y el f de Kern, se leen de gráficos):
+  - Incropera 7.7, el banco en tresbolillo: h = 137,0 W/(m²·K) (135,6 con C redondeado
+    a 0,34, como el libro), q' = 19,56 kW/m y Δp = 234 Pa contra 246 (−5 %); con
+    CoolProp, h = 138,1 W/(m²·K).
+  - Çengel y Ghajar 7-7, el banco alineado: Q̇ = 24,86 kW, T_sal = 29,11 °C y
+    Δp = 23,4 Pa contra 21 (P_L = 3,33 cae fuera del gráfico de f).
+  - Incropera 11.1, el enfriador de aceite: h_i = 2251, h_o = 38,9 y U = 38,27
+    W/(m²·K), L = 65,65 m contra 65,9. Çengel y Ghajar 11-1: U = 74,43 contra ≈ 74,5.
+  - Peters, Timmerhaus y West 14-6, el lado del casco con Kern: h_o = 3253 W/(m²·K)
+    (−3,4 % contra 3369) y Δp = 18,7 kPa (+14 % contra 16,4): el libro lee j_H y f de
+    los gráficos de Kern; es también el control de Bell–Delaware para la 12.2.
+  - Identidades: Q̇ = ṁ·c_p·ΔT = U·A·F·ΔT_ml en los tres modos; dimensionar y después
+    verificar con ese largo devuelve la salida pedida; 1/U_D = 1/U_C + R_d; el Kern a
+    mano con las propiedades del libro, exacto.
+- **Detectado**:
+  - Desde el contenedor solo se llega a PyPI: los libros no se pudieron leer y las
+    series de Zukauskas y Ulinskas recordadas se apartaban 5–30 % de los gráficos; por
+    eso la digitalización de ht (aprobada por el autor).
+  - El primer borrador calculaba el Δp del doble tubo con el largo necesario: va con el
+    instalado (las horquillas enteras), como Kern.
+  - N_t estimado no se repartía igual entre los pasos (178 tubos en 4 pasos): ahora se
+    redondea a un múltiplo de N_p, y un N_t dado que no se reparte lleva una nota.
+  - El procedimiento decía «el c_p … es un dato» con el c_p de CoolProp, y nombraba las
+    corrientes «caliente» y «frío»: ahora lleva el nombre del fluido y el c_p del paso
+    «Propiedades».
+  - 📐 ya era el ícono de Interpolación: la página usa 🛠️.
+- **Mensajes al alumno**: los tubos que se tocan (S_T ≤ D o P_T ≤ d_o), un caño exterior
+  más chico que el tubo, más tubos que los que entran en el casco o más pasos que tubos,
+  un calibre BWG desconocido, un fluido que cambia de fase adentro («subí la presión»),
+  una salida imposible (las temperaturas se cruzan o pasan el máximo del tipo) y medidas
+  que no son positivas; avisos de Re fuera de los rangos (Zukauskas, Kern), bafles fuera
+  de D_s/5 a D_s y F < 0,75, y una nota si un Δp pasa los 10 psi (69 kPa) de Kern.
+- **Tests**: 176 nuevos de la Fase 12.1, más la coherencia de unidades y la página en la
+  navegación:
+  - `tests/test_tube_bank.py` (33), `tests/test_double_pipe.py` (27),
+    `tests/test_shell_tube.py` (29);
+  - `tests/test_exchanger_design_procedure.py` (44), `tests/test_exchanger_design_charts.py`
+    (4) y `tests/test_page_diseno_de_intercambiadores.py` (39, AppTest).
+  - LaTeX: 10 443 expresiones distintas del procedimiento y 780 de la página (teoría y
+    procedimiento) validan con KaTeX estricto y entran en 317 y 310 px como máximo en los
+    tres sistemas.
+- **Dependencias**: ninguna nueva (ht se usó para muestrear los gráficos y como control,
+  solo en el scratchpad).
+
 ---
 
 ## Pendientes / próximas fases
@@ -2102,15 +2184,20 @@
   cada componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
+- **Diseño de intercambiadores (Fase 12.2)**: Bell–Delaware en el mismo casco
+  (los factores J de Taborek con las holguras de TEMA y el Δp por zonas) comparado con
+  Kern, con el ejemplo 14-6 de Peters et al. de control (3080 W/(m²·K) y 9,48 kPa), e
+  intercambiadores compactos (j y f de Kays y London: aletas desplazadas de Manglik y
+  Bergles, tubos con aletas circulares de Briggs y Young) con el ε-NTU de flujo cruzado.
+  Más adelante: el banco de tubos con el fluido de los tubos (T_s variable), las
+  propiedades de los aceites con la temperatura y la selección económica.
 - **Transferencia de calor (continuación)**: la ebullición en flujo (dentro de
   tubos) y la condensación anular con mucho vapor, la placa horizontal chica de
   Lienhard y Dhir, conducción bidimensional (factores de forma) y
   transitoria por diferencias finitas (generación interna, bordes que cambian
-  en el tiempo, cuerpos de dos materiales), bancos de tubos, aletas de perfil
+  en el tiempo, cuerpos de dos materiales), aletas de perfil
   variable; radiación de gases (CO₂ y H₂O, gráficos de Hottel)
-  e intensidad direccional; intercambiadores compactos (j de Colburn), la caída
-  de presión del casco (Kern, Bell–Delaware), el U armado con las
-  correlaciones de la 8.1 y la selección económica.
+  e intensidad direccional.
 
 ---
 

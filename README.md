@@ -558,6 +558,34 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   las tablas da 0,933) y 11-9 (ε = 0,462 y 38,4 kW con la fórmula; el libro lee
   0,47 en el gráfico). Procedimiento en los tres sistemas y export. _Fase 8.2
   cerrada._
+- ✅ **Diseño de intercambiadores** (página `/Diseno_de_Intercambiadores`, Çengel y
+  Ghajar §7-4 y cap. 11; Incropera §7.6, §8.7 y cap. 11; Kern, 1950; Kakaç y Liu,
+  2002). **Banco de tubos** alineado o en tresbolillo que cruza un fluido de
+  CoolProp, con los tubos a temperatura constante: V_máx por el plano transversal o
+  por la diagonal, el Nu de Zukauskas con las constantes de Çengel y Ghajar o de
+  Incropera y la corrección por filas, la salida y el calor con las propiedades a la
+  temperatura media (iterada), y Δp = N_L·χ·f·ρ·V_máx²/2 con f y χ de los gráficos
+  de Zukauskas (la digitalización de la biblioteca ht); el gráfico de f con el
+  punto, h y Δp contra la velocidad y los dos arreglos comparados. **Doble tubo**
+  con cada corriente de CoolProp o con propiedades a elección (los aceites de los
+  libros): el h del tubo con las correlaciones de la Fase 8.1 y el del anular con
+  el diámetro hidráulico (la tabla de Kays y Perkins en laminar), el U por metro
+  con la pared y el ensuciamiento de TEMA, el **dimensionamiento** (el largo y las
+  horquillas para una salida o un calor) o la **verificación** (las salidas de un
+  equipo dado) por ε-NTU, Δp de los dos lados con el largo instalado, qué lado
+  manda, el perfil de temperaturas y las corrientes al revés. **Casco y tubos con
+  Kern**: el casco (D_s, bafles), los tubos (d_o y calibre BWG, paso cuadrado o
+  triangular, N_t dato o estimado con D_s, de 1 a 8 pasos), el lado del casco
+  (a_s, G_s, D_e, h_o con (μ/μ_p)^0,14), U_C y U_D, el ε-NTU de un paso por el
+  casco, el **criterio de Kern** (el R_d que tolera el equipo contra el pedido),
+  Δp del casco y de los tubos y h_o y Δp contra la separación de los bafles.
+  Reproduce Incropera (7.7, h = 138,1 W/(m²·K) con CoolProp y 137,0 con sus
+  propiedades contra 135,6, Δp = 232 Pa contra 246; 11.1, h_o = 38,9, U = 38,3
+  W/(m²·K) y L = 65,6 m contra 65,9), Çengel y Ghajar (7-7, Q̇ = 24,9 kW con sus
+  propiedades; 11-1, U = 74,4 W/(m²·K) contra ≈ 74,5) y Peters, Timmerhaus y West
+  (14-6, Kern: h_o = 3253 W/(m²·K) y Δp = 18,7 kPa contra 3369 y 16,4 leídos de los
+  gráficos). Procedimiento en los tres sistemas (con el 1000 y el 3600 de ṁ·c_p y
+  g_c en ρ·u²/2 a la vista; Δp en Pa, kPa o psi) y export. _Fase 12.1 cerrada._
 - ✅ **Gases ideales** (página `/Gases_Ideales`, vademecum §4, §5, §6 y §10.5;
   Çengel caps. 7 y 13). **Un gas entre dos estados** (15 gases: los nueve de la
   tabla del vademecum y seis más de los polinomios NASA), con dos de p, T y v
@@ -635,11 +663,14 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
   componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
+- **Diseño de intercambiadores (Fase 12.2)**: Bell–Delaware en el mismo casco,
+  comparado con Kern (los factores J de Taborek y el Δp por zonas), e
+  intercambiadores compactos (j y f de Kays y London: aletas desplazadas de Manglik
+  y Bergles, tubos con aletas circulares de Briggs y Young).
 - **Transferencia de calor (continuación)**: conducción bidimensional y
-  transitoria por diferencias finitas, bancos de tubos, radiación de gases (CO₂
-  y H₂O, gráficos de Hottel), intercambiadores compactos (j de Colburn), la
-  caída de presión del casco (Kern, Bell–Delaware), la ebullición en flujo
-  (dentro de tubos) y la condensación anular con mucho vapor.
+  transitoria por diferencias finitas, radiación de gases (CO₂ y H₂O, gráficos de
+  Hottel), la ebullición en flujo (dentro de tubos) y la condensación anular con
+  mucho vapor.
 
 ---
 
@@ -706,6 +737,10 @@ apps/
 │   │   ├── phase_change.py  # fluidos y propiedades de saturación para el cambio de fase
 │   │   ├── boiling.py     # ebullición en pileta: Rohsenow, flujo crítico, película, curva
 │   │   ├── condensation.py  # condensación en película: placa, tubos, banco, esfera, Chato
+│   │   ├── design_common.py # lo común del diseño: corrientes, h de un tubo, U por metro
+│   │   ├── tube_bank.py   # banco de tubos: Zukauskas, f y χ de los gráficos, barrido de V
+│   │   ├── double_pipe.py # doble tubo: el anular, el U, el largo y las horquillas, Δp
+│   │   ├── shell_tube.py  # casco y tubos con Kern: N_t, D_e, h_o, Δp y el criterio de R_d
 │   │   └── *_procedure.py # sus procedimientos «como en el pizarrón»
 │   ├── exergy/
 │   │   ├── physical.py    # exergía física: estado muerto, ψ, φ, calor, fuente finita
@@ -746,15 +781,17 @@ apps/
 │                          # de los ciclos (T–Q, T–s, Sankey), carta psicrométrica,
 │                          # gráficos de la combustión, del poder calorífico, de la
 │                          # exergía (Grassmann), de la transferencia de calor, de la
-│                          # radiación, de los intercambiadores, de la conducción
+│                          # radiación, de los intercambiadores (y su diseño), de la conducción
 │                          # transitoria, de la ebullición y la condensación, de los gases
 │                          # ideales y reales, de los balances y del segundo
 │                          # principio, créditos
 ├── tests/                 # pytest (+ páginas con streamlit.testing)
 ├── data/                  # tablas: ISO 6976, polinomios NASA-9, biomasas (Ghugare),
-│                          # carbones de Argonne con el PCS medido y exergías
-│                          # químicas estándar (Szargut, Ahrendts)
-├── scripts/               # extracción de datos (los polinomios de thermo.inp de NASA CEA)
+│                          # carbones de Argonne con el PCS medido, exergías
+│                          # químicas estándar (Szargut, Ahrendts) y f y χ de
+│                          # Zukauskas (digitalización de ht)
+├── scripts/               # extracción de datos (los polinomios de thermo.inp de NASA CEA
+│                          # y el muestreo de los gráficos de Zukauskas)
 ├── requirements.txt
 ├── CITATION.cff
 ├── LICENSE
@@ -769,7 +806,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.31.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.32.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 La página **ℹ️ Acerca de** de la app arma esta cita y la de todas las fuentes
@@ -1562,6 +1599,73 @@ turbulenta y adentro de un tubo):
   volume  = {4},
   pages   = {52--60},
   year    = {1962}
+}
+```
+
+**Diseño de intercambiadores** — el banco de tubos de Zukauskas (y la
+digitalización de sus gráficos en la biblioteca ht), el anular laminar, el método
+de Kern para el casco, la estimación de la cantidad de tubos y el ejemplo de
+control:
+
+```bibtex
+@article{zukauskas1972crossflow,
+  author  = {Zukauskas, A.},
+  title   = {Heat transfer from tubes in crossflow},
+  journal = {Advances in Heat Transfer},
+  volume  = {8},
+  pages   = {93--160},
+  year    = {1972},
+  doi     = {10.1016/S0065-2717(08)70038-8}
+}
+
+@incollection{kays1973internal,
+  author    = {Kays, W. M. and Perkins, H. C.},
+  title     = {Forced convection, internal flow in ducts},
+  booktitle = {Handbook of Heat Transfer},
+  editor    = {Rohsenow, W. M. and Hartnett, J. P.},
+  chapter   = {7},
+  publisher = {McGraw-Hill},
+  year      = {1973}
+}
+
+@book{shah1978laminar,
+  author    = {Shah, R. K. and London, A. L.},
+  title     = {Laminar Flow Forced Convection in Ducts},
+  series    = {Advances in Heat Transfer, Supplement 1},
+  publisher = {Academic Press},
+  year      = {1978}
+}
+
+@book{kern1950process,
+  author    = {Kern, D. Q.},
+  title     = {Process Heat Transfer},
+  publisher = {McGraw-Hill},
+  year      = {1950}
+}
+
+@book{kakac2002heat,
+  author    = {Kakaç, S. and Liu, H.},
+  title     = {Heat Exchangers: Selection, Rating, and Thermal Design},
+  edition   = {2},
+  publisher = {CRC Press},
+  year      = {2002}
+}
+
+@book{peters2003plant,
+  author    = {Peters, M. S. and Timmerhaus, K. D. and West, R. E.},
+  title     = {Plant Design and Economics for Chemical Engineers},
+  edition   = {5},
+  publisher = {McGraw-Hill},
+  year      = {2003}
+}
+
+@software{bell2016ht,
+  author  = {Bell, Caleb},
+  title   = {ht: Heat transfer component of the Chemical Engineering Design
+             Library (ChEDL)},
+  url     = {https://github.com/CalebBell/ht},
+  license = {MIT},
+  year    = {2016}
 }
 ```
 
