@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.32.0"
+PAGE_VERSION = "0.33.0"
 
 
 def _home_page() -> None:
@@ -218,9 +218,11 @@ def _home_page() -> None:
           cruza un fluido (Zukauskas, con la caída de presión de sus gráficos),
           un **doble tubo** dimensionado en horquillas (el h de cada lado, el U
           con el ensuciamiento, el largo y las caídas de presión) y un **casco y
-          tubos** con el **método de Kern** (el lado del casco, U limpio y
-          sucio, el criterio del factor de ensuciamiento y h_o y Δp contra los
-          bafles) (ejemplos de Incropera, Çengel y Ghajar y Peters et al.).
+          tubos** con el **método de Kern** o el de **Bell–Delaware** (el lado
+          del casco con las fugas, el bypass y los extremos, U limpio y sucio,
+          el criterio del factor de ensuciamiento, los dos métodos lado a lado
+          y h_o y Δp contra los bafles) (ejemplos de Incropera, Çengel y Ghajar
+          y Peters et al.).
         - 🎈 **Gases ideales** — un gas **entre dos estados** con c_p
           constante a 25 °C, a la temperatura media o variable (polinomios
           NASA) y cuánto te equivocás con c_p constante; las **mezclas**
