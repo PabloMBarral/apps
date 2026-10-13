@@ -1974,6 +1974,16 @@ Notas de la Fase 11.2 (ebullición y condensación):
   expresiones del procedimiento (ejemplos y variantes de calentador, régimen, modo,
   geometría y sistema) y 45 de la teoría, KaTeX estricto, máx. 323 px (la teoría de
   Rohsenow en un renglón llegaba a 351).
+- **En un eje logarítmico de plotly, las formas (`add_hline`, `add_vline`) toman la
+  coordenada como exponente**, como las anotaciones: las líneas de Re = 30 y 1800 iban a
+  10³⁰ y 10¹⁸⁰⁰ y el eje aplastaba la curva. Van como trazas (`go.Scatter` de dos puntos).
+- Smoke test a 390 y 1280 px: los 12 casos (los dos modos y sus ejemplos, en los tres
+  sistemas) con la teoría y el procedimiento abiertos, sin errores ni desbordes. Las
+  capturas encontraron el eje de Re aplastado (lo de arriba), la leyenda de la
+  comparación de geometrías pisando el título del eje (ahora sin leyenda: «(tus datos)»
+  en el rótulo y en naranja), los nombres de la comparación en m y mm en el Inglés (sin
+  medidas: son las de los datos) y el eje de h con «15k»; se repitieron las 24 corridas
+  con el servidor reiniciado.
 
 ### Citas y licencias
 
