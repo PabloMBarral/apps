@@ -8,7 +8,9 @@
   horquillas y las caídas de presión (Incropera, §8.7 y §11.3);
 - :func:`shell_tube_steps`: la geometría, el lado del casco con Kern, el de los tubos,
   U_C y U_D, ε-NTU, el criterio de R_d de Kern y las caídas de presión (Kern, 1950;
-  Kakaç y Liu, 2002).
+  Kakaç y Liu, 2002). Con Bell–Delaware (Fase 12.2; Taborek, 1983), el casco va en cuatro
+  pasos (la geometría, las fugas y el bypass, el banco ideal y los factores) y su Δp, por
+  zonas.
 
 Factores de unidades a la vista: ṁ·c_p lleva 1000 en el Técnico (c_p en kJ/(kg·K)) y
 3600 en el Inglés (para pasar Btu/s a Btu/h, la hora de los h); ρ·u²/2 lleva g_c = 32,174
@@ -20,8 +22,9 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 
+from core.heat_transfer.bell_delaware import IDEAL_BANK, BellDelawareSide
 from core.heat_transfer.convection_procedure import big, correlation_latex
-from core.heat_transfer.design_common import StreamProps, TubeFlow, stream_name
+from core.heat_transfer.design_common import DesignStream, StreamProps, TubeFlow, stream_name
 from core.heat_transfer.double_pipe import ANNULUS_TABLE, DoublePipeResult, annulus_friction_Re
 from core.heat_transfer.exchangers import ExchangerResult
 from core.heat_transfer.exchangers_procedure import _capacity_units_note, effectiveness_steps
@@ -29,6 +32,7 @@ from core.heat_transfer.procedure_common import (
     Pack,
     chain,
     dimensionless,
+    flush,
     frac,
     n,
     numbered,
@@ -103,6 +107,11 @@ def _txt(value_si: float, kind: QuantityKind, system: UnitSystem, sig: int = 4) 
 
 def _comma(x: float, sig: int = 4) -> str:
     return f"{x:.{sig}g}".replace(".", ",")
+
+
+def _minus(x: float, sig: int = 4) -> str:
+    """Como :func:`_comma`, con el signo menos tipográfico (−0,395)."""
+    return _comma(x, sig).replace("-", "−")
 
 
 def _count(x: float) -> str:
@@ -1042,7 +1051,7 @@ def _shell_side_step(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
         n(i.B_m, _L, system),
         n(i.d_o_m, _L, system),
     )
-    square = i.layout == "square"
+    square = i.layout in ("square", "rotated_square")
     clearance = i.P_T_m - i.d_o_m
     if square:
         free = i.P_T_m**2 - math.pi * i.d_o_m**2 / 4.0
@@ -1117,7 +1126,11 @@ def _shell_side_step(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
             q(s.h_W_per_m2K, _H, system),
         )
     )
-    shape = "cuadrado" if i.layout == "square" else "triangular"
+    shape = {
+        "square": "cuadrado",
+        "rotated_square": "cuadrado (Kern no distingue el cuadrado rotado)",
+        "triangular": "triangular",
+    }[i.layout]
     if mu_w is None:
         wall = "sin μ_p, φ_s = 1"
     elif shell_s.properties is not None:
@@ -1227,8 +1240,41 @@ def _kern_check_step(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
     return ProcedureStep("El criterio de Kern (R_d)", text, tuple(lines))
 
 
+def _dp_tube_lines(r: ShellTubeResult, system: UnitSystem) -> list[str]:
+    """Δp_t = K_t·q_t, con la fricción de los N_p pasos y cuatro cargas por paso."""
+    i, t = r.inputs, r.tube
+    lines = _friction_lines("f_t", t)
+    rho_t = r.tube_props.rho_kg_per_m3
+    dyn = rho_t * t.velocity_m_s**2 / 2.0
+    lines.append(
+        chain(
+            r"q_t", _dyn_sym(system), _dyn_num(system, rho_t, t.velocity_m_s), q(dyn, _PD, system)
+        )
+    )
+    n_p = i.tube_passes
+    bracket = t.f * i.L_m * n_p / i.d_i_m + 4.0 * n_p
+    friction = frac(times(n(i.L_m, _L, system), str(n_p)), n(i.d_i_m, _L, system))
+    lines.append(
+        chain(
+            "K_t",
+            r"f_t\,\frac{L\,N_p}{d_i} + 4\,N_p",
+            Pack(times(_d(t.f), friction), (("+", f"4 \\cdot {n_p}"),)),
+            _d(bracket),
+        )
+    )
+    lines.append(
+        chain(
+            r"\Delta p_t",
+            r"K_t\,q_t",
+            times(_d(bracket), n(dyn, _PD, system)),
+            *_to_loss(r.dp_tube_Pa, system),
+        )
+    )
+    return lines
+
+
 def _dp_shell_tube(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
-    i, s, t = r.inputs, r.shell, r.tube
+    i, s = r.inputs, r.shell
     p = r.shell_props
     q_s = s.G_s**2 / (2.0 * p.rho_kg_per_m3 * s.phi)
     num = _pw(n(s.G_s, _G, system), "2")
@@ -1259,33 +1305,7 @@ def _dp_shell_tube(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
             *_to_loss(s.dp_Pa, system),
         ),
     ]
-    lines += _friction_lines("f_t", t)
-    rho_t = r.tube_props.rho_kg_per_m3
-    dyn = rho_t * t.velocity_m_s**2 / 2.0
-    lines.append(
-        chain(
-            r"q_t", _dyn_sym(system), _dyn_num(system, rho_t, t.velocity_m_s), q(dyn, _PD, system)
-        )
-    )
-    n_p = i.tube_passes
-    bracket = t.f * i.L_m * n_p / i.d_i_m + 4.0 * n_p
-    friction = frac(times(n(i.L_m, _L, system), str(n_p)), n(i.d_i_m, _L, system))
-    lines.append(
-        chain(
-            "K_t",
-            r"f_t\,\frac{L\,N_p}{d_i} + 4\,N_p",
-            Pack(times(_d(t.f), friction), (("+", f"4 \\cdot {n_p}"),)),
-            _d(bracket),
-        )
-    )
-    lines.append(
-        chain(
-            r"\Delta p_t",
-            r"K_t\,q_t",
-            times(_d(bracket), n(dyn, _PD, system)),
-            *_to_loss(r.dp_tube_Pa, system),
-        )
-    )
+    lines += _dp_tube_lines(r, system)
     text = (
         "Casco (Kern): f con el ajuste de Kakaç y Liu del gráfico de Kern (400 < Re ≤ 10⁶) y "
         "una caída por cada cruce del haz, N_b + 1. Tubos: la fricción de los N_p pasos y "
@@ -1294,9 +1314,783 @@ def _dp_shell_tube(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
     return ProcedureStep("Caídas de presión", text, tuple(lines))
 
 
-def shell_tube_steps(r: ShellTubeResult, system: UnitSystem) -> list[ProcedureStep]:
-    """Los pasos del casco y tubos con Kern (Kern, 1950; Kakaç y Liu, 2002)."""
+# ---------------------------------------------------------------------
+# Casco y tubos: el lado del casco con Bell–Delaware (Fase 12.2)
+# ---------------------------------------------------------------------
+
+#: El factor del paso en la dirección del flujo (L_pp) y del normal efectivo (L_tp,ef) de
+#: cada ángulo (Taborek, 1983).
+_ANGLE_PITCH: dict[int, tuple[str, str]] = {
+    30: ("0.866", "1"),
+    45: ("0.707", "0.707"),
+    90: ("1", "1"),
+}
+_ANGLE_NAME: dict[int, str] = {
+    30: "triangular (30°)",
+    45: "cuadrado rotado (45°)",
+    90: "cuadrado (90°)",
+}
+#: Los tramos de Re de la tabla de Taborek, por el Re mínimo de cada uno.
+_RE_ROW: dict[float, str] = {
+    1.0e4: "de 10⁴ a 10⁵",
+    1.0e3: "de 10³ a 10⁴",
+    1.0e2: "de 10² a 10³",
+    1.0e1: "de 10 a 10²",
+    0.0: "de 1 a 10",
+}
+_ENT = r"\text{ent}"
+_SAL = r"\text{sal}"
+
+
+def _bd(r: ShellTubeResult) -> BellDelawareSide:
+    assert r.bell_delaware is not None
+    return r.bell_delaware
+
+
+def _rad(x: float) -> str:
+    return rf"{_d(x)}\ \text{{rad}}"
+
+
+def _paren(tex: str) -> str:
+    return f"({tex})"
+
+
+def _shell_stream(r: ShellTubeResult) -> DesignStream:
     i = r.inputs
+    return i.hot if i.shell_side == "hot" else i.cold
+
+
+def _bd_geometry_step(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
+    i, bd = r.inputs, _bd(r)
+    g, a = bd.geometry, bd.areas
+
+    def L(x: float) -> str:
+        return n(x, _L, system)
+
+    Bc = _d(g.baffle_cut, 3)
+    cut = rf"(1 - 2 \cdot {Bc})"
+    k_pp, k_eff = _ANGLE_PITCH[a.angle]
+    pp = "P_T" if k_pp == "1" else "L_{pp}"
+    eff = "P_T" if k_eff == "1" else r"L_{tp,\text{ef}}"
+    lines = [
+        chain("D_{otl}", "D_s - L_{bb}", sub(L(i.D_s_m), L(g.L_bb_m)), q(a.D_otl_m, _L, system)),
+        chain("D_{ctl}", "D_{otl} - d_o", sub(L(a.D_otl_m), L(i.d_o_m)), q(a.D_ctl_m, _L, system)),
+    ]
+    if k_pp != "1":
+        lines.append(
+            chain(
+                r"L_{pp} = L_{tp,\text{ef}}" if k_eff == k_pp else "L_{pp}",
+                rf"{k_pp}\,P_T",
+                times(k_pp, L(i.P_T_m)),
+                q(a.L_pp_m, _L, system),
+            )
+        )
+    if k_eff not in ("1", k_pp):
+        lines.append(
+            chain(
+                r"L_{tp,\text{ef}}",
+                rf"{k_eff}\,P_T",
+                times(k_eff, L(i.P_T_m)),
+                q(a.L_tp_eff_m, _L, system),
+            )
+        )
+    ell = a.S_m_m2 / i.B_m
+    lines += [
+        chain(
+            r"\ell_m",
+            Pack("L_{bb}", (("+", rf"\frac{{D_{{ctl}}}}{{{eff}}}\,(P_T - d_o)"),)),
+            Pack(
+                L(g.L_bb_m),
+                (
+                    ("+", frac(L(a.D_ctl_m), L(a.L_tp_eff_m))),
+                    (r"\cdot", _paren(sub(L(i.P_T_m), L(i.d_o_m)))),
+                ),
+            ),
+            q(ell, _L, system),
+        ),
+        chain("S_m", r"B\,\ell_m", times(L(i.B_m), L(ell)), q(a.S_m_m2, _A, system)),
+        chain(r"\theta_{ds}", r"2\,\arccos(1 - 2\,B_c)", rf"2\,\arccos{cut}", _rad(a.theta_ds)),
+    ]
+    if a.theta_ctl > 0.0:
+        lines.append(
+            chain(
+                r"\theta_{ctl}",
+                r"2\,\arccos\frac{D_s\,(1 - 2\,B_c)}{D_{ctl}}",
+                r"2\,\arccos" + frac(times(L(i.D_s_m), cut), L(a.D_ctl_m)),
+                _rad(a.theta_ctl),
+            )
+        )
+        lines.append(
+            chain(
+                "F_w",
+                frac(r"\theta_{ctl} - \sin\theta_{ctl}", r"2\pi"),
+                frac(rf"{_d(a.theta_ctl)} - \sin {_d(a.theta_ctl)}", r"2\pi"),
+                _d(a.F_w),
+            )
+        )
+    else:
+        lines.append(r"\theta_{ctl} = 0 \quad \Rightarrow \quad F_w = 0")
+    lines += [
+        chain("F_c", r"1 - 2\,F_w", sub("1", times("2", _d(a.F_w))), _d(a.F_c)),
+        chain(
+            "S_{wg}",
+            r"\frac{\pi\,D_s^2}{4}\,\frac{\theta_{ds} - \sin\theta_{ds}}{2\pi}",
+            prod(
+                frac(times(r"\pi", _pw(L(i.D_s_m), "2")), "4"),
+                frac(rf"{_d(a.theta_ds)} - \sin {_d(a.theta_ds)}", r"2\pi"),
+            ),
+            q(a.S_wg_m2, _A, system),
+        ),
+        chain(
+            "S_{wt}",
+            r"N_t\,F_w\,\frac{\pi\,d_o^2}{4}",
+            prod(str(r.N_t), _d(a.F_w), frac(times(r"\pi", _pw(L(i.d_o_m), "2")), "4")),
+            q(a.S_wt_m2, _A, system),
+        ),
+        chain(
+            "S_w",
+            "S_{wg} - S_{wt}",
+            sub(n(a.S_wg_m2, _A, system), n(a.S_wt_m2, _A, system)),
+            q(a.S_w_m2, _A, system),
+        ),
+        chain(
+            "N_{tcc}",
+            rf"\frac{{D_s}}{{{pp}}}\,(1 - 2\,B_c)",
+            times(frac(L(i.D_s_m), L(a.L_pp_m)), cut),
+            _d(a.N_tcc),
+        ),
+    ]
+    ell_w = g.baffle_cut * i.D_s_m - (i.D_s_m - a.D_ctl_m) / 2.0
+    lines.append(
+        chain(
+            r"\ell_w",
+            Pack(r"B_c\,D_s", (("-", r"\frac{D_s - D_{ctl}}{2}"),)),
+            Pack(times(Bc, L(i.D_s_m)), (("-", frac(sub(L(i.D_s_m), L(a.D_ctl_m)), "2")),)),
+            q(ell_w, _L, system),
+        )
+    )
+    if ell_w > 0.0:
+        lines.append(
+            chain(
+                "N_{tcw}",
+                rf"\frac{{0.8\,\ell_w}}{{{pp}}}",
+                frac(times("0.8", L(ell_w)), L(a.L_pp_m)),
+                _d(a.N_tcw),
+            )
+        )
+    else:
+        lines.append(r"N_{tcw} = 0 \quad (\ell_w \le 0)")
+    if bd.factors.laminar:
+        perimeter = math.pi * i.d_o_m * r.N_t * a.F_w + a.theta_ds * i.D_s_m
+        lines += [
+            chain(
+                r"\mathcal{P}_w",
+                Pack(r"\pi\,d_o\,N_t\,F_w", (("+", r"\theta_{ds}\,D_s"),)),
+                Pack(
+                    times(r"\pi", L(i.d_o_m), str(r.N_t), _d(a.F_w)),
+                    (("+", times(_d(a.theta_ds), L(i.D_s_m))),),
+                ),
+                q(perimeter, _L, system),
+            ),
+            chain(
+                "D_w",
+                frac(r"4\,S_w", r"\mathcal{P}_w"),
+                frac(times("4", n(a.S_w_m2, _A, system)), L(perimeter)),
+                q(a.D_w_m, _L, system),
+            ),
+        ]
+    if a.angle == 90:
+        pitch = "los pasos en la dirección del flujo (L_pp) y normal a él (L_tp,ef) son P_T"
+    elif a.angle == 30:
+        pitch = "el paso en la dirección del flujo es L_pp = 0,866·P_T y el normal, P_T"
+    else:
+        pitch = "los pasos en la dirección del flujo y normal a él son 0,707·P_T"
+    text = (
+        "Bell–Delaware (Taborek, 1983): el haz ocupa hasta D_otl (el casco menos la holgura "
+        "L_bb) y los centros de los tubos de la periferia llegan hasta D_ctl. S_m es el área "
+        "de flujo cruzado en la línea de centros: la luz entre los tubos más el canal entre el "
+        f"haz y el casco. En el arreglo {_ANGLE_NAME[a.angle]}, {pitch}. Con el corte B_c, θ_ds "
+        "y θ_ctl son los ángulos que abarca la cuerda del bafle sobre D_s y sobre D_ctl (en "
+        "radianes): F_w es la fracción de los tubos que queda en una ventana y F_c, la de los "
+        "que cruzan entre las puntas de los bafles. S_w es el área de flujo de una ventana "
+        "(sin los tubos); N_tcc y N_tcw, las hileras que cruza el fluido entre las puntas de "
+        "los bafles y en cada ventana (ℓ_w es la altura de la ventana dentro del haz)."
+        + (
+            " Con flujo laminar hace falta además D_w, el diámetro hidráulico de la ventana "
+            "(su perímetro mojado: los tubos y el arco del casco)."
+            if bd.factors.laminar
+            else ""
+        )
+    )
+    return ProcedureStep(
+        f"Lado del casco ({stream_name(_shell_stream(r))}): la geometría de Bell–Delaware",
+        text,
+        tuple(lines),
+    )
+
+
+def _bd_leakage_step(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
+    i, bd = r.inputs, _bd(r)
+    g, a = bd.geometry, bd.areas
+
+    def L(x: float) -> str:
+        return n(x, _L, system)
+
+    hole = i.d_o_m + a.L_tb_m
+    annulus = math.pi / 4.0 * (hole**2 - i.d_o_m**2)
+    leak = a.S_sb_m2 + a.S_tb_m2
+    lines = [
+        chain(
+            "S_{sb}",
+            r"\frac{\pi\,D_s\,L_{sb}}{2}\left(1 - \frac{\theta_{ds}}{2\pi}\right)",
+            prod(
+                frac(times(r"\pi", L(i.D_s_m), L(a.L_sb_m)), "2"),
+                rf"\left(1 - \frac{{{_d(a.theta_ds)}}}{{2\pi}}\right)",
+            ),
+            q(a.S_sb_m2, _A, system),
+        ),
+        chain(
+            r"d_{\text{ag}}", "d_o + L_{tb}", f"{L(i.d_o_m)} + {L(a.L_tb_m)}", q(hole, _L, system)
+        ),
+        chain(
+            "s_{tb}",
+            r"\frac{\pi}{4}\,(d_{\text{ag}}^2 - d_o^2)",
+            times(frac(r"\pi", "4"), _paren(sub(_pw(L(hole), "2"), _pw(L(i.d_o_m), "2")))),
+            q(annulus, _A, system),
+        ),
+        chain(
+            "S_{tb}",
+            r"s_{tb}\,N_t\,(1 - F_w)",
+            prod(n(annulus, _A, system), str(r.N_t), _paren(sub("1", _d(a.F_w)))),
+            q(a.S_tb_m2, _A, system),
+        ),
+    ]
+    if g.L_pl_m > 0.0:
+        lines.append(
+            chain(
+                "S_b",
+                r"B\,(L_{bb} + L_{pl})",
+                times(L(i.B_m), _paren(f"{L(g.L_bb_m)} + {L(g.L_pl_m)}")),
+                q(a.S_b_m2, _A, system),
+            )
+        )
+    else:
+        lines.append(
+            chain("S_b", r"B\,L_{bb}", times(L(i.B_m), L(g.L_bb_m)), q(a.S_b_m2, _A, system))
+        )
+    lines += [
+        chain(
+            "S_l",
+            "S_{sb} + S_{tb}",
+            f"{n(a.S_sb_m2, _A, system)} + {n(a.S_tb_m2, _A, system)}",
+            q(leak, _A, system),
+        ),
+        chain(
+            "r_s",
+            frac("S_{sb}", "S_l"),
+            frac(n(a.S_sb_m2, _A, system), n(leak, _A, system)),
+            _d(a.r_s),
+        ),
+        chain(
+            "r_{lm}",
+            frac("S_l", "S_m"),
+            frac(n(leak, _A, system), n(a.S_m_m2, _A, system)),
+            _d(a.r_lm),
+        ),
+        chain(
+            "F_{sbp}",
+            frac("S_b", "S_m"),
+            frac(n(a.S_b_m2, _A, system), n(a.S_m_m2, _A, system)),
+            _d(a.F_sbp),
+        ),
+        chain(
+            "r_{ss}",
+            frac("N_{ss}", "N_{tcc}"),
+            frac(str(g.sealing_strips), _d(a.N_tcc)),
+            _d(a.r_ss),
+        ),
+    ]
+    tema_sb = " (TEMA, RCB-4.3)" if g.L_sb_m is None else ""
+    tema_tb = " (TEMA, RCB-4.2)" if g.L_tb_m is None else ""
+    lane = (
+        f" más el carril de los pasos, L_pl = {_txt(g.L_pl_m, 'small_length', system)}"
+        if g.L_pl_m > 0.0
+        else ""
+    )
+    strips = (
+        "Sin tiras de sellado (N_ss = 0), nada lo corta."
+        if g.sealing_strips == 0
+        else f"N_ss = {g.sealing_strips} pares de tiras de sellado lo cortan."
+    )
+    text = (
+        "Las holguras diametrales: casco–bafle L_sb = "
+        f"{_txt(a.L_sb_m, 'small_length', system)}{tema_sb} y tubo–bafle L_tb = "
+        f"{_txt(a.L_tb_m, 'small_length', system)}{tema_tb}. Por ellas el fluido pasa de un "
+        "compartimiento al siguiente sin cruzar el haz: S_sb es el anillo entre el casco y el "
+        "bafle (sin el arco de la ventana) y S_tb, el de los agujeros de los tubos que no están "
+        "en la ventana (s_tb cada uno, con el agujero de d_ag); S_l = S_sb + S_tb. S_b es el "
+        f"canal del bypass entre el haz y el casco{lane}. {strips} r_s, r_lm, F_sbp y r_ss son "
+        "los cocientes que usan los factores."
+    )
+    return ProcedureStep("Lado del casco: las fugas y el bypass", text, tuple(lines))
+
+
+def _bd_ideal_step(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
+    i, bd = r.inputs, _bd(r)
+    a, ib, p = bd.areas, bd.ideal, r.shell_props
+    shell_s = _shell_stream(r)
+    lines = [
+        chain(
+            "G_s",
+            frac(r"\dot m", "S_m"),
+            frac(n(shell_s.m_dot_kg_s, _M, system), n(a.S_m_m2, _A, system)),
+            q(bd.G_s, _G, system),
+        ),
+        chain(
+            "Re_s",
+            frac(r"d_o\,G_s", r"\mu"),
+            frac(times(n(i.d_o_m, _L, system), n(bd.G_s, _G, system)), n(p.mu_Pa_s, _MU, system)),
+            big(bd.Re),
+        ),
+        chain(
+            "a",
+            frac("a_3", r"1 + 0.14\,Re_s^{a_4}"),
+            frac(_d(ib.a3, 4), rf"1 + 0.14 \cdot {_pw(big(bd.Re), _d(ib.a4, 4))}"),
+            _d(ib.a),
+        ),
+        chain(
+            "j_i",
+            r"a_1\left(\frac{1.33}{P_T/d_o}\right)^{a}\,Re_s^{a_2}",
+            prod(
+                _d(ib.a1, 4),
+                _pw(frac("1.33", _d(ib.pitch_ratio)), _d(ib.a)),
+                _pw(big(bd.Re), _d(ib.a2, 4)),
+            ),
+            _d(ib.j),
+        ),
+    ]
+    mu_w = p.mu_Pa_s / bd.phi ** (1 / 0.14) if bd.phi != 1.0 else None
+    if mu_w is not None:
+        lines.append(
+            chain(
+                r"\phi_s",
+                r"\left(\frac{\mu}{\mu_p}\right)^{0.14}",
+                _pw(frac(n(p.mu_Pa_s, _MU, system), n(mu_w, _MU, system)), "0.14"),
+                _d(bd.phi),
+            )
+        )
+    else:
+        lines.append(r"\phi_s = 1")
+    f = _FACTOR[system]
+    factors = [
+        _d(ib.j),
+        n(p.cp_J_per_kgK, _CP, system),
+        n(bd.G_s, _G, system),
+        _pw(_d(p.Pr), "-2/3"),
+        _d(bd.phi),
+    ]
+    lines.append(
+        chain(
+            r"h_{\text{ideal}}",
+            r"j_i\,c_p\,G_s\,\mathrm{Pr}^{-2/3}\,\phi_s",
+            prod(*([f, *factors] if f else factors)),
+            q(bd.h_ideal_W_per_m2K, _H, system),
+        )
+    )
+    row = next(rw[0] for rw in IDEAL_BANK[a.angle].rows if bd.Re >= rw[0])
+    stretch = _RE_ROW[row]
+    if not 1.0 <= bd.Re <= 1.0e5:
+        stretch += ", extrapolado"
+    if mu_w is None:
+        wall = "sin μ_p, φ_s = 1"
+    elif shell_s.properties is not None:
+        wall = "μ_p del enunciado"
+    else:
+        wall = "μ_p de CoolProp a la temperatura de la pared, que se itera"
+    if system == "Técnico":
+        units = " Con c_p en kJ/(kg·K), el 1000 deja h en W/(m²·K)."
+    elif system == "Inglés":
+        units = " Con G_s por segundo, el 3600 deja h por hora: Btu/(h·ft²·°F)."
+    else:
+        units = ""
+    text = (
+        "El banco ideal: todo el fluido cruza el haz con la velocidad másica de S_m, y Re_s va "
+        "con d_o. La tabla de Taborek (1983) da j_i para el arreglo de "
+        f"{a.angle}° con Re {stretch}: a₁ = {_comma(ib.a1)}, a₂ = {_minus(ib.a2)}, "
+        f"a₃ = {_comma(ib.a3)} y a₄ = {_comma(ib.a4)}. h_ideal es el h de Colburn (j = St·Pr^⅔) "
+        f"con φ_s, la corrección por la viscosidad junto a la pared ({wall})." + units
+    )
+    return ProcedureStep("Lado del casco: el banco ideal", text, tuple(lines))
+
+
+def _bd_factors_step(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
+    i, bd = r.inputs, _bd(r)
+    g, a, fc = bd.geometry, bd.areas, bd.factors
+    c_l = 0.44 * (1.0 - a.r_s)
+    lines = [
+        chain("J_c", r"0.55 + 0.72\,F_c", rf"0.55 + 0.72 \cdot {_d(a.F_c)}", _d(fc.J_c)),
+        chain("c_l", r"0.44\,(1 - r_s)", times("0.44", _paren(sub("1", _d(a.r_s)))), _d(c_l)),
+        chain(
+            "J_l",
+            r"c_l + (1 - c_l)\,e^{-2.2\,r_{lm}}",
+            Pack(
+                _d(c_l),
+                (("+", times(_paren(sub("1", _d(c_l))), rf"e^{{-2.2 \cdot {_d(a.r_lm)}}}")),),
+            ),
+            _d(fc.J_l),
+        ),
+    ]
+    bypass = r"e^{-C_{bh}\,F_{sbp}\,\left(1 - (2\,r_{ss})^{1/3}\right)}"
+    if a.r_ss >= 0.5:
+        lines.append(r"J_b = 1 \quad (r_{ss} \ge 1/2)")
+    elif g.sealing_strips == 0:
+        lines.append(
+            chain("J_b", bypass, rf"e^{{-{_d(fc.C_bh, 3)} \cdot {_d(a.F_sbp)}}}", _d(fc.J_b))
+        )
+    else:
+        lines.append(
+            chain(
+                "J_b",
+                bypass,
+                rf"e^{{-{_d(fc.C_bh, 3)} \cdot {_d(a.F_sbp)} \cdot "
+                rf"\left(1 - (2 \cdot {_d(a.r_ss)})^{{1/3}}\right)}}",
+                _d(fc.J_b),
+            )
+        )
+    equal = a.B_in_m == i.B_m and a.B_out_m == i.B_m
+    if equal:
+        lines.append(rf"J_s = 1 \quad (B_{{{_ENT}}} = B_{{{_SAL}}} = B)")
+    else:
+        Li, Lo = a.B_in_m / i.B_m, a.B_out_m / i.B_m
+        e = _d(1.0 - fc.n, 3)
+        lines += [
+            chain(
+                rf"L^*_{{{_ENT}}}",
+                frac(rf"B_{{{_ENT}}}", "B"),
+                frac(n(a.B_in_m, _L, system), n(i.B_m, _L, system)),
+                _d(Li),
+            ),
+            chain(
+                rf"L^*_{{{_SAL}}}",
+                frac(rf"B_{{{_SAL}}}", "B"),
+                frac(n(a.B_out_m, _L, system), n(i.B_m, _L, system)),
+                _d(Lo),
+            ),
+            flush(
+                "J_s",
+                frac(
+                    rf"(N_b - 1) + L^{{*\,1-n}}_{{{_ENT}}} + L^{{*\,1-n}}_{{{_SAL}}}",
+                    rf"(N_b - 1) + L^*_{{{_ENT}}} + L^*_{{{_SAL}}}",
+                ),
+                frac(
+                    f"{i.baffles - 1} + {_pw(_d(Li), e)} + {_pw(_d(Lo), e)}",
+                    f"{i.baffles - 1} + {_d(Li)} + {_d(Lo)}",
+                ),
+                _d(fc.J_s),
+            ),
+        ]
+    if fc.laminar:
+        lines += [
+            chain(
+                "N_c",
+                r"(N_{tcc} + N_{tcw})\,(N_b + 1)",
+                times(_paren(f"{_d(a.N_tcc)} + {_d(a.N_tcw)}"), _paren(f"{i.baffles} + 1")),
+                _d(fc.N_c),
+            ),
+            chain(
+                r"J_r^*",
+                r"\left(\frac{10}{N_c}\right)^{0.18}",
+                _pw(frac("10", _d(fc.N_c)), "0.18"),
+                _d(fc.J_r_star),
+            ),
+        ]
+        raw = fc.J_r_star
+        if bd.Re > 20.0:
+            raw += (20.0 - bd.Re) / 80.0 * (fc.J_r_star - 1.0)
+        clipped = raw < 0.4
+        lhs = r"J_r^{\,\prime}" if clipped else "J_r"
+        if bd.Re > 20.0:
+            lines.append(
+                chain(
+                    lhs,
+                    Pack(r"J_r^*", (("+", r"\frac{20 - Re_s}{80}\,(J_r^* - 1)"),)),
+                    Pack(
+                        _d(fc.J_r_star),
+                        (
+                            (
+                                "+",
+                                times(
+                                    frac(sub("20", _d(bd.Re)), "80"),
+                                    _paren(f"{_d(fc.J_r_star)} - 1"),
+                                ),
+                            ),
+                        ),
+                    ),
+                    _d(raw),
+                )
+            )
+        else:
+            lines.append(rf"{lhs} = J_r^* = {_d(fc.J_r_star)}")
+        if clipped:
+            lines.append(r"J_r = \max(0.4,\ J_r^{\,\prime}) = 0.4")
+    else:
+        lines.append(r"J_r = 1 \quad (Re_s \ge 100)")
+    lines.append(
+        chain(
+            "h_o",
+            r"h_{\text{ideal}}\,J_c\,J_l\,J_b\,J_s\,J_r",
+            prod(
+                n(bd.h_ideal_W_per_m2K, _H, system),
+                _d(fc.J_c),
+                _d(fc.J_l),
+                _d(fc.J_b),
+                _d(fc.J_s),
+                _d(fc.J_r),
+            ),
+            q(bd.h_W_per_m2K, _H, system),
+        )
+    )
+    regime = "laminar (Re_s < 100)" if fc.laminar else "turbulento (Re_s ≥ 100)"
+    if a.r_ss >= 0.5:
+        bypass_text = "con r_ss ≥ ½ las tiras lo anulan"
+    elif g.sealing_strips == 0:
+        bypass_text = f"C_bh = {_comma(fc.C_bh)}; sin tiras, el paréntesis vale 1"
+    else:
+        bypass_text = f"C_bh = {_comma(fc.C_bh)}"
+    text = (
+        f"Los factores de Taborek (1983), con el flujo {regime}: J_c, el corte (los tubos de "
+        "las ventanas no ven flujo cruzado; con ventanas chicas el fluido se acelera y J_c pasa "
+        "de 1); J_l, las fugas por las holguras (c_l es lo que queda con fugas enormes); J_b, "
+        f"el bypass entre el haz y el casco ({bypass_text}); J_s, las separaciones de la "
+        "entrada y de la salida"
+        + ("" if equal else f" (n = {'⅓' if fc.laminar else _comma(fc.n, 3)})")
+        + "; J_r, el gradiente adverso de temperatura del flujo laminar"
+        + (
+            f" (N_c = {_comma(fc.N_c)} hileras en todo el casco; nunca menos de 0,4)"
+            if fc.laminar
+            else ""
+        )
+        + f". En total, h_o = {_comma(fc.J_total, 3)}·h_ideal."
+    )
+    return ProcedureStep("Lado del casco: los factores de corrección", text, tuple(lines))
+
+
+def _bd_pressure_step(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
+    i, bd = r.inputs, _bd(r)
+    g, a, fc, ib, p = bd.geometry, bd.areas, bd.factors, bd.ideal, r.shell_props
+    shell_s = _shell_stream(r)
+    gc = system == "Inglés"
+    rho = n(p.rho_kg_per_m3, _RHO, system)
+    G_w = shell_s.m_dot_kg_s / math.sqrt(a.S_m_m2 * a.S_w_m2)
+    Gw = n(G_w, _G, system)
+    lines = [
+        chain(
+            "b",
+            frac("b_3", r"1 + 0.14\,Re_s^{b_4}"),
+            frac(_d(ib.b3, 4), rf"1 + 0.14 \cdot {_pw(big(bd.Re), _d(ib.b4, 4))}"),
+            _d(ib.b),
+        ),
+        chain(
+            "f_i",
+            r"b_1\left(\frac{1.33}{P_T/d_o}\right)^{b}\,Re_s^{b_2}",
+            prod(
+                _d(ib.b1, 4),
+                _pw(frac("1.33", _d(ib.pitch_ratio)), _d(ib.b)),
+                _pw(big(bd.Re), _d(ib.b2, 4)),
+            ),
+            _d(ib.f),
+        ),
+        chain(
+            r"\Delta p_{bi}",
+            frac(r"2\,f_i\,N_{tcc}\,G_s^2", r"g_c\,\rho\,\phi_s" if gc else r"\rho\,\phi_s"),
+            frac(
+                times("2", _d(ib.f), _d(a.N_tcc), _pw(n(bd.G_s, _G, system), "2")),
+                times(_GC, rho, _d(bd.phi)) if gc else times(rho, _d(bd.phi)),
+            ),
+            q(bd.dp_bi_Pa, _PD, system),
+        ),
+        chain(
+            "G_w",
+            frac(r"\dot m", r"\sqrt{S_m\,S_w}"),
+            frac(
+                n(shell_s.m_dot_kg_s, _M, system),
+                rf"\sqrt{{{times(n(a.S_m_m2, _A, system), n(a.S_w_m2, _A, system))}}}",
+            ),
+            q(G_w, _G, system),
+        ),
+    ]
+    rho_den = times(_GC, rho) if gc else rho
+    rho_sym = r"g_c\,\rho" if gc else r"\rho"
+    if fc.laminar:
+        beta = a.N_tcw / (i.P_T_m - i.d_o_m) + i.B_m / a.D_w_m**2
+        visc = 26.0 * p.mu_Pa_s * G_w * beta / p.rho_kg_per_m3
+        accel = G_w**2 / p.rho_kg_per_m3
+        lines += [
+            chain(
+                r"\beta_w",
+                Pack(frac("N_{tcw}", "P_T - d_o"), (("+", frac("B", "D_w^2")),)),
+                Pack(
+                    frac(_d(a.N_tcw), sub(n(i.P_T_m, _L, system), n(i.d_o_m, _L, system))),
+                    (("+", frac(n(i.B_m, _L, system), _pw(n(a.D_w_m, _L, system), "2"))),),
+                ),
+                q(beta, "inverse_length", system),
+            ),
+            chain(
+                r"\Delta p_{wi}",
+                Pack(
+                    frac(r"26\,\mu\,G_w\,\beta_w", rho_sym),
+                    (("+", frac("G_w^2", rho_sym)),),
+                ),
+                Pack(
+                    frac(
+                        times(
+                            "26", n(p.mu_Pa_s, _MU, system), Gw, n(beta, "inverse_length", system)
+                        ),
+                        rho_den,
+                    ),
+                    (("+", frac(_pw(Gw, "2"), rho_den)),),
+                ),
+                Pack(n(visc, _PD, system), (("+", n(accel, _PD, system)),)),
+                q(bd.dp_wi_Pa, _PD, system),
+            ),
+        ]
+        window_text = (
+            " En flujo laminar (Re_s < 100), la ventana suma la fricción viscosa (β_w, con las "
+            "hileras de la ventana y su diámetro hidráulico) y la carga de velocidad."
+        )
+    else:
+        lines.append(
+            chain(
+                r"\Delta p_{wi}",
+                rf"(2 + 0.6\,N_{{tcw}})\,\frac{{G_w^2}}{{2\,{rho_sym}}}",
+                prod(
+                    _paren(rf"2 + 0.6 \cdot {_d(a.N_tcw)}"),
+                    frac(_pw(Gw, "2"), times("2", rho_den)),
+                ),
+                q(bd.dp_wi_Pa, _PD, system),
+            )
+        )
+        window_text = (
+            " En cada ventana, dos cargas de velocidad con G_w (la media geométrica de S_m y S_w) "
+            "y 0,6 por cada hilera de la ventana."
+        )
+    lines += [
+        chain("p", r"-0.15\,(1 + r_s) + 0.8", rf"-0.15 \cdot (1 + {_d(a.r_s)}) + 0.8", _d(fc.p)),
+        chain(
+            "R_l",
+            r"e^{-1.33\,(1 + r_s)\,r_{lm}^{\,p}}",
+            rf"e^{{-1.33 \cdot (1 + {_d(a.r_s)}) \cdot {_pw(_d(a.r_lm), _d(fc.p))}}}",
+            _d(fc.R_l),
+        ),
+    ]
+    bypass = r"e^{-C_{bp}\,F_{sbp}\,\left(1 - (2\,r_{ss})^{1/3}\right)}"
+    if a.r_ss >= 0.5:
+        lines.append(r"R_b = 1 \quad (r_{ss} \ge 1/2)")
+    elif g.sealing_strips == 0:
+        lines.append(
+            chain("R_b", bypass, rf"e^{{-{_d(fc.C_bp, 3)} \cdot {_d(a.F_sbp)}}}", _d(fc.R_b))
+        )
+    else:
+        lines.append(
+            chain(
+                "R_b",
+                bypass,
+                rf"e^{{-{_d(fc.C_bp, 3)} \cdot {_d(a.F_sbp)} \cdot "
+                rf"\left(1 - (2 \cdot {_d(a.r_ss)})^{{1/3}}\right)}}",
+                _d(fc.R_b),
+            )
+        )
+    equal = a.B_in_m == i.B_m and a.B_out_m == i.B_m
+    if equal:
+        lines.append(rf"R_{{s,{_ENT}}} = R_{{s,{_SAL}}} = 1")
+    else:
+        e = _d(2.0 - fc.n_prime, 3)
+        for sym, B_end, value in (
+            (_ENT, a.B_in_m, fc.R_s_in),
+            (_SAL, a.B_out_m, fc.R_s_out),
+        ):
+            lines.append(
+                chain(
+                    rf"R_{{s,{sym}}}",
+                    _pw(frac("B", rf"B_{{{sym}}}"), "2 - n'"),
+                    _pw(frac(n(i.B_m, _L, system), n(B_end, _L, system)), e),
+                    _d(value),
+                )
+            )
+    dp_bi = n(bd.dp_bi_Pa, _PD, system)
+    windows = rf"\left(1 + \frac{{{_d(a.N_tcw)}}}{{{_d(a.N_tcc)}}}\right)"
+    lines += [
+        chain(
+            r"\Delta p_c",
+            r"(N_b - 1)\,\Delta p_{bi}\,R_b\,R_l",
+            prod(_paren(f"{i.baffles} - 1"), dp_bi, _d(fc.R_b), _d(fc.R_l)),
+            q(bd.dp_cross_Pa, _PD, system),
+        ),
+        chain(
+            r"\Delta p_w",
+            r"N_b\,\Delta p_{wi}\,R_l",
+            prod(str(i.baffles), n(bd.dp_wi_Pa, _PD, system), _d(fc.R_l)),
+            q(bd.dp_window_Pa, _PD, system),
+        ),
+    ]
+    if equal:
+        lines.append(
+            chain(
+                r"\Delta p_e",
+                r"2\,\Delta p_{bi}\left(1 + \frac{N_{tcw}}{N_{tcc}}\right)R_b",
+                prod("2", dp_bi, windows, _d(fc.R_b)),
+                q(bd.dp_ends_Pa, _PD, system),
+            )
+        )
+    else:
+        lines.append(
+            chain(
+                r"\Delta p_e",
+                Pack(
+                    r"\Delta p_{bi}\left(1 + \frac{N_{tcw}}{N_{tcc}}\right)R_b",
+                    ((r"\cdot", rf"(R_{{s,{_ENT}}} + R_{{s,{_SAL}}})"),),
+                ),
+                prod(dp_bi, windows, _d(fc.R_b), _paren(f"{_d(fc.R_s_in)} + {_d(fc.R_s_out)}")),
+                q(bd.dp_ends_Pa, _PD, system),
+            )
+        )
+    lines.append(
+        chain(
+            r"\Delta p_s",
+            r"\Delta p_c + \Delta p_w + \Delta p_e",
+            Pack(
+                n(bd.dp_cross_Pa, _PD, system),
+                (("+", n(bd.dp_window_Pa, _PD, system)), ("+", n(bd.dp_ends_Pa, _PD, system))),
+            ),
+            *_to_loss(bd.dp_Pa, system),
+        )
+    )
+    text = (
+        "El Δp del casco por zonas (Taborek, 1983): Δp_bi es un compartimiento central ideal, "
+        "con f_i de la misma tabla (los b), y Δp_wi una ventana ideal." + window_text + " R_l "
+        "corrige por las fugas el flujo cruzado y las ventanas; R_b, por el bypass, el flujo "
+        "cruzado y los extremos. Son N_b − 1 compartimientos centrales, N_b ventanas y dos "
+        "extremos, que cruzan además las hileras de una ventana"
+        + ("" if equal else f" y llevan R_s por su separación (n′ = {_comma(fc.n_prime, 3)})")
+        + "."
+        + _dp_text(system)
+    )
+    return ProcedureStep("Caída de presión en el casco (Bell–Delaware)", text, tuple(lines))
+
+
+def _dp_tubes_only(r: ShellTubeResult, system: UnitSystem) -> ProcedureStep:
+    text = (
+        "La fricción de los N_p pasos y cuatro cargas de velocidad por paso en las vueltas "
+        "(Kern; Kakaç y Liu)." + _dp_text(system)
+    )
+    return ProcedureStep("Caída de presión en los tubos", text, tuple(_dp_tube_lines(r, system)))
+
+
+def shell_tube_steps(r: ShellTubeResult, system: UnitSystem) -> list[ProcedureStep]:
+    """Los pasos del casco y tubos con Kern (Kern, 1950; Kakaç y Liu, 2002) o con
+    Bell–Delaware en el casco (Taborek, 1983)."""
+    i = r.inputs
+    bell = r.bell_delaware is not None
     hot_props = r.shell_props if i.shell_side == "hot" else r.tube_props
     cold_props = r.tube_props if i.shell_side == "hot" else r.shell_props
     steps = [
@@ -1310,7 +2104,16 @@ def shell_tube_steps(r: ShellTubeResult, system: UnitSystem) -> list[ProcedureSt
             i.cold.properties is not None,
             system,
         ),
-        _shell_side_step(r, system),
+        *(
+            (
+                _bd_geometry_step(r, system),
+                _bd_leakage_step(r, system),
+                _bd_ideal_step(r, system),
+                _bd_factors_step(r, system),
+            )
+            if bell
+            else (_shell_side_step(r, system),)
+        ),
         _tube_side_step(r, system),
     ]
     shell_s, tube_s = (i.hot, i.cold) if i.shell_side == "hot" else (i.cold, i.hot)
@@ -1323,7 +2126,7 @@ def shell_tube_steps(r: ShellTubeResult, system: UnitSystem) -> list[ProcedureSt
             tube_s.R_f_m2K_per_W,
             shell_s.R_f_m2K_per_W,
             r.tube.h_W_per_m2K,
-            r.shell.h_W_per_m2K,
+            r.h_shell_W_per_m2K,
             r.U_D_W_per_m2K,
             system,
             "en los tubos",
@@ -1358,5 +2161,8 @@ def shell_tube_steps(r: ShellTubeResult, system: UnitSystem) -> list[ProcedureSt
     steps += _effectiveness(r.exchanger, stream_name(i.hot), stream_name(i.cold), system)
     if i.problem == "check":
         steps.append(_kern_check_step(r, system))
-    steps.append(_dp_shell_tube(r, system))
+    if bell:
+        steps += [_bd_pressure_step(r, system), _dp_tubes_only(r, system)]
+    else:
+        steps.append(_dp_shell_tube(r, system))
     return numbered(steps)

@@ -52,7 +52,7 @@ def test_filter_by_kind_and_search() -> None:
     at = _app()
     at.selectbox(key="ab_kind").set_value("Normas").run()
     _no_problems(at)
-    assert len(_references(at)) == 6  # ISO 14912:2003 desde la 0.30.0
+    assert len(_references(at)) == 7  # ISO 14912:2003 desde la 0.30.0; TEMA (2007), la 0.33.0
     at.text_input(key="ab_query").input("ASTM").run()
     assert len(_references(at)) == 3
     at.selectbox(key="ab_kind").set_value("Todas").run()

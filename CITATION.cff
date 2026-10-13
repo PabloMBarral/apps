@@ -23,7 +23,8 @@ abstract: >-
   transitoria, aletas, convección, radiación e intercambiadores), gases
   ideales y sus mezclas,
   transformaciones politrópicas, diseño de intercambiadores (banco de tubos,
-  doble tubo y casco y tubos con el método de Kern), gases reales (factor de
+  doble tubo y casco y tubos con los métodos de Kern y de Bell–Delaware),
+  gases reales (factor de
   compresibilidad,
   Van der Waals, Peng–Robinson, relaciones de Maxwell, Clapeyron y
   Joule–Thomson), balances de energía y de entropía (sistemas cerrados,
@@ -72,8 +73,9 @@ keywords:
   - heat-exchanger-design
   - tube-bank
   - shell-and-tube
+  - bell-delaware
 license: MIT
-version: "0.32.0"
+version: "0.33.0"
 date-released: "2026-10-13"
 references:
   - type: article
@@ -1230,6 +1232,88 @@ references:
     publisher:
       name: "McGraw-Hill"
     year: 2003
+  - type: conference-paper
+    scope: "Diseño de intercambiadores: las corrientes del lado del casco (Bell–Delaware)"
+    authors:
+      - family-names: "Tinker"
+        given-names: "T."
+    title: "Shell side characteristics of shell and tube heat exchangers"
+    collection-title: "Proceedings of the General Discussion on Heat Transfer"
+    publisher:
+      name: "Institution of Mechanical Engineers"
+    year: 1951
+    start: 89
+    end: 116
+  - type: report
+    scope: "Diseño de intercambiadores: el programa de la Universidad de Delaware (Bell–Delaware)"
+    authors:
+      - family-names: "Bell"
+        given-names: "Kenneth J."
+    title: >-
+      Final Report of the Cooperative Research Program on Shell and Tube Heat
+      Exchangers
+    institution:
+      name: "University of Delaware Engineering Experiment Station"
+    number: "Bulletin No. 5"
+    year: 1963
+  - type: book
+    scope: "Diseño de intercambiadores: el método de Bell–Delaware"
+    authors:
+      - family-names: "Bell"
+        given-names: "Kenneth J."
+    title: "Delaware method for shellside design"
+    collection-title: >-
+      Heat Transfer Equipment Design (R. K. Shah, E. C. Subbarao y R. A. Mashelkar,
+      eds.)
+    publisher:
+      name: "Hemisphere"
+    year: 1988
+    start: 145
+    end: 166
+  - type: book
+    scope: >-
+      Diseño de intercambiadores: Bell–Delaware en ecuaciones (j_i y f_i del banco
+      ideal, los factores J y R y el Δp por zonas)
+    authors:
+      - family-names: "Taborek"
+        given-names: "J."
+    title: "Shell-and-tube heat exchangers: single-phase flow"
+    collection-title: "Heat Exchanger Design Handbook, vol. 3, sección 3.3"
+    publisher:
+      name: "Hemisphere"
+    year: 1983
+  - type: book
+    scope: "Diseño de intercambiadores: Bell–Delaware (cap. 3, el lado del casco)"
+    authors:
+      - family-names: "Thome"
+        given-names: "John R."
+    title: "Wolverine Engineering Data Book III"
+    publisher:
+      name: "Wolverine Tube"
+    year: 2004
+  - type: book
+    scope: "Diseño de intercambiadores: el método de Delaware (cap. 6)"
+    authors:
+      - family-names: "Serth"
+        given-names: "Robert W."
+      - family-names: "Lestina"
+        given-names: "Thomas G."
+    title: "Process Heat Transfer: Principles, Applications and Rules of Thumb"
+    edition: "2"
+    publisher:
+      name: "Academic Press"
+    year: 2014
+  - type: standard
+    scope: >-
+      Diseño de intercambiadores: las holguras casco–bafle (RCB-4.3) y tubo–bafle
+      (RCB-4.2) de Bell–Delaware
+    authors:
+      - name: "Tubular Exchanger Manufacturers Association"
+    title: "Standards of the Tubular Exchanger Manufacturers Association"
+    edition: "9"
+    publisher:
+      name: "TEMA"
+    year: 2007
   - type: software
     scope: "Repositorio hermano: hoja de fórmulas teóricas"
     authors:

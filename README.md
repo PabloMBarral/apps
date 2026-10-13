@@ -586,6 +586,19 @@ Suite de herramientas didácticas en Python/Streamlit para la materia
   (14-6, Kern: h_o = 3253 W/(m²·K) y Δp = 18,7 kPa contra 3369 y 16,4 leídos de los
   gráficos). Procedimiento en los tres sistemas (con el 1000 y el 3600 de ṁ·c_p y
   g_c en ρ·u²/2 a la vista; Δp en Pa, kPa o psi) y export. _Fase 12.1 cerrada._
+  **El casco con Bell–Delaware** (Fase 12.2; Taborek, 1983; Bell, 1963 y 1988; Thome,
+  2004; Serth y Lestina, 2014): el corte de los bafles, el arreglo de 30°, 45° o 90°,
+  las holguras casco–bafle y tubo–bafle de TEMA (2007) o a elección, la holgura
+  haz–casco (con el orden de magnitud por cabezal), las tiras de sellado, el carril
+  de los pasos y las separaciones de los extremos; las áreas (S_m, S_w, las fugas y
+  el bypass), el banco ideal de Taborek, los cinco factores (J_c, J_l, J_b, J_s y
+  J_r, con la rama laminar) y el Δp por zonas (el flujo cruzado, las ventanas y los
+  extremos, con R_l, R_b y R_s); la cascada del h, las zonas del Δp contra el ideal,
+  Kern y Bell–Delaware lado a lado y h_o y Δp contra la separación y el corte de los
+  bafles con los dos métodos. Reproduce las áreas del ejemplo 14-6 de Peters et al.
+  (S_m = 0,0255 y S_w = 0,03298 m²), su h ideal (−0,7 %), los factores (1–4 %) y el
+  h_o (3216 contra 3080 W/(m²·K)); el Δp (5,9 contra 9,48 kPa) queda documentado.
+  _Fase 12.2 cerrada._
 - ✅ **Gases ideales** (página `/Gases_Ideales`, vademecum §4, §5, §6 y §10.5;
   Çengel caps. 7 y 13). **Un gas entre dos estados** (15 gases: los nueve de la
   tabla del vademecum y seis más de los polinomios NASA), con dos de p, T y v
@@ -663,10 +676,9 @@ igualdad por renglón) para que entren en el ancho de la pantalla.
   componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Diseño de intercambiadores (Fase 12.2)**: Bell–Delaware en el mismo casco,
-  comparado con Kern (los factores J de Taborek y el Δp por zonas), e
-  intercambiadores compactos (j y f de Kays y London: aletas desplazadas de Manglik
-  y Bergles, tubos con aletas circulares de Briggs y Young).
+- **Diseño de intercambiadores (Fase 12.3)**: intercambiadores compactos en una
+  página nueva (j y f de Kays y London: aletas desplazadas de Manglik y Bergles,
+  tubos con aletas circulares de Briggs y Young).
 - **Transferencia de calor (continuación)**: conducción bidimensional y
   transitoria por diferencias finitas, radiación de gases (CO₂ y H₂O, gráficos de
   Hottel), la ebullición en flujo (dentro de tubos) y la condensación anular con
@@ -740,7 +752,8 @@ apps/
 │   │   ├── design_common.py # lo común del diseño: corrientes, h de un tubo, U por metro
 │   │   ├── tube_bank.py   # banco de tubos: Zukauskas, f y χ de los gráficos, barrido de V
 │   │   ├── double_pipe.py # doble tubo: el anular, el U, el largo y las horquillas, Δp
-│   │   ├── shell_tube.py  # casco y tubos con Kern: N_t, D_e, h_o, Δp y el criterio de R_d
+│   │   ├── shell_tube.py  # casco y tubos con Kern o Bell–Delaware: N_t, h_o, Δp, R_d
+│   │   ├── bell_delaware.py # Bell–Delaware: Taborek, holguras de TEMA, J, R y Δp por zonas
 │   │   └── *_procedure.py # sus procedimientos «como en el pizarrón»
 │   ├── exergy/
 │   │   ├── physical.py    # exergía física: estado muerto, ψ, φ, calor, fuente finita
@@ -806,7 +819,7 @@ Si lo usás en investigación o docencia, GitHub te ofrece un botón
 "Cite this repository" en la columna derecha, generado a partir de
 [`CITATION.cff`](CITATION.cff). Cita sugerida:
 
-> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.32.0)
+> Barral, P. M. (2026). *TA216 — Tecnología de Calor Avanzada — Apps* (Versión 0.33.0)
 > [Software]. https://github.com/PabloMBarral/apps
 
 La página **ℹ️ Acerca de** de la app arma esta cita y la de todas las fuentes
@@ -1603,9 +1616,10 @@ turbulenta y adentro de un tubo):
 ```
 
 **Diseño de intercambiadores** — el banco de tubos de Zukauskas (y la
-digitalización de sus gráficos en la biblioteca ht), el anular laminar, el método
-de Kern para el casco, la estimación de la cantidad de tubos y el ejemplo de
-control:
+digitalización de sus gráficos en la biblioteca ht), el anular laminar, los
+métodos de Kern y de Bell–Delaware para el casco (las corrientes de Tinker, el
+programa de Delaware, las ecuaciones de Taborek y las holguras de TEMA), la
+estimación de la cantidad de tubos y el ejemplo de control:
 
 ```bibtex
 @article{zukauskas1972crossflow,
@@ -1657,6 +1671,67 @@ control:
   edition   = {5},
   publisher = {McGraw-Hill},
   year      = {2003}
+}
+
+@inproceedings{tinker1951shell,
+  author    = {Tinker, T.},
+  title     = {Shell side characteristics of shell and tube heat exchangers},
+  booktitle = {Proceedings of the General Discussion on Heat Transfer},
+  publisher = {Institution of Mechanical Engineers},
+  pages     = {89--116},
+  year      = {1951}
+}
+
+@techreport{bell1963final,
+  author      = {Bell, Kenneth J.},
+  title       = {Final Report of the Cooperative Research Program on Shell and
+                 Tube Heat Exchangers},
+  institution = {University of Delaware Engineering Experiment Station},
+  number      = {Bulletin No. 5},
+  year        = {1963}
+}
+
+@incollection{bell1988delaware,
+  author    = {Bell, Kenneth J.},
+  title     = {Delaware method for shellside design},
+  booktitle = {Heat Transfer Equipment Design},
+  editor    = {Shah, R. K. and Subbarao, E. C. and Mashelkar, R. A.},
+  publisher = {Hemisphere},
+  pages     = {145--166},
+  year      = {1988}
+}
+
+@incollection{taborek1983shell,
+  author    = {Taborek, J.},
+  title     = {Shell-and-tube heat exchangers: single-phase flow},
+  booktitle = {Heat Exchanger Design Handbook},
+  volume    = {3},
+  chapter   = {3.3},
+  publisher = {Hemisphere},
+  year      = {1983}
+}
+
+@book{thome2004wolverine,
+  author    = {Thome, John R.},
+  title     = {Wolverine Engineering Data Book III},
+  publisher = {Wolverine Tube},
+  year      = {2004}
+}
+
+@book{serth2014process,
+  author    = {Serth, Robert W. and Lestina, Thomas G.},
+  title     = {Process Heat Transfer: Principles, Applications and Rules of Thumb},
+  edition   = {2},
+  publisher = {Academic Press},
+  year      = {2014}
+}
+
+@manual{tema2007,
+  organization = {Tubular Exchanger Manufacturers Association},
+  title        = {Standards of the Tubular Exchanger Manufacturers
+                  Association},
+  edition      = {9},
+  year         = {2007}
 }
 
 @software{bell2016ht,

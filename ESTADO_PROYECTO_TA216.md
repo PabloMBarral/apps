@@ -5,7 +5,7 @@
 > con el bump de versión, el README y el `CITATION.cff`). Generada a
 > partir del `git log` y la documentación interna del proyecto.
 >
-> **Versión actual**: `0.32.0` — Fase 12.1, diseño de intercambiadores (2026-10-13).
+> **Versión actual**: `0.33.0` — Fase 12.2, Bell–Delaware en el casco y tubos (2026-10-13).
 
 ---
 
@@ -2128,6 +2128,94 @@
 - **Dependencias**: ninguna nueva (ht se usó para muestrear los gráficos y como control,
   solo en el scratchpad).
 
+### Fase 12.2 — Bell–Delaware en el casco y tubos
+- **Versión**: `0.33.0` (2026-10-13). Rama `claude/water-state-analyzer-f4fiev`.
+  El autor aprobó partir la 12.2 del plan: esta entrega es Bell–Delaware, en el mismo
+  modo del casco y tubos y comparado con Kern; los compactos pasan a la 12.3, en una
+  página nueva y con su propio plan. No tiene el Peters a mano, así que el ejemplo 14-6
+  controla las áreas, el h ideal, los factores y el h_o, y la diferencia del Δp queda
+  documentada. L_bb es un dato del equipo, con el orden de magnitud por cabezal.
+- **Scope**:
+  - **`core/heat_transfer/bell_delaware.py`** (nuevo): la tabla de j_i y f_i de Taborek
+    (30°, 45° y 90°), las holguras de TEMA (RCB-4.3 casco–bafle, RCB-4.2 tubo–bafle),
+    la geometría (D_otl, D_ctl, S_m, θ_ds, θ_ctl, F_w, F_c, S_w, D_w, N_tcc, N_tcw), las
+    fugas y el bypass (S_sb, S_tb, S_b, r_s, r_lm, F_sbp, r_ss), los cinco factores J,
+    R_l, R_b y R_s, y el Δp por zonas (Δp_bi, Δp_wi turbulento o laminar, el flujo
+    cruzado, las ventanas y los extremos), con avisos (corte fuera del 15–45 %, Re fuera
+    de la tabla, fugas muy grandes, ventanas sin tubos).
+  - **`shell_tube.py`**: `shell_method` ("kern" por defecto) y `bell_delaware` (la
+    geometría); el arreglo suma el cuadrado rotado (45°; Kern lo trata como el cuadrado,
+    con una nota). Con Bell–Delaware, el h_o y el Δp del casco salen del método y el U,
+    el ε-NTU y el criterio de R_d los usan; `compare_shell_methods`, el barrido de los
+    bafles con el método de los datos, `baffle_cut_sweep` (15 a 45 %), las notas (el
+    factor que más baja el h_o, las tiras, las fugas, el Δp ideal, Kern con las mismas
+    propiedades, los bafles que no cierran con el largo) y el export con el bloque de
+    Bell–Delaware y `casco_kern`. Los ejemplos traen su geometría (Peters: 405 tubos,
+    L_bb = 33,3 mm, 2 pares de tiras; kerosene: 35 mm; agua–agua: 12 mm).
+  - `exchanger_design_procedure.py`: el casco con Bell–Delaware en cuatro pasos (la
+    geometría, las fugas y el bypass, el banco ideal y los factores) y el Δp por zonas;
+    el de los tubos, aparte.
+  - `ui/exchanger_design_charts.py`: la cascada del h (del banco ideal al h_o, un escalón
+    por factor), el Δp por zonas con su barra ideal al lado y los barridos con los dos
+    métodos en los mismos paneles (contra la separación y contra el corte).
+  - **Página**: el modo pasa a «Casco y tubos», con el selector del método; con
+    Bell–Delaware, sus datos (el corte, L_bb con la guía por cabezal, las holguras de
+    TEMA o a elección, las tiras, el carril y los extremos), las áreas, la cascada, las
+    zonas, Kern y Bell–Delaware lado a lado (h_o, Δp, U_D y Q̇ o R_d), los barridos, la
+    teoría (las corrientes de Tinker, el banco ideal, los factores y el Δp por zonas) y
+    el procedimiento. Con Kern, la página de la 0.32.0.
+- **Validación**:
+  - La tabla de Taborek es continua dentro del 1 % entre tramos de Re salvo dos saltos
+    de la tabla original (j a 45° en Re = 10³, +4 %; a 90° en 10⁴, +5,4 %). La
+    continuidad corrigió un coeficiente recordado mal (a₁ = 1,498 a 45° entre Re = 10 y
+    100, como pychemqt).
+  - Los cinco factores coinciden con los de ht (`baffle_correction_Bell`,
+    `baffle_leakage_Bell`, `bundle_bypassing_Bell`, `unequal_baffle_spacing_Bell` y
+    `laminar_correction_Bell`) en sus ejemplos.
+  - Peters, Timmerhaus y West 14-6 (corte del 25 %, L_bb = 33,3 mm, 405 tubos y las
+    holguras de TEMA): S_m = 0,02549 m² y S_w = 0,03298 m² (las del libro); h ideal
+    5769 contra 5807 W/(m²·K) (−0,7 %); J_c = 1,027 (1,013), J_l = 0,584 (0,56), J_b =
+    0,929 (0,935); h_o = 3216 contra 3080 W/(m²·K) (+4 %). **El Δp da 5,9 kPa contra
+    9,48 (−38 %)** con R_l = 0,36 y R_b = 0,80, los típicos de esas holguras: no se
+    encontró de dónde sale la diferencia (el libro no muestra cómo arma el Δp); no se
+    testea contra el libro.
+  - Kern contra Bell–Delaware en los tres ejemplos (cada uno con sus temperaturas): el
+    h_o de Kern queda entre −8 % y +48 % del de Bell–Delaware (+48 % en el kerosene, sin
+    tiras y con L_bb = 35 mm: J_b = 0,69) y su Δp es 2,3 a 4,1 veces mayor.
+  - Con Kern, la 0.32.0 queda idéntica: un snapshot de los tres ejemplos y sus variantes
+    (diccionarios, pasos del procedimiento en los tres sistemas y barridos), 12 casos,
+    sin diferencias.
+- **Detectado**:
+  - El procedimiento de Kern con el cuadrado rotado escribía la celda triangular (el
+    núcleo usaba la del cuadrado): ahora escribe la del cuadrado.
+  - La cascada del h giraba los rótulos a 390 px: el nombre del factor y su explicación
+    van en dos renglones.
+  - El barrido de los bafles con Bell–Delaware tiene quiebres: la tabla de Taborek salta
+    en Re = 10⁴ a 90° (y en 10³ a 45°) y TEMA achica L_tb cuando el tramo sin apoyo (2·B)
+    pasa de 36″. El texto del gráfico lo explica.
+- **Mensajes al alumno**: el corte fuera de 0–50 % (los bafles no se superponen), una
+  holgura, las tiras o el carril negativos, un haz que no entra en el casco con esa L_bb,
+  separaciones de los extremos que no son positivas y Bell–Delaware sin su geometría;
+  avisos del corte fuera del 15–45 %, Re fuera de la tabla, fugas muy grandes
+  (r_lm > 0,8) y un corte que no llega a los tubos; notas con el factor que más pesa,
+  la sugerencia de tiras, las fugas grandes, cuánto bajan el Δp las fugas y el bypass,
+  Kern con las mismas propiedades y los bafles que no cierran con el largo.
+- **Tests**: 119 nuevos: `tests/test_bell_delaware.py` (60), `tests/test_shell_tube.py`
+  (+17), `tests/test_exchanger_design_procedure.py` (+25),
+  `tests/test_exchanger_design_charts.py` (+3) y
+  `tests/test_page_diseno_de_intercambiadores.py` (+14, AppTest; el modo pasa a «Casco y
+  tubos»).
+  - LaTeX: 15 304 expresiones distintas del procedimiento (los ejemplos y 681 variantes
+    de arreglo, corte, holguras, tiras, carril, extremos, flujo laminar, el piso de J_r y
+    la ventana sin tubos, en los tres sistemas) y 547 de la página con Bell–Delaware
+    validan con KaTeX estricto y entran en 319 y 310 px como máximo.
+  - Smoke test en Chromium a 390 y 1280 px de los tres ejemplos con Bell–Delaware (en los
+    tres sistemas) y del casco con Kern, con la teoría y el procedimiento abiertos: sin
+    errores, sin desbordes y sin ecuaciones que se pasen de su expansor. Después del
+    arreglo de la cascada se repitieron las 6 corridas de Bell–Delaware con el servidor
+    reiniciado.
+- **Dependencias**: ninguna nueva (ht y pychemqt, solo de control en el scratchpad).
+
 ---
 
 ## Pendientes / próximas fases
@@ -2194,13 +2282,15 @@
   cada componente, SPECO), el ambiente a elección para la exergía química
   (corrección a T₀ ≠ 25 °C), la tabla de Szargut (2007), y la HRSG, la
   psicrometría y la combustión en el diagrama de Grassmann.
-- **Diseño de intercambiadores (Fase 12.2)**: Bell–Delaware en el mismo casco
-  (los factores J de Taborek con las holguras de TEMA y el Δp por zonas) comparado con
-  Kern, con el ejemplo 14-6 de Peters et al. de control (3080 W/(m²·K) y 9,48 kPa), e
-  intercambiadores compactos (j y f de Kays y London: aletas desplazadas de Manglik y
-  Bergles, tubos con aletas circulares de Briggs y Young) con el ε-NTU de flujo cruzado.
-  Más adelante: el banco de tubos con el fluido de los tubos (T_s variable), las
-  propiedades de los aceites con la temperatura y la selección económica.
+- **Diseño de intercambiadores (Fase 12.3)**: intercambiadores compactos en una página
+  nueva (`/Intercambiadores_Compactos`, con su plan antes de empezar): placa y aletas
+  desplazadas en los dos lados (Manglik y Bergles, el ε-NTU de flujo cruzado sin mezclar
+  y el Δp del núcleo de Kays y London) y tubos con aletas circulares (Briggs y Young, la
+  aleta anular de la 8.1 y el Δp de ESDU). Más adelante: el Δp de Bell–Delaware del
+  ejemplo 14-6 de Peters et al. (9,48 kPa contra 5,9), el análisis de las corrientes
+  (Wills y Johnston), las toberas, más de un paso por el casco, el banco de tubos con
+  el fluido de los tubos (T_s variable), las propiedades de los aceites con la
+  temperatura y la selección económica.
 - **Transferencia de calor (continuación)**: la ebullición en flujo (dentro de
   tubos) y la condensación anular con mucho vapor, la placa horizontal chica de
   Lienhard y Dhir, conducción bidimensional (factores de forma) y

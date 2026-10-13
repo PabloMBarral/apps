@@ -1,4 +1,4 @@
-"""Tests del casco y tubos con Kern (Fase 12.1)."""
+"""Tests del casco y tubos con Kern (Fase 12.1) y con Bell–Delaware (Fase 12.2)."""
 
 from __future__ import annotations
 
@@ -8,10 +8,13 @@ from dataclasses import replace
 
 import pytest
 
+from core.heat_transfer.bell_delaware import solve_bell_delaware
 from core.heat_transfer.design_common import FluidProperties
 from core.heat_transfer.shell_tube import (
     SHELL_TUBE_EXAMPLES,
+    baffle_cut_sweep,
     baffle_sweep,
+    compare_shell_methods,
     estimate_tube_count,
     kern_equivalent_diameter,
     kern_friction,
@@ -242,3 +245,147 @@ def test_examples_have_no_warnings(name: str) -> None:
     r = solve_shell_tube(ex.inputs)
     assert r.warnings == ()
     assert ex.description
+
+
+# ---------------------------------------------------------------------
+# Bell–Delaware en el casco (Fase 12.2)
+# ---------------------------------------------------------------------
+
+
+def _bd(inputs):  # noqa: ANN001, ANN202
+    return replace(inputs, shell_method="bell_delaware")
+
+
+def test_kern_ignores_the_bell_delaware_geometry() -> None:
+    # con Kern (lo que da la 0.32.0), la geometría de Bell–Delaware no cambia nada
+    for inputs in (PETERS, KEROSENE, WATER):
+        a = solve_shell_tube(inputs)
+        b = solve_shell_tube(replace(inputs, bell_delaware=None))
+        assert a.Q_W == b.Q_W and a.shell == b.shell and a.U_D_W_per_m2K == b.U_D_W_per_m2K
+        assert a.bell_delaware is None and a.h_shell_W_per_m2K == a.shell.h_W_per_m2K
+        assert a.dp_shell_Pa == a.shell.dp_Pa and a.method_label == "Kern"
+
+
+@pytest.mark.parametrize("inputs", [PETERS, KEROSENE, WATER], ids=["peters", "kerosene", "agua"])
+def test_bell_delaware_drives_the_exchanger(inputs) -> None:  # noqa: ANN001
+    r = solve_shell_tube(_bd(inputs))
+    bd = r.bell_delaware
+    assert bd is not None and r.method_label == "Bell–Delaware"
+    assert r.h_shell_W_per_m2K == bd.h_W_per_m2K and r.dp_shell_Pa == bd.dp_Pa
+    # el U usa el h_o de Bell–Delaware y el balance cierra
+    assert r.u_dirty.resistances[-1].R_K_per_W > 0
+    ex = r.exchanger
+    if inputs.problem == "rating":
+        assert ex.Q_W == pytest.approx(r.U_D_W_per_m2K * r.area_m2 * ex.F * ex.dT_lm_K, rel=1e-6)
+    # el lado del casco, con las propiedades y la pared del resultado
+    shell_s = inputs.hot if inputs.shell_side == "hot" else inputs.cold
+    again = solve_bell_delaware(
+        r.shell_props,
+        shell_s.m_dot_kg_s,
+        inputs.D_s_m,
+        inputs.d_o_m,
+        inputs.P_T_m,
+        {"triangular": 30, "square": 90, "rotated_square": 45}[inputs.layout],
+        inputs.B_m,
+        inputs.baffles,
+        r.N_t,
+        inputs.bell_delaware,
+        r.shell_props.mu_Pa_s / bd.phi ** (1 / 0.14),
+    )
+    assert again.h_W_per_m2K == pytest.approx(bd.h_W_per_m2K, rel=1e-9)
+    assert again.dp_Pa == pytest.approx(bd.dp_Pa, rel=1e-9)
+
+
+def test_peters_bell_delaware_against_the_book() -> None:
+    bd = solve_shell_tube(_bd(PETERS)).bell_delaware
+    assert bd is not None
+    assert bd.areas.S_m_m2 == pytest.approx(0.0255, rel=0.005)
+    assert bd.areas.S_w_m2 == pytest.approx(0.03298, rel=0.005)
+    assert bd.h_ideal_W_per_m2K == pytest.approx(5807.0, rel=0.01)
+    assert bd.h_W_per_m2K == pytest.approx(3080.0, rel=0.05)
+
+
+def test_compare_shell_methods() -> None:
+    res = compare_shell_methods(KEROSENE)
+    assert set(res) == {"kern", "bell_delaware"}
+    assert res["kern"].h_shell_W_per_m2K == solve_shell_tube(KEROSENE).shell.h_W_per_m2K
+    # en el ejemplo, sin tiras de sellado, el bypass baja el h_o y Bell–Delaware da menos
+    assert res["bell_delaware"].h_shell_W_per_m2K < res["kern"].h_shell_W_per_m2K
+    assert res["bell_delaware"].dp_shell_Pa < res["kern"].dp_shell_Pa
+
+
+def test_sealing_strips_raise_the_coefficient() -> None:
+    geo = KEROSENE.bell_delaware
+    assert geo is not None
+    without = solve_shell_tube(_bd(KEROSENE))
+    with_strips = solve_shell_tube(
+        replace(_bd(KEROSENE), bell_delaware=replace(geo, sealing_strips=2))
+    )
+    assert with_strips.h_shell_W_per_m2K > without.h_shell_W_per_m2K
+    assert with_strips.dp_shell_Pa > without.dp_shell_Pa
+
+
+def test_rotated_square_layout() -> None:
+    k = solve_shell_tube(replace(WATER, layout="rotated_square"))
+    assert k.shell.D_e_m == pytest.approx(kern_equivalent_diameter(0.0254, 0.03175, "square"))
+    assert any("cuadrado rotado" in n for n in shell_tube_notes(k))
+    b = solve_shell_tube(_bd(replace(WATER, layout="rotated_square")))
+    assert b.bell_delaware is not None and b.bell_delaware.areas.angle == 45
+    assert not any("cuadrado rotado" in n for n in shell_tube_notes(b))
+
+
+def test_bell_delaware_needs_its_geometry() -> None:
+    with pytest.raises(ValueError, match="L_bb"):
+        solve_shell_tube(replace(_bd(WATER), bell_delaware=None))
+    with pytest.raises(ValueError, match="Método"):
+        solve_shell_tube(replace(WATER, shell_method="tinker"))  # type: ignore[arg-type]
+
+
+def test_baffle_sweeps_with_bell_delaware() -> None:
+    kern = baffle_sweep(WATER)
+    bd = baffle_sweep(_bd(WATER))
+    assert [p.B_m for p in kern] == [p.B_m for p in bd]
+    assert all(b.h_o_W_per_m2K != k.h_o_W_per_m2K for b, k in zip(bd, kern, strict=True))
+    # más separación, menos Δp con los dos métodos
+    assert bd[0].dp_shell_Pa > bd[-1].dp_shell_Pa
+    cut = baffle_cut_sweep(WATER)
+    assert cut[0].baffle_cut == pytest.approx(0.15) and cut[-1].baffle_cut == pytest.approx(0.45)
+    # un corte más grande: menos Δp, y menos tubos en flujo cruzado (J_c baja)
+    assert cut[0].dp_shell_Pa > cut[-1].dp_shell_Pa
+    assert cut[0].J_c > cut[-1].J_c
+    with pytest.raises(ValueError, match="geometría"):
+        baffle_cut_sweep(replace(WATER, bell_delaware=None))
+
+
+def test_bell_delaware_notes() -> None:
+    r = solve_shell_tube(_bd(KEROSENE))
+    notes = shell_tube_notes(r)
+    assert any("J_b" in n and "bypass" in n for n in notes)
+    assert any("tiras" in n for n in notes)
+    assert any(n.startswith("Kern, con las mismas propiedades") for n in notes)
+    assert not any("e+" in n for n in notes)
+    # los bafles que no cierran con el largo de los tubos
+    geo = KEROSENE.bell_delaware
+    assert geo is not None
+    r = solve_shell_tube(replace(_bd(KEROSENE), bell_delaware=replace(geo, B_in_m=1.0)))
+    assert any("Los bafles ocupan" in n for n in shell_tube_notes(r))
+
+
+@pytest.mark.parametrize("system", ["SI", "Técnico", "Inglés"])
+def test_bell_delaware_export(system: str) -> None:
+    data = shell_tube_to_dict(solve_shell_tube(_bd(PETERS)), system)  # type: ignore[arg-type]
+    json.dumps(data)
+    assert data["metodo_casco"] == "Bell–Delaware"
+    for key in ("S_m", "S_w", "J_c", "J_l", "J_b", "J_s", "J_r", "R_l", "R_b", "h_ideal"):
+        assert key in data["casco"]
+    assert data["casco_kern"]["D_e"]
+    assert (
+        data["casco"]["Delta_p"]["unidad"]
+        == {"SI": "Pa", "Técnico": "kPa", "Inglés": "psi"}[system]
+    )
+
+
+@pytest.mark.parametrize("name", list(SHELL_TUBE_EXAMPLES))
+def test_examples_with_bell_delaware_have_no_warnings(name: str) -> None:
+    r = solve_shell_tube(_bd(SHELL_TUBE_EXAMPLES[name].inputs))
+    assert r.warnings == ()

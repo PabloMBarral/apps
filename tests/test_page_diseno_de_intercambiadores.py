@@ -1,8 +1,10 @@
 """Tests de /Diseno_de_Intercambiadores (AppTest).
 
-Fase 12.1. Los tres modos (banco de tubos, doble tubo y casco y tubos con Kern), todos los
-ejemplos en los tres sistemas de unidades, los cambios de arreglo, de constantes, de fluido,
-de lado, de problema y de calibre, los errores, la teoría, el procedimiento y la exportación.
+Fases 12.1 y 12.2. Los tres modos (banco de tubos, doble tubo y casco y tubos con Kern o con
+Bell–Delaware), todos los ejemplos en los tres sistemas de unidades, los cambios de arreglo,
+de constantes, de fluido, de lado, de problema y de calibre, los datos de Bell–Delaware
+(corte, holguras, tiras, carril y extremos), la comparación con Kern, los errores, la
+teoría, el procedimiento y la exportación.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from core.units_system import convert_from_si
 
 PAGE = str(Path(__file__).resolve().parents[1] / "app_pages" / "23_Diseno_de_Intercambiadores.py")
 C = 273.15
-M_BANK, M_DP, M_ST = "Banco de tubos", "Doble tubo", "Casco y tubos (Kern)"
+M_BANK, M_DP, M_ST = "Banco de tubos", "Doble tubo", "Casco y tubos"
 SYSTEMS = ("SI", "Técnico", "Inglés")
 
 
@@ -276,3 +278,168 @@ def test_shell_tube_errors() -> None:
     _mode(at, M_ST)
     at.number_input(key=_wkey(at, "ik_0_PT")).set_value(19.0).run()  # mm: igual a d_o
     assert at.error and "se tocan" in at.error[0].value
+
+
+# ---------------------------------------------------------------------
+# Casco y tubos con Bell–Delaware (Fase 12.2)
+# ---------------------------------------------------------------------
+
+PETERS = "Agua por el casco (Peters, Timmerhaus y West, ejemplo 14-6)"
+KEROSENE = "Enfriador de kerosene con agua de río"
+
+
+def _bell_delaware(at: AppTest, name: str | None = None) -> tuple[AppTest, int]:
+    _mode(at, M_ST)
+    if name is not None:
+        at.selectbox(key="ik_example").set_value(name).run()
+        _no_problems(at)
+    idx = list(stt.SHELL_TUBE_EXAMPLES).index(at.selectbox(key="ik_example").value)
+    at.radio(key=f"ik_{idx}_method").set_value("bell_delaware").run()
+    _no_problems(at)
+    return at, idx
+
+
+def _bd_result(name: str, **geometry: object) -> stt.ShellTubeResult:
+    inputs = replace(stt.SHELL_TUBE_EXAMPLES[name].inputs, shell_method="bell_delaware")
+    if geometry:
+        assert inputs.bell_delaware is not None
+        inputs = replace(inputs, bell_delaware=replace(inputs.bell_delaware, **geometry))
+    return stt.solve_shell_tube(inputs)
+
+
+@pytest.mark.parametrize("system", SYSTEMS)
+@pytest.mark.parametrize("index", range(len(stt.SHELL_TUBE_EXAMPLES)))
+def test_every_shell_tube_example_with_bell_delaware(index: int, system: str) -> None:
+    at = _app()
+    _system(at, system)
+    name = list(stt.SHELL_TUBE_EXAMPLES)[index]
+    _bell_delaware(at, name)
+    r = _bd_result(name)
+    h = convert_from_si(r.h_shell_W_per_m2K, "heat_transfer_coefficient", system)  # type: ignore[arg-type]
+    dp_s = convert_from_si(r.dp_shell_Pa, "pressure_loss", system)  # type: ignore[arg-type]
+    assert _metric(at, "h_o (casco, Bell–Delaware)") == pytest.approx(h, rel=1e-3)
+    assert _metric(at, "Δp del casco") == pytest.approx(dp_s, rel=1e-3)
+    # la cascada, las zonas, los dos barridos y las resistencias; el perfil, con 1 paso
+    charts = 6 if r.inputs.tube_passes == 1 else 5
+    assert len(at.get("plotly_chart")) == charts
+    frames = [df.value for df in at.dataframe]
+    assert any("Kern contra BD" in f.columns for f in frames)
+    titles = [m.value for m in at.markdown]
+    for title in ("#### El lado del casco (Bell–Delaware)", "#### Kern y Bell–Delaware"):
+        assert title in titles
+    assert "#### El lado del casco (Kern)" not in titles
+    tex = _latex(at)
+    assert r"h_o = h_{\text{ideal}}\,J_c\,J_l\,J_b\,J_s\,J_r" in tex  # la teoría
+    assert r"\Delta p_c + \Delta p_w + \Delta p_e" in tex  # el procedimiento
+
+
+def test_bell_delaware_peters_numbers() -> None:
+    at = _app()
+    _system(at, "SI")
+    _bell_delaware(at)
+    # el libro: 3080 W/(m²·K) (+4 %) y 9,48 kPa (el Δp no se reproduce: ver la nota del ejemplo)
+    assert _metric(at, "h_o (casco, Bell–Delaware)") == pytest.approx(3216, rel=2e-3)
+    assert _metric(at, "Δp del casco") == pytest.approx(5912, rel=0.01)  # Pa
+    frames = [df.value for df in at.dataframe]
+    geometry = next(
+        f for f in frames if "Símbolo" in f.columns and "S_m (flujo cruzado)" in set(f["Símbolo"])
+    )
+    row = geometry[geometry["Símbolo"] == "S_m (flujo cruzado)"].iloc[0]
+    assert float(row["Valor"].replace(",", ".")) == pytest.approx(0.02549, rel=1e-3)
+    # la comparación con Kern: Kern da más Δp
+    table = next(f for f in frames if "Kern contra BD" in f.columns)
+    dp_row = table[table["Magnitud"].str.startswith("Δp del casco")].iloc[0]
+    assert dp_row["Kern contra BD"].startswith("+")
+
+
+def test_bell_delaware_inputs_change_the_result() -> None:
+    at = _app()
+    _system(at, "Técnico")
+    at, idx = _bell_delaware(at, KEROSENE)
+    key = f"ik_{idx}"
+    base = _bd_result(KEROSENE)
+    h0 = _metric(at, "h_o (casco, Bell–Delaware)")
+    assert h0 == pytest.approx(base.h_shell_W_per_m2K, rel=1e-3)
+    # dos pares de tiras: el bypass baja menos el h_o
+    at.number_input(key=f"{key}_Nss").set_value(2).run()
+    _no_problems(at)
+    strips = _bd_result(KEROSENE, sealing_strips=2)
+    assert _metric(at, "h_o (casco, Bell–Delaware)") == pytest.approx(
+        strips.h_shell_W_per_m2K, rel=1e-3
+    )
+    assert strips.h_shell_W_per_m2K > base.h_shell_W_per_m2K
+    # el corte
+    at.number_input(key=f"{key}_cut").set_value(35.0).run()
+    _no_problems(at)
+    cut = _bd_result(KEROSENE, sealing_strips=2, baffle_cut=0.35)
+    assert _metric(at, "h_o (casco, Bell–Delaware)") == pytest.approx(
+        cut.h_shell_W_per_m2K, rel=1e-3
+    )
+    # holguras a elección: arrancan con las de TEMA (mismo resultado)
+    at.radio(key=f"{key}_clr").set_value("A elección").run()
+    _no_problems(at)
+    assert _metric(at, "h_o (casco, Bell–Delaware)") == pytest.approx(
+        cut.h_shell_W_per_m2K, rel=1e-3
+    )
+    at.number_input(key=_wkey(at, f"{key}_Lsb")).set_value(1.0).run()  # mm
+    _no_problems(at)
+    tight = _bd_result(KEROSENE, sealing_strips=2, baffle_cut=0.35, L_sb_m=0.001)
+    assert _metric(at, "h_o (casco, Bell–Delaware)") == pytest.approx(
+        tight.h_shell_W_per_m2K, rel=1e-3
+    )
+    # separaciones de los extremos: arrancan en 1,5·B
+    at.checkbox(key=f"{key}_ends").check().run()
+    _no_problems(at)
+    B = stt.SHELL_TUBE_EXAMPLES[KEROSENE].inputs.B_m
+    ends = _bd_result(
+        KEROSENE,
+        sealing_strips=2,
+        baffle_cut=0.35,
+        L_sb_m=0.001,
+        L_tb_m=tight.bell_delaware.areas.L_tb_m,  # type: ignore[union-attr]
+        B_in_m=1.5 * B,
+        B_out_m=1.5 * B,
+    )
+    assert _metric(at, "h_o (casco, Bell–Delaware)") == pytest.approx(
+        ends.h_shell_W_per_m2K, rel=1e-3
+    )
+    frames = [df.value for df in at.dataframe]
+    coef = next(
+        f for f in frames if "Símbolo" in f.columns and "J_s (extremos)" in set(f["Símbolo"])
+    )
+    J_s = coef[coef["Símbolo"] == "J_s (extremos)"].iloc[0]["Valor"]
+    fc = ends.bell_delaware.factors  # type: ignore[union-attr]
+    assert float(J_s.replace(",", ".")) == pytest.approx(fc.J_s, abs=1e-4) and fc.J_s < 1.0
+
+
+def test_bell_delaware_rotated_square() -> None:
+    at = _app()
+    at, idx = _bell_delaware(at)
+    at.radio(key=f"ik_{idx}_layout").set_value("rotated_square").run()
+    _no_problems(at)
+    r = _bd_result(PETERS)
+    rotated = stt.solve_shell_tube(replace(r.inputs, layout="rotated_square"))
+    system = _current_system(at)
+    h = convert_from_si(rotated.h_shell_W_per_m2K, "heat_transfer_coefficient", system)  # type: ignore[arg-type]
+    assert _metric(at, "h_o (casco, Bell–Delaware)") == pytest.approx(h, rel=1e-3)
+    assert "arreglo de 45°" in "\n".join(m.value for m in at.markdown)
+    assert len(at.get("download_button")) == 2
+
+
+def test_bell_delaware_back_to_kern() -> None:
+    at = _app()
+    at, idx = _bell_delaware(at)
+    at.radio(key=f"ik_{idx}_method").set_value("kern").run()
+    _no_problems(at)
+    titles = [m.value for m in at.markdown]
+    assert "#### El lado del casco (Kern)" in titles
+    assert "#### Kern y Bell–Delaware" not in titles
+    assert any(m.label.startswith("h_o (casco, Kern)") for m in at.metric)
+
+
+def test_bell_delaware_errors() -> None:
+    at = _app()
+    at, idx = _bell_delaware(at)
+    at.checkbox(key=f"ik_{idx}_ends").check().run()
+    at.number_input(key=_wkey(at, f"ik_{idx}_Bin")).set_value(0.0).run()
+    assert at.error and "separaciones" in at.error[0].value

@@ -174,6 +174,10 @@ apps/
 │   │                          # revés) y casco y tubos con Kern (BWG, N_t estimado
 │   │                          # o dato, U_C y U_D, el criterio de R_d, h_o y Δp
 │   │                          # contra los bafles).
+│   │                          # Fase 12.2: el casco con Kern o Bell–Delaware (el
+│   │                          # corte, las holguras de TEMA, el bypass y las
+│   │                          # tiras, los extremos; la cascada del h, el Δp por
+│   │                          # zonas, Kern al lado y los barridos con los dos).
 │   └── 99_Acerca.py           # ✅ 0.25.1 — Créditos, cómo citar la app (APA y
 │                              # BibTeX), las fuentes del CITATION.cff por tipo
 │                              # (con búsqueda y la bibliografía .bib), las
@@ -381,10 +385,21 @@ apps/
 │   │   │                      # kern_shell_side, solve_shell_tube (U_C, U_D y el
 │   │   │                      # criterio de R_d), baffle_sweep, notas, ejemplos y
 │   │   │                      # export.
+│   │   │                      # Fase 12.2: shell_method (Kern o Bell–Delaware), el
+│   │   │                      # cuadrado rotado, compare_shell_methods,
+│   │   │                      # baffle_cut_sweep y las notas de Bell–Delaware.
+│   │   ├── bell_delaware.py   # ✅ Fase 12.2 — IDEAL_BANK (j_i y f_i de Taborek a
+│   │   │                      # 30°, 45° y 90°), las holguras de TEMA,
+│   │   │                      # BellDelawareGeometry, bd_areas, bd_factors (J_c,
+│   │   │                      # J_l, J_b, J_s, J_r; R_l, R_b, R_s) y
+│   │   │                      # solve_bell_delaware (h_o y el Δp por zonas).
 │   │   └── exchanger_design_procedure.py # ✅ Fase 12.1 — tube_bank_steps,
 │   │                          # double_pipe_steps y shell_tube_steps (C', el área
 │   │                          # libre y el perímetro mojado, ṁ·c_p con 1000 o
 │   │                          # 3600, g_c y el Δp en Pa y en kPa o psi).
+│   │                          # Fase 12.2: el casco con Bell–Delaware (la
+│   │                          # geometría, las fugas y el bypass, el banco ideal,
+│   │                          # los factores y el Δp por zonas).
 │   ├── gases/                 # ✅ Fase 9.1 (ideales) y 9.2 (reales)
 │   │   ├── ideal.py           # IdealGas (15 gases, NASA-9; el helio con 5/2·R):
 │   │   │                      # cp, h, u, s°, p_r, v_r; model_cp/h/u/s (c_p a
@@ -664,6 +679,8 @@ apps/
 │   └── exchanger_design_charts.py # ✅ Fase 12.1 — friction_chart_figure (el f
 │                              # de Zukauskas con el punto), velocity_sweep_figure
 │                              # y baffle_sweep_figure (dos paneles en log–log).
+│                              # Fase 12.2: h_cascade_figure, dp_zones_figure y
+│                              # methods_sweep_figure (Kern y Bell–Delaware).
 │   └── real_gas_charts.py     # ✅ Fase 9.2 — generalized_chart_figure,
 │                              # z_isotherm_figure, fluid_isotherm_figure,
 │                              # vdw_isotherms_figure (las áreas de Maxwell),
@@ -2123,6 +2140,64 @@ Notas de la Fase 12.1 (diseño de intercambiadores):
   cinco y quedaban «10000» y «100000» junto a «10⁶», así que con una marca por década van
   potencias desde 10⁴); se repitieron los 12 casos con barridos con el servidor
   reiniciado.
+
+Notas de la Fase 12.2 (Bell–Delaware):
+
+- La 12.2 del plan se partió: 12.2 = Bell–Delaware en el modo casco y tubos de
+  /Diseno_de_Intercambiadores, comparado con Kern; 12.3 = compactos, en una página nueva
+  (`/Intercambiadores_Compactos`) y con su propio plan. El modo pasa a «Casco y tubos»
+  con el radio `ik_{e}_method` (Kern por defecto: con Kern, la 0.32.0 queda idéntica,
+  snapshot de 12 casos). Los datos de Bell–Delaware: `…_cut` (en %), `…_Lbb`, `…_clr`
+  (TEMA o a elección: `…_Lsb`, `…_Ltb`), `…_Nss`, `…_Lpl`, `…_ends` (`…_Bin`,
+  `…_Bout`). El método va después del ejemplo: su key lleva el ejemplo.
+- **Fuentes**: Taborek (1983, HEDH §3.3), Bell (1963 y 1988), Thome (2004, *Data Book
+  III*, cap. 3), Serth y Lestina (2014, cap. 6) y TEMA (2007, 9.ª ed., RCB-4.2 y
+  RCB-4.3); Tinker (1951) para las corrientes. El vademecum no tiene el capítulo. Los
+  libros no se pudieron leer desde el contenedor: las formas de los factores se
+  controlaron con ht (cinco funciones) y la tabla de Taborek con su continuidad
+  (≤ 1 % salvo los dos saltos de la tabla original: j a 45° en Re = 10³, +4 %, y a 90°
+  en 10⁴, +5,4 %), que corrigió a₁ = 1,498 a 45° entre 10 y 100 (pychemqt da lo mismo).
+- **La geometría**: D_otl = D_s − L_bb y D_ctl = D_otl − d_o; L_pp = 0,866, 0,707 o 1·P_T
+  y L_tp,ef = 1, 0,707 o 1·P_T (30°, 45°, 90°); θ_ctl = 0 si la cuerda no llega a D_ctl
+  (F_w = 0). L_bb es un dato del equipo (`BUNDLE_CLEARANCE_HINTS`: placas fijas o tubos en
+  U ~10–15 mm, anillo partido ~30–50 mm, extraíble ~80–100 mm); L_sb y L_tb, por defecto
+  los de TEMA (L_tb = 1/64″ si d_o ≤ 1¼″ y el tramo sin apoyo, 2·B, pasa de 36″; si no,
+  1/32″). El cuadrado rotado (45°) es nuevo en `LAYOUTS`: Kern lo trata como el cuadrado
+  (nota), también en el procedimiento.
+- **Los factores** con las formas de Taborek: J_l y R_l con r_s y r_lm; J_b y R_b = 1 si
+  r_ss ≥ ½; en laminar (Re < 100) C_bh = 1,35, C_bp = 4,5, n = ⅓ y n′ = 1, J_r =
+  (10/N_c)^0,18 con Re ≤ 20, interpolado hasta 100 y nunca menos de 0,4, y la ventana
+  laminar con D_w. El Δp: (N_b − 1)·Δp_bi·R_b·R_l + N_b·Δp_wi·R_l + Δp_bi·(1 + N_tcw/N_tcc)·
+  R_b·(R_s,ent + R_s,sal); los «ideales» de cada zona (R_l = R_b = 1) son propiedades del
+  resultado (el gráfico de las zonas).
+- **Peters et al. 14-6** con 405 tubos, L_bb = 33,3 mm y 2 pares de tiras da las áreas del
+  libro (S_m = 0,0255 y S_w = 0,03298 m²), h_ideal −0,7 %, los J a 1–4 % y h_o = 3216
+  contra 3080 W/(m²·K); el Δp da 5,9 contra 9,48 kPa (R_l = 0,36 y R_b = 0,80 son los
+  típicos) y no se testea contra el libro: el autor no tiene el Peters a mano.
+- **Kern contra Bell–Delaware** (cada uno con sus temperaturas, `compare_shell_methods`):
+  el h_o de Kern queda entre −8 % y +48 % del de Bell–Delaware en los ejemplos y su Δp es
+  2,3 a 4,1 veces mayor. Las notas comparan además Kern con las mismas propiedades.
+- **Procedimiento**: cuatro pasos del casco (la geometría con ℓ_m = S_m/B y ℓ_w, la altura
+  de la ventana dentro del haz; las fugas con el agujero d_ag = d_o + L_tb y S_l = S_sb +
+  S_tb; el banco ideal con el tramo de la tabla; los factores con c_l = 0,44·(1 − r_s)) y
+  el Δp por zonas con G_w = ṁ/√(S_m·S_w), y el de los tubos aparte. El U de diseño usa
+  el h_o del método. `vis` cuenta `\arccos` como función. LaTeX: 15 304 expresiones
+  distintas del procedimiento (681 variantes en los tres sistemas) y 547 de la página,
+  KaTeX estricto, máx. 319 y 310 px. Lo que hizo falta: S_sb como (π·D_s·L_sb/2)·
+  (1 − θ_ds/2π), el agujero y S_l en renglones propios, el perímetro mojado de la
+  ventana antes de D_w, ℓ_m partido después de la fracción y Δp_wi con G_w (en el Inglés
+  la fracción con g_c no entraba al lado de (2 + 0,6·N_tcw)).
+- **Gráficos**: la cascada del h (lo que sube en azul, lo que baja en naranja, los
+  totales en gris, como las cascadas de los balances; los factores que valen 1 no
+  aparecen; los rótulos en dos renglones, a 390 px se giraban), las zonas del Δp (el ideal
+  en gris claro, el real en azul) y los barridos con los dos métodos (el color es el
+  método: Bell–Delaware azul, Kern naranja rayado; Kern no ve el corte: una recta). Los
+  quiebres del barrido de los bafles vienen de las tablas (Taborek y TEMA): el texto del
+  gráfico lo dice.
+- Smoke test a 390 y 1280 px: los tres ejemplos con Bell–Delaware (uno por sistema) y el
+  casco con Kern, con la teoría y el procedimiento abiertos, sin errores ni desbordes;
+  después del arreglo de la cascada se repitieron las 6 corridas de Bell–Delaware con el
+  servidor reiniciado.
 
 ### Citas y licencias
 

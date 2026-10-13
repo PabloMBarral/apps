@@ -95,7 +95,7 @@ def numbered(steps: list[ProcedureStep]) -> list[ProcedureStep]:
 ROW = 29.0
 
 _NARROW_CMDS = {",": 0.2, " ": 0.3, ";": 0.3, "quad": 1.0, "qquad": 2.0, "left": 0.0, "right": 0.0}
-_FUNCS = {"sin", "cos", "tan", "cot", "ln", "exp"}
+_FUNCS = {"sin", "cos", "tan", "cot", "ln", "exp", "arccos"}
 
 
 def _group(tex: str, i: int) -> tuple[str, int]:
