@@ -21,7 +21,7 @@ import streamlit as st
 from ui.branding import SUBJECT, sidebar_credits
 from ui.units_ui import render_units_selector
 
-PAGE_VERSION = "0.30.0"
+PAGE_VERSION = "0.31.0"
 
 
 def _home_page() -> None:
@@ -190,6 +190,16 @@ def _home_page() -> None:
           aluminio se siente frío) y los cuerpos de **varias dimensiones**
           por el producto de soluciones, con el calor de Langston (ejemplos
           de Cengel y Ghajar cap. 4 e Incropera cap. 5).
+        - 🫖 **Ebullición y condensación** — la **ebullición en pileta**
+          sobre una placa, un cilindro o una esfera: la **curva de
+          ebullición** con la convección natural, la nucleada (Rohsenow), el
+          **flujo crítico** (Zuber, con Lienhard y Dhir), la transición, el
+          punto de Leidenfrost y la película (Bromley) con la radiación, y
+          qué pasa si te pasás del flujo crítico (el «burnout»); y la
+          **condensación en película** sobre una pared vertical o inclinada
+          (laminar, con ondas o turbulenta), un tubo horizontal, un banco de
+          tubos, una esfera o adentro de un tubo, con el vapor sobrecalentado
+          y las gotas (ejemplos de Cengel y Ghajar cap. 10).
         - ☀️ **Radiación** — el **cuerpo negro** (Planck, Wien y
           Stefan–Boltzmann, la fracción en una banda) y las **superficies
           reales** (ε por bandas y la absortividad para el sol), los
@@ -238,8 +248,7 @@ def _home_page() -> None:
 
         ### En desarrollo
 
-        La ebullición y la condensación, y la exergoeconomía (el costo de
-        la exergía en cada componente). Ver el
+        La exergoeconomía (el costo de la exergía en cada componente). Ver el
         [README](https://github.com/PabloMBarral/apps#m%C3%B3dulos) para
         el roadmap completo.
 
@@ -254,9 +263,9 @@ def _home_page() -> None:
         Btu/(lb·°R)). La selección persiste entre páginas y aplica a
         Propiedades, Isoentrópicos, Rankine, Refrigeración, Psicrometría,
         Combustión, Poder calorífico, Brayton, HRSG, Ciclo combinado,
-        Exergía, Transferencia de calor, Conducción transitoria, Radiación,
-        Intercambiadores, Gases ideales, Gases reales, Primer principio y
-        Segundo principio.
+        Exergía, Transferencia de calor, Conducción transitoria, Ebullición
+        y condensación, Radiación, Intercambiadores, Gases ideales, Gases
+        reales, Primer principio y Segundo principio.
         Interpolación respeta las
         unidades del CSV original; ISO 6976 usa las unidades de la norma.
         """
@@ -285,6 +294,9 @@ pages = [
     st.Page("app_pages/11_Exergia.py", title="Exergía", icon="🔋"),
     st.Page("app_pages/14_Transferencia_de_Calor.py", title="Transferencia de calor", icon="🧱"),
     st.Page("app_pages/21_Conduccion_Transitoria.py", title="Conducción transitoria", icon="⏱️"),
+    st.Page(
+        "app_pages/22_Ebullicion_y_Condensacion.py", title="Ebullición y condensación", icon="🫖"
+    ),
     st.Page("app_pages/15_Radiacion.py", title="Radiación", icon="☀️"),
     st.Page("app_pages/16_Intercambiadores.py", title="Intercambiadores", icon="🔄"),
     st.Page("app_pages/17_Gases_Ideales.py", title="Gases ideales", icon="🎈"),
