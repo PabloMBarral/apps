@@ -79,7 +79,12 @@ def test_condensation_curve_two_panels_for_a_wall() -> None:
     assert fig.layout.yaxis2.type == "log"
     legend = [t.name for t in fig.data if t.showlegend is not False]
     assert {"laminar", "laminar con ondas", "turbulenta", "tus datos"} <= set(legend)
-    assert [s.y0 for s in fig.layout.shapes] == [co.RE_LAMINAR, co.RE_TURBULENT]
+    limits = [t for t in fig.data if t.name in ("Re = 30", "Re = 1800")]
+    assert [t.y[0] for t in limits] == [co.RE_LAMINAR, co.RE_TURBULENT]
+    assert not fig.layout.shapes  # en un eje logarítmico una forma toma la y como exponente
+    # el eje de Re abarca la curva (no 10¹⁸⁰⁰ por una forma mal ubicada)
+    assert max(fig.layout.yaxis2.tickvals) < 1e8
+    assert fig.layout.yaxis.exponentformat == "none"
 
 
 def test_condensation_curve_against_the_diameter() -> None:
@@ -105,6 +110,7 @@ def test_comparison_highlights_the_data() -> None:
     assert current.marker.color == "#eb6834"
     assert current.x[0] == pytest.approx(r.h)
     assert len(fig.data[0].x) + len(current.x) == len(rows)
+    assert "tus datos" in current.y[0] and fig.layout.showlegend is False
     assert all(
         len(line) <= 22 for name in fig.layout.yaxis.categoryarray for line in name.split("<br>")
     )

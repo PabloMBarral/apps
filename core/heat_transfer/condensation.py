@@ -594,41 +594,34 @@ class ComparisonRow:
 
 
 def _comparison_set(i: CondensationInputs) -> list[tuple[str, str, CondensationInputs]]:
+    """Las geometrías de la familia de los datos, con las mismas medidas (los nombres no
+    llevan números: las medidas son las de los datos, en las unidades de la página)."""
     g = i.geometry
     rows: list[tuple[str, str, CondensationInputs]] = []
     if g in ("vertical_plate", "inclined_plate"):
-        L = _fmt(i.L_m)
-        rows.append(
-            ("vertical", f"Vertical ({L} m de alto)", replace(i, geometry="vertical_plate"))
-        )
+        rows.append(("vertical", "Placa vertical", replace(i, geometry="vertical_plate")))
         angles = sorted({30.0, 60.0} | ({i.angle_deg} if g == "inclined_plate" else set()))
         for a in angles:
             rows.append(
                 (
                     f"inclined_{a:g}",
-                    f"Inclinada {_fmt(a)}°",
+                    f"Placa inclinada {_fmt(a)}°",
                     replace(i, geometry="inclined_plate", angle_deg=a),
                 )
             )
         return rows
     if g == "sphere":
-        D = _fmt(i.D_m * 1000.0)
         return [
-            ("sphere", f"Esfera de {D} mm", i),
+            ("sphere", "Esfera", i),
             (
                 "horizontal_tube",
-                f"Tubo horizontal de {D} mm",
+                "Tubo horizontal del mismo D",
                 replace(i, geometry="horizontal_tube"),
             ),
         ]
-    D, L = _fmt(i.D_m * 1000.0), _fmt(i.L_m)
     rows = [
-        ("vertical_tube", f"Tubo vertical ({L} m de alto)", replace(i, geometry="vertical_tube")),
-        (
-            "horizontal_tube",
-            f"Tubo horizontal (D = {D} mm)",
-            replace(i, geometry="horizontal_tube"),
-        ),
+        ("vertical_tube", "Tubo vertical", replace(i, geometry="vertical_tube")),
+        ("horizontal_tube", "Tubo horizontal", replace(i, geometry="horizontal_tube")),
     ]
     if g == "tube_bank" and i.rows > 1:
         rows.append(("tube_bank", f"Banco, {i.rows} tubos por columna", i))

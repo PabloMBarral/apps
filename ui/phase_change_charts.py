@@ -221,7 +221,7 @@ def boiling_curve_figure(
     )
     fig.update_xaxes(
         type="log",
-        title=f"ΔT_e = T_s − T_sat [{dT_unit}]",
+        title=f"ΔT<sub>e</sub> = T<sub>s</sub> − T<sub>sat</sub> [{dT_unit}]",
         gridcolor=_GRID,
         **_log_ticks(xs),
     )
@@ -310,20 +310,32 @@ def condensation_curve_figure(
             row=2,
             col=1,
         )
+        # Los límites de los regímenes como trazas: en un eje logarítmico las formas
+        # (add_hline) toman la y como exponente y el eje llegaba a 10¹⁸⁰⁰.
         for Re_limit in (RE_LAMINAR, RE_TURBULENT):
-            fig.add_hline(
-                y=Re_limit,
-                line={"color": _GRAY, "width": 1.2, "dash": "dot"},
-                annotation_text=f"Re = {Re_limit:.0f}",
-                annotation_position="top left",
-                annotation_font={"color": _GRAY},
+            fig.add_trace(
+                go.Scatter(
+                    x=[xs[0], xs[-1]],
+                    y=[Re_limit, Re_limit],
+                    mode="lines+text",
+                    text=[f"Re = {Re_limit:.0f}", ""],
+                    textposition="top right",
+                    textfont={"color": _GRAY},
+                    line={"color": _GRAY, "width": 1.2, "dash": "dot"},
+                    name=f"Re = {Re_limit:.0f}",
+                    showlegend=False,
+                    hoverinfo="skip",
+                ),
                 row=2,
                 col=1,
             )
+        Re_values = [*curve.Re, RE_LAMINAR, RE_TURBULENT]
         fig.update_yaxes(
-            type="log", title="Re", gridcolor=_GRID, row=2, col=1, **_log_ticks(curve.Re)
+            type="log", title="Re", gridcolor=_GRID, row=2, col=1, **_log_ticks(Re_values)
         )
-        fig.update_yaxes(title=f"h [{h_unit}]", gridcolor=_GRID, row=1, col=1)
+        fig.update_yaxes(
+            title=f"h [{h_unit}]", gridcolor=_GRID, exponentformat="none", row=1, col=1
+        )
         fig.update_xaxes(type="log", gridcolor=_GRID, row=1, col=1, **_log_ticks(xs))
         fig.update_xaxes(
             type="log",
@@ -338,7 +350,7 @@ def condensation_curve_figure(
         fig.update_xaxes(
             type="log", title=f"{x_name} [{x_unit}]", gridcolor=_GRID, **_log_ticks(xs)
         )
-        fig.update_yaxes(title=f"h [{h_unit}]", gridcolor=_GRID)
+        fig.update_yaxes(title=f"h [{h_unit}]", gridcolor=_GRID, exponentformat="none")
         height = 380
     fig.update_layout(
         height=height,
@@ -351,8 +363,9 @@ def condensation_curve_figure(
 
 
 def comparison_figure(rows: Sequence[ComparisonRow], *, h_scale: float, h_unit: str) -> go.Figure:
-    """h de cada geometría con las mismas temperaturas (la de los datos, en naranja)."""
-    names = [_wrap(row.name) for row in rows]
+    """h de cada geometría con las mismas temperaturas (la de los datos, en naranja y con
+    «(tus datos)» en el rótulo: sin leyenda, que a 390 px pisaba el título del eje)."""
+    names = [_wrap(row.name + (" (tus datos)" if row.current else "")) for row in rows]
     fig = go.Figure()
     for current in (False, True):
         sel = [k for k, row in enumerate(rows) if row.current == current]
@@ -372,15 +385,16 @@ def comparison_figure(rows: Sequence[ComparisonRow], *, h_scale: float, h_unit: 
                     "line": {"color": _INK, "width": 1},
                 },
                 name="tus datos" if current else "otras geometrías",
+                showlegend=False,
                 hovertemplate=f"%{{y}}<br>h = %{{x:.4g}} {h_unit}<extra></extra>",
             )
         )
     top = max(row.h for row in rows) * h_scale
     fig.update_layout(
-        height=110 + 52 * len(rows),
+        height=90 + 52 * len(rows),
         margin={"l": 10, "r": 40, "t": 40, "b": 10},
         title={"text": "La misma pared en otras geometrías", "x": 0},
-        legend=_LEGEND_BELOW,
+        showlegend=False,
         separators=", ",
         xaxis={
             "title": f"h [{h_unit}]",
